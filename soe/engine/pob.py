@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import time
 import zlib
@@ -123,6 +124,93 @@ class PoB:
     def recalc(self) -> None:
         self._call(self.api.recalc)
 
+    def node_path(self, node_id: int) -> list[int]:
+        return _lua_to_py(self._call(self.api.node_path, node_id)) or []
+
+    def node_info(self, node_id: int) -> dict | None:
+        return _lua_to_py(self._call(self.api.node_info, node_id))
+
+    # gems / skills
+    def groups(self) -> list[dict]:
+        """Socket groups with gems and the active skills they grant (1-based indexes, like PoB)."""
+        return _lua_to_py(self._call(self.api.list_groups)) or []
+
+    def set_gem(self, group: int, gem: int, **fields) -> bool:
+        """Change name/level/quality/enabled of a gem; gem index past the end adds a new gem."""
+        return bool(self._call(self.api.set_gem, group, gem, json.dumps(fields)))
+
+    def remove_gem(self, group: int, gem: int) -> bool:
+        return bool(self._call(self.api.remove_gem, group, gem))
+
+    def set_main_skill(self, group: int, skill: int = 1) -> bool:
+        return bool(self._call(self.api.set_main, group, skill))
+
+    def all_skill_dps(self) -> list[dict]:
+        """DPS of every active skill in every enabled group (main skill is restored)."""
+        return _lua_to_py(self._call(self.api.all_skill_dps)) or []
+
+    # items
+    def items(self, active_only: bool = False) -> list[dict]:
+        """Equipped items: slot, name, base, rarity, active (used by calcs) and raw text."""
+        res = _lua_to_py(self._call(self.api.list_items)) or []
+        return [i for i in res if i["active"]] if active_only else res
+
+    def resolve_slot(self, slot: str) -> str:
+        """'Weapon 1'/'Weapon 2' -> the slot of the weapon set the build actually uses."""
+        if slot.startswith("Weapon") and not slot.endswith("Swap") and self._call(self.api.uses_second_weapon_set):
+            return slot + " Swap"
+        return slot
+
+    def equip(self, slot: str, raw: str, exact_slot: bool = False):
+        return self._call(self.api.equip, slot if exact_slot else self.resolve_slot(slot), raw)
+
+    def unequip(self, slot: str, exact_slot: bool = False) -> bool:
+        return bool(self._call(self.api.unequip, slot if exact_slot else self.resolve_slot(slot)))
+
+    # config
+    def config_options(self) -> list[dict]:
+        return _lua_to_py(self._call(self.api.config_options)) or []
+
+    def set_config(self, var: str, value) -> None:
+        self._call(self.api.set_config, var, json.dumps(value))
+
+    # ---- snapshot / rollback ----------------------------------------------
+    def snapshot(self) -> str:
+        return self.export_xml()
+
+    def restore(self, snap: str) -> None:
+        self.load_xml(snap)
+
+    @contextmanager
+    def trial(self):
+        """Try changes and roll them back: `with pob.trial(): pob.set_gem(...); s = pob.summary()`."""
+        snap = self.snapshot()
+        try:
+            yield self
+        finally:
+            self.restore(snap)
+
+    # ---- what-if (fast, never changes the build) ----------------------------
+    def whatif(self, *, add_nodes=None, with_path=False, remove_nodes=None, slot=None, item_raw=None,
+               full: bool = False, exact_slot: bool = False) -> dict:
+        """Calculate a hypothetical change with PoB's own calculator.
+
+        add_nodes/remove_nodes: passive node ids (with_path=True also takes the shortest path).
+        slot + item_raw: put that item in the slot; slot alone: empty the slot.
+        'Weapon 1/2' maps to the active weapon set unless exact_slot=True.
+        Returns the summary stats (or every stat with full=True) plus `points` spent.
+        Stats the build no longer has (e.g. DPS with no weapon) are 0.
+        """
+        if slot and not exact_slot:
+            slot = self.resolve_slot(slot)
+        spec = {k: v for k, v in dict(add_nodes=add_nodes, with_path=with_path, remove_nodes=remove_nodes,
+                                       slot=slot, item_raw=item_raw).items() if v}
+        out = _lua_to_py(self._call(self.api.whatif, json.dumps(spec)))
+        points = out.pop("__points", 0)
+        res = out if full else {k: out.get(k, 0) for k in SUMMARY_KEYS}
+        res["points"] = points
+        return res
+
     # ---- results ---------------------------------------------------------
     @property
     def build(self):
@@ -142,7 +230,7 @@ class PoB:
             "level": b.characterLevel,
             "main_skill": self._main_skill_name(),
             "passives_allocated": self._call(self.api.allocated_count),
-            **{k: o[k] for k in SUMMARY_KEYS if k in o},
+            **{k: o.get(k, 0) for k in SUMMARY_KEYS},
         }
 
     def _main_skill_name(self):

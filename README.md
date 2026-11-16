@@ -3,7 +3,7 @@
 Optymalizator buildów do Path of Exile 2, oparty na silniku Path of Building (PoE2) i Claude'zie.
 Plan i harmonogram: [PLAN.md](PLAN.md).
 
-**Status:** faza 0 gotowa. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
+**Status:** faza 0 i 1 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
 
 ## Setup (Windows)
 
@@ -23,7 +23,14 @@ py -m venv .venv
 
 ## Jak to działa
 
-- `soe/engine/pob.py`: klasa `PoB` z metodami: ładowanie (`load_code`, `load_xml`), eksport (`export_code`), zmiany (`set_class`, `set_level`, `paste_gems`, `add_item`, `alloc_node`, `dealloc_node`, `reachable`) i wyniki (`summary`, `output`).
+- `soe/engine/pob.py`: klasa `PoB`, jedna instancja PoB:
+  - **ładowanie i eksport:** `load_code`, `load_xml`, `export_code`, `export_xml`
+  - **wyniki:** `summary()` (najważniejsze staty, brakujące = 0), `output()` (wszystko), `all_skill_dps()` (DPS, DoT i miniony każdego skilla)
+  - **what-if bez zmiany buildu (~130/s na rdzeń):** `whatif(add_nodes=[...], with_path=True)`, `whatif(remove_nodes=[...])`, `whatif(slot="Ring 2", item_raw=...)`, `whatif(slot="Ring 2")` (pusty slot)
+  - **zmiany:** drzewko (`alloc_node`, `dealloc_node`, `reachable`, `node_info`, `node_path`), gemy (`groups`, `set_gem(group, gem, name=/level=/quality=/enabled=)`, `remove_gem`, `set_main_skill`, `paste_gems`), itemy (`items`, `equip`, `unequip`), config (`config_options`, `set_config`), postać (`set_class`, `set_level`)
+  - **cofanie:** `with pob.trial(): ...` (albo `snapshot()` i `restore()`)
+  - „Weapon 1/2” samo trafia w aktywny zestaw broni (swap), `exact_slot=True` wyłącza to mapowanie
+- `soe/engine/pool.py`: `PoBPool` to wiele procesów z tym samym buildem. Zadania to słowniki (`{"call": "whatif", "kwargs": {...}}` albo `{"trial": [[metoda, kwargs], ...]}`). Na 16 rdzeniach daje ~800 what-if/s (`scripts/bench.py`).
 - `soe/engine/lua/soe_api.lua`: jedyne miejsce, które dotyka wnętrzności PoB. Przy aktualizacji PoB naprawiamy tylko ten plik.
 - `soe/engine/lua/bootstrap.lua`: odpala `HeadlessWrapper.lua` z PoB, podpina zlib z Pythona i pure-Lua shim za `lua-utf8`.
 - Nową wersję PoB (np. 1.0 w dniu premiery) ściągasz przez `python scripts/fetch_pob.py <tag>` i zmianę `POB_VERSION`.

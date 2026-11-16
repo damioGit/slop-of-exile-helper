@@ -98,7 +98,7 @@ Konsekwencja: dochodzi warstwa **`api/`** (lokalny serwer HTTP, FastAPI), z któ
 | Faza | Termin | Cel — „gotowe” gdy… |
 |---|---|---|
 | **0. Bootstrap** ✅ | 16.11 | Repo, submoduł PoB2, `lupa` ładuje PoB headless, wklejam kod buildu → dostaję DPS/EHP w JSON. |
-| **1. Engine API** | 19–23.11 | `mutate()` dla node'ów drzewka, gemów, itemów, configu; snapshot/rollback; pula instancji; test wydajności (cel: >20 evali/s). |
+| **1. Engine API** ✅ | 16.11 | `mutate()` dla node'ów drzewka, gemów, itemów, configu; snapshot/rollback; pula instancji; test wydajności (cel: >20 evali/s). |
 | **2. Knowledge Base** | 21–25.11 | SQLite ze wszystkimi gemami/supportami/modami/unikatami/drzewkiem, wyszukiwarka, CLI `soe kb search "fire spell"`. |
 | **3. MCP + Advisor v1** | 24–28.11 | Claude w Claude Code widzi narzędzia, odpowiada na „jak zwiększyć DPS tego buildu” na prawdziwych liczbach. |
 | **4. Optymalizatory** | 26.11–4.12 | Stat weights, optymalizacja drzewka i supportów, raport „top 10 zmian za najmniej”. |
