@@ -5,6 +5,7 @@ Everything returns plain JSON-able dicts. Numbers come from PoB; nothing here gu
 from __future__ import annotations
 
 import threading
+import uuid
 from pathlib import Path
 
 from soe.engine.pob import PoB, SUMMARY_KEYS
@@ -61,6 +62,7 @@ class Session:
         self.name = None
         self.base: dict = {}
         self.original_code: str | None = None
+        self.build_id: str | None = None
 
     # ---- process pool (parallel full recalculations) ------------------------------
     _pool = None
@@ -131,6 +133,7 @@ class Session:
         else:
             self.pob.load_code(text, name)
         self.loaded, self.name = True, name
+        self.build_id = uuid.uuid4().hex[:10]  # lets a client notice that another build was loaded meanwhile
         self.original_code = self.pob.export_code()
         self.base = self.pob.summary()
         return self.base

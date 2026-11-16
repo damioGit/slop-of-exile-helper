@@ -5,6 +5,7 @@ Single user, local only. Long calls (support optimizer, plan) block for their du
 """
 from __future__ import annotations
 
+import json
 import os
 import traceback
 from pathlib import Path
@@ -18,6 +19,43 @@ STATIC = Path(__file__).parent / "static"
 
 app = FastAPI(title="Slop of Exile Helper", docs_url="/api/docs", redoc_url=None)
 session = Session(os.environ.get("SOE_KB") or None)
+# the build the player worked on last; loaded again on start, so a restart never swaps or loses it
+LAST = Path(os.environ.get("SOE_LAST_BUILD") or Path(__file__).resolve().parents[2] / "data" / "user" / "last_session.json")
+
+
+def _save_last():
+    if not session.loaded:
+        return
+    try:
+        LAST.parent.mkdir(parents=True, exist_ok=True)
+        LAST.write_text(json.dumps({"code": session.export_code(), "name": session.name, "source": session.source,
+                                    "original_code": session.original_code}), encoding="utf-8")
+    except Exception:
+        traceback.print_exc()
+
+
+def _restore_last():
+    if not LAST.exists():
+        return
+    try:
+        d = json.loads(LAST.read_text(encoding="utf-8"))
+        with session.lock:
+            session.load(d["original_code"] or d["code"], d.get("name") or "build")
+            if d.get("code") and d.get("code") != d.get("original_code"):  # changes the player applied
+                session.pob.load_code(d["code"], session.name)
+                session.base = session.pob.summary()
+            session.source = d.get("source")
+    except Exception:
+        traceback.print_exc()
+
+
+@app.middleware("http")
+async def _build_header(request: Request, call_next):
+    """Every answer says which build it was computed on; the page compares it with the build it shows."""
+    resp = await call_next(request)
+    if session.build_id:
+        resp.headers["X-SOE-Build"] = session.build_id
+    return resp
 
 
 @app.exception_handler(Exception)
@@ -37,6 +75,12 @@ def locked(fn, *a, **kw):
         return fn(*a, **kw)
 
 
+def _saved(result):
+    with session.lock:
+        _save_last()
+    return result
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
@@ -50,12 +94,12 @@ def status():
     except Exception as e:  # KB not built yet
         meta = {"error": str(e)}
     return {"loaded": session.loaded, "name": session.name, "kb": meta, "source": session.source,
-            "summary": session.base if session.loaded else None}
+            "build_id": session.build_id, "summary": session.base if session.loaded else None}
 
 
 @app.post("/api/load")
 def load(payload: dict = Body(...)):
-    return locked(session.load, payload["code"], payload.get("name") or "build")
+    return _saved(locked(session.load, payload["code"], payload.get("name") or "build"))
 
 
 @app.post("/api/ask")
@@ -83,7 +127,7 @@ def skills():
 
 @app.post("/api/main_skill")
 def main_skill(payload: dict = Body(...)):
-    return locked(session.apply_changes, [{"op": "set_main_skill", "group": payload["group"], "skill": payload["skill"]}])
+    return _saved(locked(session.apply_changes, [{"op": "set_main_skill", "group": payload["group"], "skill": payload["skill"]}]))
 
 
 _TREE_CACHE: dict = {}
@@ -116,17 +160,17 @@ def node_path(id: int):
 
 @app.post("/api/import")
 def import_character(payload: dict = Body(...)):
-    return locked(session.import_character, payload["ref"], payload.get("name") or None)
+    return _saved(locked(session.import_character, payload["ref"], payload.get("name") or None))
 
 
 @app.post("/api/resync")
 def resync():
-    return locked(session.resync)
+    return _saved(locked(session.resync))
 
 
 @app.post("/api/reset")
 def reset():
-    return locked(session.reset)
+    return _saved(locked(session.reset))
 
 
 @app.get("/api/export")
@@ -192,7 +236,7 @@ def try_changes(payload: dict = Body(...)):
 
 @app.post("/api/apply")
 def apply_changes(payload: dict = Body(...)):
-    return locked(session.apply_changes, payload["steps"])
+    return _saved(locked(session.apply_changes, payload["steps"]))
 
 
 @app.get("/api/optimize_supports")
@@ -309,6 +353,7 @@ def main(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False):
                 time.sleep(0.5)
         threading.Thread(target=opener, daemon=True).start()
 
+    _restore_last()
     print(f"Slop of Exile Helper: {url}  (zamknij to okno, żeby wyłączyć)")
     uvicorn.run(app, host=host, port=port, log_level="warning")
 

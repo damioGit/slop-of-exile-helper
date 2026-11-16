@@ -9,10 +9,11 @@ from soe.pipeline.diff import diff_kb, report_md
 
 
 @pytest.fixture(scope="module")
-def client(kb_path, spirit_walker_code):
+def client(kb_path, spirit_walker_code, tmp_path_factory):
     import soe.web.app as web
     from soe.advisor.session import Session
 
+    web.LAST = tmp_path_factory.mktemp("user") / "last_session.json"  # never the player's own file
     web.session = Session(kb_path)
     web.session.pool_workers = 3
     c = TestClient(web.app, raise_server_exceptions=False)
@@ -48,6 +49,26 @@ def test_try_and_apply_and_reset(client):
     assert client.get("/api/status").json()["summary"]["CombinedDPS"] > base["CombinedDPS"]
     client.post("/api/reset", json={})
     assert client.get("/api/status").json()["summary"] == base
+
+
+def test_build_id_and_restore_after_restart(client):
+    import soe.web.app as web
+    from soe.advisor.session import Session
+
+    s = client.get("/api/status")
+    bid = s.json()["build_id"]
+    assert bid and s.headers["X-SOE-Build"] == bid
+    assert client.post("/api/main_skill", json={"group": 1, "skill": 1}).status_code == 200
+    assert web.LAST.exists()
+    applied = web.session.base["main_skill"]
+    old = web.session
+    try:  # a restart loads the same build back, with the changes the player applied
+        web.session = Session(old._kb_path)
+        web._restore_last()
+        assert web.session.loaded and web.session.base["main_skill"] == applied
+        assert web.session.build_id != bid  # a new id: open pages refresh instead of mixing results
+    finally:
+        web.session = old
 
 
 def test_errors_are_json(client):

@@ -189,6 +189,15 @@ function goals() {
 async function api(path, opts = {}) {
   const r = await fetch(path, opts.body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(opts.body)} : {});
   const j = await r.json();
+  const bid = r.headers.get("X-SOE-Build");
+  if (bid && ["/api/load", "/api/import", "/api/resync", "/api/status"].includes(path)) state.buildId = bid;
+  else if (bid && state.buildId && bid !== state.buildId) {
+    // the server has another build than this page shows (loaded in another window or by Claude in the terminal)
+    state.buildId = bid; state.cache = {};
+    toast("Uwaga: na serwerze jest teraz inny build (wczytany w innym oknie albo przez Claude). Pokazuję aktualny, sprawdź nagłówek.");
+    await refreshBadge(); render();
+    throw new Error("build na serwerze się zmienił, wynik pominięty");
+  }
   if (!r.ok || (j && j.error)) throw new Error(j.error || r.statusText);
   return j;
 }
@@ -613,6 +622,7 @@ async function render() {
 async function refreshBadge() {
   const s = await api("/api/status");
   state.loaded = s.loaded;
+  state.buildId = s.build_id;
   state.overview = null;
   $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}` : "· brak bazy wiedzy: uruchom soe kb build";
   api("/api/prices").then(p => { $("#kbInfo").textContent += ` · ceny: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
