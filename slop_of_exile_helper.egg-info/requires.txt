@@ -1,4 +1,0 @@
-lupa>=2.4
-
-[dev]
-pytest>=8

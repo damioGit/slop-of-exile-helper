@@ -7,3 +7,5 @@ data/
 .env
 .claude/settings.local.json
 vendor/
+*.egg-info/
+.pytest_cache/
