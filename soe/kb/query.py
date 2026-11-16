@@ -10,7 +10,8 @@ from soe.kb.build import current_db_path
 
 _JSON_COLS = {
     "tags", "stats_text", "skill_types", "minion_types", "require_types", "add_types", "exclude_types",
-    "family", "weight_keys", "weight_vals", "spawns_on", "req", "props", "implicits", "mods", "stats", "linked",
+    "family", "weight_keys", "weight_vals", "spawns_on", "adds_tags", "req", "props", "implicits", "mods", "stats",
+    "linked",
 }
 
 

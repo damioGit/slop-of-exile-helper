@@ -103,3 +103,19 @@ def test_suggest_combos(s):
     blind = r["payoffs"]["Blind"]["supports"]
     assert blind and blind[0]["support"] == "Blindside" and blind[0]["dps_pct"] > 10
     assert s.pob.summary() == s.base
+
+
+def test_mod_blocking_tags(s):
+    from soe.items.craft import added_tags, can_roll
+
+    # Voltaic Staff itself blocks every non-lightning spell level; a neutral base shows the mod-to-mod block
+    assert "no_cold_spell_mods" in s.kb.base("Voltaic Staff")["tags"]
+    staff = set(s.kb.base("Roaring Staff")["tags"])
+    pool = s.kb.mod_pool("Roaring Staff", 82)
+    light = next(m for m in pool if m["grp"] == "GlobalIncreaseLightningSpellSkillGemLevelWeapon")
+    cold = next(m for m in pool if m["grp"] == "GlobalIncreaseColdSpellSkillGemLevelWeapon")
+    allsp = next(m for m in pool if m["grp"] == "GlobalIncreaseSpellSkillGemLevelWeapon")
+    assert "no_cold_spell_mods" in light["adds_tags"]
+    with_light = staff | added_tags([light])
+    assert can_roll(cold, staff) and not can_roll(cold, with_light)  # lightning levels block cold levels
+    assert can_roll(allsp, with_light)  # but "all spell skills" still fits next to it

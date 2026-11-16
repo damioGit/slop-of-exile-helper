@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
 POINTER = DATA_DIR / "kb.current"  # name of the current database file
 LEGACY_DB = DATA_DIR / "kb.sqlite"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def current_db_path() -> Path:
@@ -46,7 +46,7 @@ CREATE TABLE skills (
 CREATE INDEX skills_name ON skills(name COLLATE NOCASE);
 CREATE TABLE mods (
     id TEXT, domain TEXT, type TEXT, affix TEXT, text TEXT, level INT, grp TEXT,
-    tags TEXT, weight_keys TEXT, weight_vals TEXT, spawns_on TEXT,
+    tags TEXT, weight_keys TEXT, weight_vals TEXT, spawns_on TEXT, adds_tags TEXT,
     PRIMARY KEY (domain, id)
 );
 CREATE INDEX mods_grp ON mods(grp);
@@ -161,9 +161,9 @@ def build(db_path: Path | None = None, game_data: dict | None = None, pob_versio
         spawns = [k for k, v in zip(keys, vals) if v and k != "default"]
         text = " / ".join(m.get("text", []))
         con.execute(
-            "INSERT OR REPLACE INTO mods VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO mods VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (m["id"], m["domain"], m.get("type"), m.get("affix"), text, m.get("level"), m.get("group"),
-             _j(m.get("tags", [])), _j(keys), _j(vals), _j(spawns)),
+             _j(m.get("tags", [])), _j(keys), _j(vals), _j(spawns), _j(m.get("adds_tags", []))),
         )
         search.append(("mod", f"{m['domain']}:{m['id']}", m.get("affix") or m["id"],
                        " ".join([text, m.get("type") or "", m["domain"], " ".join(m.get("tags", [])), " ".join(spawns)])))

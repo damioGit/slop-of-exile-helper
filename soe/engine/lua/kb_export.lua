@@ -121,6 +121,7 @@ function soe.kb_export()
 					id = id, domain = domain, type = m.type, affix = m.affix,
 					text = copyList(m), level = m.level, group = m.group,
 					tags = copyList(m.modTags), weight_keys = copyList(m.weightKey), weight_vals = copyList(m.weightVal),
+					adds_tags = copyList(m.tags),  -- tags the mod puts on the item, e.g. no_cold_spell_mods
 				}
 			end
 		end

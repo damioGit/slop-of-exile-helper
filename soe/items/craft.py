@@ -120,6 +120,32 @@ def _mod_lines(mod: dict) -> list[str]:
     return [resolve_ranges(p) for p in mod["text"].split(" / ")]
 
 
+def mod_weight(mod: dict, tags: set) -> float:
+    """The game's spawn rule: the first weight key in the mod's list that the item has decides
+    (0 = cannot roll). Item tags = base tags + tags added by mods already on it (e.g. no_cold_spell_mods)."""
+    for k, v in zip(mod.get("weight_keys") or [], mod.get("weight_vals") or []):
+        if k in tags:
+            return v
+    return 0
+
+
+def can_roll(mod: dict, tags: set) -> bool:
+    return mod_weight(mod, tags) > 0
+
+
+def added_tags(mods: list[dict]) -> set:
+    out = set()
+    for m in mods:
+        out.update(m.get("adds_tags") or [])
+    return out
+
+
+def _mod_of(ident: tuple, groups) -> dict | None:
+    atype, grp, tier = ident
+    tiers = groups.get((atype, grp))
+    return tiers[max(tier, 1) - 1] if tiers else None
+
+
 def _context(session, slot: str):
     cur = session.item(slot)
     if cur is None:
@@ -138,16 +164,20 @@ def ideal_item(session, slot: str, objective: Objective | None = None, ilvl: int
     cur, head, imp, exp, base, item_lvl = _context(session, slot)
     groups = pool_by_group(kb, base, ilvl or item_lvl)
     real_slot = pob.resolve_slot(slot)
+    base_tags = set((kb.base(base) or {}).get("tags") or [])
     chosen: list[tuple[tuple[str, str], dict]] = []
     counts = {"Prefix": 0, "Suffix": 0}
     lines: list[str] = []
     while counts["Prefix"] < 3 or counts["Suffix"] < 3:
         best = None
+        tags = base_tags | added_tags([m for _, m in chosen])  # mods already picked can block others
         for key, tiers in groups.items():
             atype, _ = key
             if counts[atype] >= MAX_AFFIX[atype] or any(k == key for k, _ in chosen):
                 continue
             top = tiers[0]
+            if not can_roll(top, tags):
+                continue
             w = pob.whatif(slot=real_slot, item_raw=join_item(head, imp, lines + _mod_lines(top)), exact_slot=True)
             sc = obj.score(w, session.base)
             if best is None or sc > best[0]:
@@ -179,19 +209,28 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
     groups = pool_by_group(kb, base, ilvl)
     real_slot = pob.resolve_slot(slot)
     skip_tags = ("{fractured}", "{crafted}", "{desecrated}", "{enchant}", "{rune}")
+    base_tags = set((kb.base(base) or {}).get("tags") or [])
     present: dict[tuple[str, str], int] = {}
     lines_info: list[list] = []
+    line_mods: list[dict | None] = []  # the mod each line is, for the tags it puts on the item
     for i, line in enumerate(exp):
-        if not line.strip() or line.startswith(skip_tags) or _clean(line) in ("Corrupted", "Mirrored"):
+        if not line.strip() or _clean(line) in ("Corrupted", "Mirrored"):
             lines_info.append([])
+            line_mods.append(None)
             continue
         ident = identify(line, groups)
+        line_mods.append(_mod_of(ident[0], groups) if ident else None)
+        if line.startswith(skip_tags):  # fractured/desecrated stay, but still block what they block
+            lines_info.append([])
+            continue
         lines_info.append(ident)
         for atype, grp, _ in ident:
             present.setdefault((atype, grp), i)
     rows, seen = [], set()
     corrupted = any(_clean(x) == "Corrupted" for x in exp)
     for i, idents in enumerate(lines_info):
+        # tags of every other mod on the item: the replacement must still be allowed to roll next to them
+        tags = base_tags | added_tags([m for j, m in enumerate(line_mods) if m and j != i])
         for atype, grp, tier in idents:
             for key, tiers in groups.items():
                 if key[0] != atype or (key in present and present[key] != i):
@@ -206,6 +245,8 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
                 # typical = the middle tier with a middle roll: what you realistically hit or can afford;
                 # top = the best tier with the best roll: the ceiling, usually a lottery
                 typical = tiers[len(tiers) // 2]
+                if not can_roll(typical, tags):
+                    continue  # blocked by another mod on the item (e.g. lightning levels block cold levels)
                 evals = {}
                 for label, mod, mode in (("typical", typical, "mid"), ("top", top, "max")):
                     lines = [resolve_ranges(p, mode) for p in mod["text"].split(" / ")]
