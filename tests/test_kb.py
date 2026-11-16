@@ -1,16 +1,13 @@
 """Knowledge base built from PoB data (built once per test session into a temp file)."""
 import pytest
 
-from soe.kb.build import build, parse_unique
+from soe.kb.build import parse_unique
 from soe.kb.query import KB, can_support, type_expr_match
 
 
-@pytest.fixture(scope="session")
-def kb(tmp_path_factory):
-    path = tmp_path_factory.mktemp("kb") / "kb.sqlite"
-    info = build(path)
-    assert info["gems"] > 500 and info["mods"] > 5000 and info["uniques"] > 300 and info["nodes"] > 3000
-    return KB(path)
+@pytest.fixture(scope="module")
+def kb(kb_path):
+    return KB(kb_path)
 
 
 def test_meta(kb):

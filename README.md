@@ -3,7 +3,7 @@
 Optymalizator buildów do Path of Exile 2, oparty na silniku Path of Building (PoE2) i Claude'zie.
 Plan i harmonogram: [PLAN.md](PLAN.md).
 
-**Status:** fazy 0–2 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
+**Status:** fazy 0–3 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
 
 ## Setup (Windows)
 
@@ -20,6 +20,15 @@ py -m venv .venv
 .venv/Scripts/soe eval <kod buildu PoB>         # podsumowanie: DPS, EHP, resy, atrybuty
 .venv/Scripts/soe eval build.txt --full         # wszystkie staty, które liczy PoB
 ```
+
+## Doradca w Claude Code (MCP)
+
+Serwer `soe` jest zarejestrowany w `.mcp.json`. Claude Code w tym folderze pyta przy starcie, czy go włączyć.
+Wymaga zbudowanej bazy (`soe kb build`). Narzędzia: `load_build`, `build_overview`, `get_item`, `build_config`,
+`whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `export_build`, `reset_build`,
+`kb_search`, `kb_gem`, `kb_supports_for`, `kb_unique`, `kb_mods`, `kb_node`. Zasady odpowiadania są w [CLAUDE.md](CLAUDE.md).
+
+Ręczne uruchomienie: `.venv/Scripts/python -m soe.advisor.server` (stdio).
 
 ## Baza wiedzy
 
