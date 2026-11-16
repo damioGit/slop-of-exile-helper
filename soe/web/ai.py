@@ -35,7 +35,7 @@ TOOL_PL = {
     "find_upgrade": "szukam na trade", "price_check": "ceny poe.ninja", "try_changes": "testuję zmianę",
     "whatif_item": "testuję item", "whatif_passives": "testuję pasywy", "try_unique": "testuję unikat",
     "rank_uniques": "ranking unikatów", "suggest_combos": "synergie", "get_item": "czytam item",
-    "WebSearch": "szukam w sieci", "WebFetch": "czytam stronę",
+    "WebSearch": "szukam w sieci", "WebFetch": "czytam stronę", "ToolSearch": "dobieram narzędzia",
 }
 
 
