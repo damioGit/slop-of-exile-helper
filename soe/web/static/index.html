@@ -93,6 +93,18 @@ pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; backgrou
 .muted { color: var(--muted); } .small { font-size: 12.5px; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
 .slotlist button { margin: 0 6px 6px 0; }
+.eqgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.eqcard { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; background: var(--panel-2); min-width: 0; }
+.eqcard:hover, .eqcard.on { border-color: var(--accent-2); }
+.eqcard .nm { font-weight: 700; overflow-wrap: anywhere; }
+.eqcard.UNIQUE .nm { color: #c06a22; } .eqcard.RARE .nm { color: #b8960c; } .eqcard.MAGIC .nm { color: #4f74b8; }
+.eqcard ul { margin: 4px 0 0; padding-left: 16px; } .eqcard li { overflow-wrap: anywhere; }
+.eqcard .imp { color: var(--info); }
+.verdict { font-weight: 700; } .verdict.warto { color: var(--good); } .verdict.loteria, .verdict.ryzykowne, .verdict.mały { color: var(--warn); }
+.verdict.nie, .verdict.raczej { color: var(--bad); }
+.craftgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.craftgrid > div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+tr.first td { background: color-mix(in srgb, var(--good) 12%, transparent); }
 .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
 .toast.on { opacity: .95; }
@@ -248,13 +260,17 @@ const views = {
       <div class="row">
         <label class="small muted">Skill: <select id="qSkill" style="width:auto">${skills.map(s => `<option value="${s.group}:${s.skill}" ${s.main ? "selected" : ""}>${esc(s.label)}${s.main ? " (główny)" : ""}</option>`).join("")}</select></label>
         <label class="small muted">Cel: <select id="qGoal" style="width:auto"><option value="">z pytania</option><option value="dps">DPS</option><option value="hit">pojedynczy hit (oneshot)</option><option value="survive">przetrwanie</option><option value="clear">clear map</option><option value="mana">mana</option><option value="speed">prędkość ruchu</option></select></label>
+        <label class="small" title="Pytanie idzie do Claude z Twoim buildem i tymi samymi narzędziami. Rozumie dowolne pytania, liczy w PoB, szuka na wiki. Trwa 1–3 min."><input type="checkbox" id="qAi" style="width:auto;vertical-align:middle"> <b>AI</b> (Claude)</label>
         <button id="btnAsk">Zapytaj</button>
       </div>
       <p class="muted small">Liczenie trwa ~20–60 s: sprawdzam supporty, drzewko, gear i unikaty. Budżet bierzemy z pola nad zakładkami albo z pytania („za 5 div”).</p></div>
       <div id="answer"></div>`;
     el.querySelectorAll(".ex").forEach(b => b.onclick = () => { $("#q").value = b.textContent; });
+    try { $("#qAi").checked = localStorage.getItem("soe-ai") === "1"; } catch {}
+    $("#qAi").onchange = e => { try { localStorage.setItem("soe-ai", e.target.checked ? "1" : "0"); } catch {} };
     $("#btnAsk").onclick = e => busy(e.target, async () => {
       const g = goals();
+      if ($("#qAi").checked) return askAi($("#q").value, null);
       const r = await api("/api/ask", {body: {question: $("#q").value, skill: $("#qSkill").value, goal: $("#qGoal").value || null, budget: g.budget}});
       renderAnswer(r);
     });
@@ -364,13 +380,32 @@ const views = {
   },
 
   async gear(el) {
-    const o = state.overview || (state.overview = await api("/api/overview"));
-    const slots = o.items.filter(i => !/^(Flask|Charm)/.test(i.slot));
-    el.innerHTML = `<div class="panel"><h2>Itemy w użyciu</h2><div class="slotlist">${slots.map(i => `<button class="ghost" data-slot="${esc(i.slot)}">${esc(i.slot)}: ${esc(i.name.split(",")[0])}</button>`).join("")}</div></div>
+    const eq = await api("/api/equipment");
+    const order = ["Weapon 1", "Weapon 2", "Weapon 1 Swap", "Weapon 2 Swap", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt"];
+    const rank = s => { const i = order.indexOf(s); return i < 0 ? 99 : i; };
+    const items = eq.items.slice().sort((a, b) => rank(a.slot) - rank(b.slot));
+    const card = i => `<div class="eqcard ${esc((i.rarity || "").toUpperCase())}" data-slot="${esc(i.slot)}">
+      <div class="small muted">${esc(i.slot)}</div><div class="nm">${esc(i.name.split(",")[0])}</div><div class="small muted">${esc(i.base || i.name.split(", ")[1] || "")}</div>
+      <ul class="small">${i.implicits.filter(m => !m.flags.includes("rune")).map(m => `<li class="imp">${esc(m.text)}</li>`).join("")}${i.mods.map(m => `<li>${esc(m.text)}${m.flags.length ? ` <span class="pill check">${esc(m.flags.join(", "))}</span>` : ""}</li>`).join("")}</ul></div>`;
+    el.innerHTML = `<div class="panel"><h2>Ekwipunek (lvl ${esc(eq.level)})</h2>
+      <p class="muted small">Kliknij item: ile daje każdy mod, czy opłaca się exalt / chaos / annul / fracture, lepsze mody, porównanie z innym itemem i szukanie na trade.</p>
+      <div class="eqgrid">${items.filter(i => !/^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div>
+      <details style="margin-top:8px"><summary class="small muted">Flaski i charmy</summary><div class="eqgrid" style="margin-top:8px">${items.filter(i => /^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div></details></div>
+      <div class="panel"><h2>Co wymienić najpierw</h2>
+      <p class="muted small">Dla każdego slotu: co item daje teraz i ile zyskasz na realnym rare na Twój level: najlepsza baza, którą możesz założyć, 3 prefiksy + 3 suffiksy ze środkowych tierów, dobrane pod build. Bez itemów za mirrora. ~5 s.</p>
+      <button id="btnAudit">Sprawdź cały gear</button><div id="auditOut"></div></div>
       <div id="slotOut"></div>
       <div class="panel"><h2>Ile wart jest każdy stat</h2><p class="muted small">Jedna linia dodana do biżuterii, policzona w PoB. Szukaj na gearze statów z góry listy.</p><button id="btnSW">Policz wagi statów</button><div id="swOut"></div></div>
       <div class="panel"><h2>Unikat, który Ci się podoba</h2><div class="row"><input type="text" id="uName" placeholder="np. Headhunter" style="flex:1;min-width:180px"><button id="btnTryU">Sprawdź</button></div><div id="tryUOut"></div></div>`;
-    el.querySelectorAll("[data-slot]").forEach(b => b.onclick = () => slotView(b.dataset.slot));
+    el.querySelectorAll(".eqcard").forEach(b => b.onclick = () => {
+      el.querySelectorAll(".eqcard").forEach(x => x.classList.toggle("on", x === b));
+      slotView(b.dataset.slot); $("#slotOut").scrollIntoView({behavior: "smooth", block: "start"});
+    });
+    $("#btnAudit").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/gear_audit?" + q({damage: g.damage, survive: g.survive}));
+      renderAudit(r);
+    });
     $("#btnSW").onclick = e => busy(e.target, async () => {
       const g = goals();
       const r = await api("/api/stat_weights?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
@@ -453,6 +488,51 @@ function marketCard(m) {
       <pre>${esc([...(b.implicits || []), ...(b.grants_skill || []).map(x => "Grants Skill: " + x), "--", ...(b.mods || [])].join("\n"))}</pre></div>` : ""}
     ${m.warning ? `<div class="small muted">${esc(m.warning)}</div>` : ""}
     <div class="small muted">Szukane: ${esc((m.searched || []).join(" + "))} · znalezionych ofert: ${m.found}</div></div>`;
+}
+
+// ---------------------------------------------------------------- AI (Claude)
+function md(text) {  // small markdown: headings, bold, code, lists, tables, paragraphs
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const out = []; let list = null, table = null;
+  const flush = () => { if (list) { out.push(`<${list.t}>${list.items.map(i => `<li>${inline(i)}</li>`).join("")}</${list.t}>`); list = null; }
+    if (table) { const [h, ...rows] = table; out.push(`<div class="tablewrap"><table><tr>${h.map(c => `<th>${inline(c)}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</table></div>`); table = null; } };
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const ln = raw.trim();
+    if (/^\|.*\|$/.test(ln)) { if (/^\|[\s:|-]+\|$/.test(ln)) continue; if (list) flush(); (table = table || []).push(ln.slice(1, -1).split("|").map(c => c.trim())); continue; }
+    if (table) flush();
+    let m;
+    if ((m = ln.match(/^(#{1,4})\s+(.*)/))) { flush(); out.push(`<h3 style="margin:14px 0 6px">${inline(m[2])}</h3>`); }
+    else if ((m = ln.match(/^[-*]\s+(.*)/))) { if (list && list.t !== "ul") flush(); (list = list || {t: "ul", items: []}).items.push(m[1]); }
+    else if ((m = ln.match(/^\d+[.)]\s+(.*)/))) { if (list && list.t !== "ol") flush(); (list = list || {t: "ol", items: []}).items.push(m[1]); }
+    else if (!ln) flush();
+    else { flush(); out.push(`<p>${inline(ln)}</p>`); }
+  }
+  flush();
+  return out.join("");
+}
+async function askAi(question, resume) {
+  if (!question.trim()) return toast("Napisz pytanie.");
+  const box = $("#answer");
+  const thread = resume ? box : (box.innerHTML = "", box);
+  const card = document.createElement("div");
+  card.className = "panel";
+  card.innerHTML = `<div class="muted small">Ty: ${esc(question)}</div><div class="aiBody"><span class="busy"></span> Claude myśli…</div>`;
+  thread.appendChild(card);
+  let j = await api("/api/ai", {body: {question, resume}});
+  while (j.status === "running") {
+    await new Promise(r => setTimeout(r, 1500));
+    j = await api("/api/ai/" + j.id);
+    const last = j.steps.slice(-4).join(" → ");
+    card.querySelector(".aiBody").innerHTML = `<span class="busy"></span> Claude pracuje (${j.seconds} s)${last ? ": " + esc(last) : "…"}`;
+  }
+  if (j.status === "error") { card.querySelector(".aiBody").innerHTML = `<b class="neg">AI:</b> <pre class="small" style="white-space:pre-wrap">${esc(j.error)}</pre>`; return; }
+  card.querySelector(".aiBody").innerHTML = `<div class="aiAnswer">${md(j.answer)}</div>
+    <p class="muted small">Claude · ${j.seconds} s · ${j.steps.length} wywołań narzędzi. Liczby z PoB pod obecny config.</p>
+    <div class="row"><input class="aiFollow" placeholder="Dopytaj… (np. a co jeśli mam tylko 3 div?)"><button class="aiFollowBtn">Dopytaj</button></div>`;
+  const inp = card.querySelector(".aiFollow"), btn = card.querySelector(".aiFollowBtn");
+  btn.onclick = () => busy(btn, () => askAi(inp.value, j.session));
+  inp.onkeydown = e => { if (e.key === "Enter") btn.click(); };
 }
 
 function renderAnswer(r) {
@@ -575,14 +655,80 @@ function treeView(box, data) {
   };
 }
 
+function gainCell(x) {
+  if (!x) return "–";
+  const parts = [];
+  if (x.dps_pct) parts.push(`DPS ${pct(x.dps_pct)}`);
+  if (x.ehp_pct) parts.push(`EHP ${pct(x.ehp_pct)}`);
+  if (x.move_speed_pct) parts.push(`ruch ${pct(x.move_speed_pct)}`);
+  return parts.join(" · ") || "bez zmian";
+}
+function renderAudit(r) {
+  const firstIdx = r.slots.findIndex(s => (s.realistic || {}).score > 0.5);
+  $("#auditOut").innerHTML = `${firstIdx >= 0
+      ? `<p><b>Wymień najpierw: ${esc(r.slots[firstIdx].slot)}</b> (${esc(r.slots[firstIdx].item.split(",")[0])}). Realny rare na lvl ${r.level} da ${gainCell(r.slots[firstIdx].realistic)}.</p>`
+      : `<p><b>Na tym levelu żaden realny rare nie bije Twojego gearu.</b> Ulepszeń szukaj w modach (kliknij item) albo w droższych itemach z rynku.</p>`}
+    <div class="tablewrap"><table><tr><th>Slot</th><th>Teraz</th><th>Co daje teraz</th><th>Realny rare na lvl ${r.level}</th><th></th></tr>${
+    r.slots.map((s, i) => { const x = s.realistic || {};
+      return `<tr class="${i === firstIdx ? "first" : ""}"><td>${esc(s.slot)}</td><td class="small">${esc(s.item.split(",")[0])}</td>
+        <td class="small">${gainCell(s.item_value)}</td>
+        <td class="small">${x.error ? `<span class="muted">${esc(x.error)}</span>` : x.score > 0.5 ? `<b class="pos">${gainCell(x)}</b>` : `<span class="muted">nie lepszy (${gainCell(x)})</span>`}</td>
+        <td>${x.mods ? `<button class="ghost small" data-audit="${i}">Pokaż</button>` : ""}</td></tr>
+        <tr style="display:none" id="auditRow${i}"><td colspan="5"></td></tr>`; }).join("")}</table></div>
+    <p class="muted small">${esc(r.note)}</p>`;
+  document.querySelectorAll("[data-audit]").forEach(b => b.onclick = () => {
+    const i = +b.dataset.audit, s = r.slots[i], x = s.realistic, row = $("#auditRow" + i);
+    row.style.display = row.style.display ? "" : "none";
+    row.firstElementChild.innerHTML = `<div class="grid2"><div><b>${esc(x.base)}</b> <span class="muted small">(wymaga lvl ${esc(x.base_level ?? "?")}, item level ${x.item_level})</span>
+      <ul class="small">${x.implicit.map(t => `<li class="muted">${esc(t)}</li>`).join("")}${x.mods.map(m => `<li>${esc(m.type)}: <b>${esc(m.text)}</b></li>`).join("")}</ul>
+      ${x.kept_runes.length ? `<p class="muted small">Zostawiam Twoje runy: ${esc(x.kept_runes.join("; "))}</p>` : ""}</div>
+      <div><p class="small">Szukaj na trade itemu z najważniejszymi modami (min. ~80% wartości), każda oferta przeliczona w PoB:</p>
+      <button class="ghost" id="auditTrade${i}">Szukaj na trade</button><div id="auditTradeOut${i}"></div></div></div>`;
+    $("#auditTrade" + i).onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const m = await api("/api/search_items", {body: {slot: s.slot, mods: x.mods.slice(0, 3).flatMap(mm => mm.text.split(" / ")), budget: g.budget, damage: g.damage, survive: g.survive, speed: g.speed}});
+      $("#auditTradeOut" + i).innerHTML = tradeTable(m);
+    });
+  });
+}
+function tradeTable(m) {
+  const best = (m.items || []).find(x => x.score > 0.5);
+  return marketCard({...m, searched: m.searched_mods, best, verdict: best ? `${best.name} za ${best.price}` : "nic lepszego od obecnego w budżecie"})
+    + ((m.items || []).length ? `<div class="tablewrap"><table><tr><th>Item</th><th class="n">Cena</th><th class="n">DPS</th><th class="n">EHP</th></tr>${m.items.map(x => `<tr><td class="small"><b>${esc(x.name)}</b><div class="muted">${esc((x.mods || []).join("; "))}</div></td><td class="n">${esc(x.price)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td></tr>`).join("")}</table></div>` : "");
+}
+function renderAnalysis(a) {
+  const c = a.crafting || {};
+  const vclass = v => esc(String(v || "").split(" ")[0]);
+  const best = list => (list || []).length ? `<ul class="small">${list.slice(0, 4).map(o => `<li>${o.removes ? `<span class="muted">zamiast ${esc(o.removes)}:</span> ` : ""}<b>${esc(o.text)}</b> ${gainCell(o)}</li>`).join("")}</ul>` : "";
+  const price = p => p ? esc(p.text) : "cena nieznana";
+  const cards = [];
+  if (c.exalt) cards.push(`<div><b>Exalted Orb</b> (${price(c.exalt.price)}): <span class="verdict ${vclass(c.exalt.verdict)}">${esc(c.exalt.verdict)}</span>
+    <div class="small">Dodaje losowy mod w wolne miejsce. Szansa na odczuwalny zysk: <b>${c.exalt.chance_pct}%</b>, wtedy średnio +${fmt(c.exalt.gain_if_good, 1)} pkt.</div>${best(c.exalt.best)}</div>`);
+  if (c.chaos) cards.push(`<div><b>Chaos Orb</b> (${price(c.chaos.price)}): <span class="verdict ${vclass(c.chaos.verdict)}">${esc(c.chaos.verdict)}</span>
+    <div class="small">Usuwa losowy mod i dodaje losowy. Szansa, że wyjdzie lepiej: <b>${c.chaos.chance_pct}%</b>${c.chaos.expected_score < 0 ? ", średnio tracisz (może zabrać mocny mod)" : ""}.</div>${best(c.chaos.best)}</div>`);
+  if (c.annul) cards.push(`<div><b>Orb of Annulment</b> (${price(c.annul.price)}): <span class="verdict ${vclass(c.annul.verdict)}">${esc(c.annul.verdict)}</span>
+    <div class="small">Usuwa losowy mod. Szansa, że trafi bezużyteczny: <b>${c.annul.chance_pct}%</b>${c.annul.junk_mods.length ? ` (${esc(c.annul.junk_mods.join("; "))})` : ""}. Potem wolne miejsce na exalta.</div></div>`);
+  if (c.fracture) cards.push(`<div><b>Fracturing Orb</b> (${price(c.fracture.price)}): <span class="verdict ${vclass(c.fracture.verdict)}">${esc(c.fracture.verdict)}</span>
+    <div class="small">Zamraża losowy mod na stałe. Szansa na najcenniejszy (<b>${esc(c.fracture.best_mod)}</b>, ${gainCell(c.fracture.best_value)}): <b>${c.fracture.chance_best_pct}%</b>, na bezużyteczny: ${c.fracture.chance_junk_pct}%. Opłaca się przed dalszym craftem chaosami/annulami.</div></div>`);
+  const af = a.affixes || {};
+  return `<div class="panel"><h2>${esc(a.slot)}: ${esc(a.item)}</h2>
+    <p>Ten item daje Ci: <b>${gainCell(a.item_value)}</b> <span class="muted small">(w porównaniu z pustym slotem)</span></p>
+    <div class="tablewrap"><table><tr><th>Mod</th><th>Typ</th><th class="n">DPS</th><th class="n">EHP</th><th class="n">Wartość</th></tr>${
+      a.mods.map(m => `<tr><td>${esc(m.text)}${m.flags.length ? ` <span class="pill check">${esc(m.flags.join(", "))}</span>` : ""}</td><td class="small muted">${esc(m.type || "?")}${m.tier ? " " + esc(m.tier) : ""}</td>
+        <td class="n">${pct(m.value.dps_pct)}</td><td class="n">${pct(m.value.ehp_pct)}</td><td class="n">${m.value.score < 0.5 ? '<span class="neg">śmieć</span>' : fmt(m.value.score, 1)}</td></tr>`).join("")}</table></div>
+    <p class="muted small">Wartość = ile tracisz bez tego moda (DPS/EHP w %, wynik wg Twoich celów). Wolne miejsca: ${af.open_prefix ?? 0} prefix, ${af.open_suffix ?? 0} suffix.</p>
+    <h3>Crafting na tym itemie</h3>${c.possible === false ? `<p class="muted">${esc(c.why)}</p>` : `<div class="craftgrid">${cards.join("")}</div><p class="muted small">Szanse przy równych wagach modów (prawdziwych wag nie ma w danych PoB): szacunek. Wynik liczony dla środkowego tieru.</p>`}</div>`;
+}
+
 async function slotView(slot) {
   const out = $("#slotOut");
   out.innerHTML = `<div class="panel"><span class="busy"></span> ${esc(slot)}…</div>`;
   const g = goals();
   const gq = q({slot, damage: g.damage, survive: g.survive});
   try {
-    const [item, up, uq] = await Promise.all([api("/api/item?" + q({slot})), api("/api/mod_upgrades?" + gq), api("/api/uniques?" + gq).catch(() => null)]);
-    out.innerHTML = `<div class="panel"><h2>${esc(item.slot)}: ${esc(item.name)}</h2><div class="grid2">
+    const [item, up, uq, an] = await Promise.all([api("/api/item?" + q({slot})), api("/api/mod_upgrades?" + gq), api("/api/uniques?" + gq).catch(() => null),
+      api("/api/item_analysis?" + gq).catch(e => ({error: e.message}))]);
+    out.innerHTML = (an.error ? `<div class="panel muted">Analiza itemu: ${esc(an.error)}</div>` : renderAnalysis(an)) + `<div class="panel"><h2>Ulepszenia i porównanie</h2><div class="grid2">
       <div><pre>${esc(item.raw.replace(/\{[^}]*\}/g, ""))}</pre>
         <h3>Sprawdź inny item (wklej z gry lub trade)</h3><textarea id="wiText" placeholder="Ctrl+C na itemie w grze i wklej tutaj"></textarea><button id="btnWI" style="margin-top:6px">Porównaj</button><div id="wiOut"></div></div>
       <div><h3>Lepsze mody na tym itemie</h3>${up.corrupted ? "<p>Item jest skorumpowany, nie da się go zmienić.</p>" :

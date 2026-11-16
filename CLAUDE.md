@@ -10,6 +10,7 @@ When the user pastes a build code or asks about their build, use the `soe` tools
 1. `load_build` with the code, then `build_overview`. Note the main skill, the active weapon set, the passive point budget, enemy resistances and the config, especially `enemyIsBoss`.
    For "what should I improve?" start with `checkup` (set goal weights from what the player says). On a full tree, use `rank_respec` to find points to move.
    For "what should I change?" use `improvement_plan` (~1 min), or the parts on their own: `optimize_supports` (~25 s), `optimize_tree` (~10–30 s), `stat_weights` (what to look for on gear). Tell the player it takes a moment.
+   Gear: "which item do I replace first?" → `gear_audit` (each slot vs a realistic rare for the character's level). "What is this item worth / should I exalt, chaos, annul or fracture it?" → `item_analysis` (value of every mod, currency odds and prices).
    Items: "I like unique X" → `try_unique`; "best unique for this slot" → `rank_uniques`; "what to craft / how to improve this item" → `mod_upgrades` (per mod, with essences) and `ideal_item` (the ceiling); odds of hitting mods → `craft_odds`. Crafting odds use equal weights and are estimates; say so.
    Synergies: `suggest_combos` shows what the build creates and feeds on, payoffs, enablers, and **config conditions that nothing in the build creates**. Mention those first, because they mean the DPS shown is optimistic.
    Real items: `find_upgrade(slot, wanted_mod, budget_divine)` searches the official trade site, keeps the current item's key mods, and prices and measures every listing in PoB. Use it before suggesting gear the player has to buy, and say plainly when nothing in budget beats the current item.
@@ -42,6 +43,8 @@ When the user pastes a build code or asks about their build, use the `soe` tools
 - Only `soe/engine/lua/soe_api.lua` and `kb_export.lua` touch PoB internals. When updating PoB (`POB_VERSION`), fix those first
 - Lua table fields named `items`/`keys`/`values` must be read as `tbl["items"]` from Python (lupa)
 - Write files with the Write tool, not bash heredocs: the Bash tool here mangles long heredocs
+- The running web app holds the player's own build (saved in `data/user/last_session.json`, restored on start). Never load a build into it from the terminal: test on another port (`SOE_LAST_BUILD` pointing at a scratch file)
+- AI mode of the web assistant: `soe/web/ai.py` runs Claude Code headless (`claude -p`, the player's own login) with the soe MCP tools
 - Web app: `soe/web/app.py` (FastAPI over the same `Session`) + `soe/web/static/index.html` (one file, no build step, Polish UI). Run `soe web`; API docs at /api/docs
 - Real-character check: `scripts/fetch_corpus.py` then `scripts/run_corpus.py` (data/corpus, never commit other players' characters). Run it after engine changes.
 - Launch day: `soe update [tag]` (fetch → engine check on tests/builds → new KB → patch report in data/), `soe compare old new`

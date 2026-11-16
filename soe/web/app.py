@@ -118,6 +118,24 @@ def find_upgrade(payload: dict = Body(...)):
                   _goals(payload.get("damage", 1), payload.get("survive", 1), payload.get("speed", 1)))
 
 
+@app.post("/api/ai")
+def ai_start(payload: dict = Body(...)):
+    """Ask Claude (with the soe tools) about the build open in the app; poll /api/ai/{id}."""
+    from soe.web.ai import jobs
+
+    def run():
+        session._need_build()
+        return jobs.start(payload.get("question") or "", session.export_code(), session.base, payload.get("resume"))
+    return locked(run)
+
+
+@app.get("/api/ai/{job_id}")
+def ai_poll(job_id: str):
+    from soe.web.ai import jobs
+
+    return jobs.view(job_id)
+
+
 @app.get("/api/skills")
 def skills():
     from soe.advisor.assistant import _skill_list
@@ -281,6 +299,51 @@ def mod_upgrades(slot: str, damage: float = 1, survive: float = 1, limit: int = 
     from soe.items.craft import mod_upgrades as mu
 
     return locked(mu, session, slot, _goals(damage, survive), limit)
+
+
+@app.get("/api/gear_audit")
+def gear_audit(damage: float = 1, survive: float = 1):
+    from soe.items.gear import gear_audit as ga
+
+    return locked(ga, session, _goals(damage, survive))
+
+
+@app.get("/api/item_analysis")
+def item_analysis(slot: str, damage: float = 1, survive: float = 1):
+    from soe.items.gear import item_analysis as ia
+
+    return locked(ia, session, slot, _goals(damage, survive))
+
+
+@app.get("/api/equipment")
+def equipment():
+    """Equipped items (the active weapon set) with their mod lines, for the gear view."""
+    from soe.advisor.checkup import split_item
+    from soe.items.craft import _clean
+
+    def run():
+        session._need_build()
+        out = []
+        for it in session.pob.items(active_only=True):
+            head, imp, exp = split_item(it["raw"])
+            flags = lambda ln: [t for t in ("fractured", "desecrated", "crafted", "rune", "enchant") if "{" + t + "}" in ln]
+            out.append({"slot": it["slot"], "name": it["name"], "base": it.get("base"), "rarity": it.get("rarity"),
+                        "implicits": [{"text": _clean(x), "flags": flags(x)} for x in imp if x.strip()],
+                        "mods": [{"text": _clean(x), "flags": flags(x)} for x in exp if x.strip()]})
+        return {"level": session.base.get("level"), "items": out}
+    return locked(run)
+
+
+@app.post("/api/search_items")
+def search_items(payload: dict = Body(...)):
+    """Trade listings with these mods (minimums at ~80% of the given values), each measured in PoB."""
+    from soe.prices.trade import _relaxed, search_items as run
+
+    mods = [_relaxed(m) for m in payload["mods"]]
+    r = locked(run, session, payload["slot"], mods, payload.get("budget"),
+               _goals(payload.get("damage", 1), payload.get("survive", 1), payload.get("speed", 1)))
+    r["searched_mods"] = mods
+    return r
 
 
 @app.get("/api/ideal_item")

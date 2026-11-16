@@ -51,6 +51,23 @@ def test_try_and_apply_and_reset(client):
     assert client.get("/api/status").json()["summary"] == base
 
 
+def test_equipment_and_gear_endpoints(client):
+    eq = client.get("/api/equipment").json()
+    ring = next(i for i in eq["items"] if i["slot"] == "Ring 2")
+    assert any("fractured" in m["flags"] for m in ring["mods"])
+    a = client.get("/api/item_analysis", params={"slot": "Ring 2"}).json()
+    assert "crafting" in a and a["mods"]
+    g = client.get("/api/gear_audit").json()
+    assert g["slots"] and g["level"]
+
+
+def test_ai_cli_override(monkeypatch):
+    from soe.web import ai
+
+    monkeypatch.setenv("SOE_CLAUDE", "C:/nope/claude.exe")
+    assert ai.find_claude() == "C:/nope/claude.exe"
+
+
 def test_build_id_and_restore_after_restart(client):
     import soe.web.app as web
     from soe.advisor.session import Session

@@ -260,6 +260,26 @@ def ideal_item(slot: str, damage: float = 1, survive: float = 1, item_level: int
 
 
 @tool
+def gear_audit(damage: float = 1, survive: float = 1) -> dict:
+    """Which item to replace first: every equipped slot with what the item gives now (vs an empty slot) and a
+    realistic rare for the character's level (best wearable base, 3+3 middle-tier mods for this build) with its
+    gain over the current item. Sorted, first = biggest gain. ~5 s."""
+    from soe.items.gear import gear_audit as ga
+
+    return ga(session, _goals(damage, survive))
+
+
+@tool
+def item_analysis(slot: str, damage: float = 1, survive: float = 1) -> dict:
+    """One item in depth: what each mod is worth to the build (loss without it), free prefixes/suffixes, and
+    whether an Exalted Orb, Chaos Orb, Orb of Annulment or Fracturing Orb is worth it (chance of a noticeable
+    gain, expected result, best outcomes, price). Equal mod weights: estimates."""
+    from soe.items.gear import item_analysis as ia
+
+    return ia(session, slot, _goals(damage, survive))
+
+
+@tool
 def craft_odds(base: str, item_level: int, want_groups: list[str]) -> dict:
     """Chance that one random added prefix/suffix lands in the wanted mod families (names as in
     ideal_item / mod_upgrades 'group'). Equal weights: PoB has no real spawn weights, so it is an estimate."""
