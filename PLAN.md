@@ -46,6 +46,17 @@ Co robi helper, krok po kroku:
 
 Każdy moduł poniżej istnieje po to, żeby ten scenariusz działał.
 
+## 1c. Decyzje (16.11.2026)
+
+| Temat | Decyzja |
+|---|---|
+| Mózg | **Serwer MCP w Claude Code.** Claude woła narzędzia helpera, bez osobnych kosztów API. |
+| UI na premierę | **Lokalna web appka**: wklejasz kod buildu, widzisz staty, drzewko, porównania i plan zmian. Rozmowa idzie przez Claude Code, a appka i MCP korzystają z tego samego backendu, więc to, co policzy Claude, od razu widać w appce. |
+| Priorytety na 11.12 | 1) optymalizacja Twojej postaci, 2) crafting helper, 3) Q&A o mechanikach i combosach. Ranking starterów schodzi na później. |
+| Ceny | Tak, z poe.ninja i trade, od fazy 4. Sugestie typu „najtaniej” w divine/exalt. |
+
+Konsekwencja: dochodzi warstwa **`api/`** (lokalny serwer HTTP, FastAPI), z której korzystają i serwer MCP, i web appka. Faza 6 to UI zamiast rankingu starterów, a pipeline premierowy zostaje, bo i tak trzeba szybko wciągnąć dane 1.0.
+
 ## 2. Architektura
 
 ```
@@ -92,7 +103,7 @@ Każdy moduł poniżej istnieje po to, żeby ten scenariusz działał.
 | **3. MCP + Advisor v1** | 24–28.11 | Claude w Claude Code widzi narzędzia, odpowiada na „jak zwiększyć DPS tego buildu” na prawdziwych liczbach. |
 | **4. Optymalizatory** | 26.11–4.12 | Stat weights, optymalizacja drzewka i supportów, raport „top 10 zmian za najmniej”. |
 | **5. Combo + Crafting** | 1–9.12 | Graf interakcji i sugestie combosów; planer craftu (o ile dane wag modów będą dostępne). |
-| **6. Launch pipeline** | 5–10.12 | Próba generalna na diffie 0.22 → 0.23; skrypt „nowy release → raport” w < 30 min. |
+| **6. Web appka + launch pipeline** | 3–10.12 | Lokalna appka (build, staty, drzewko, plan zmian). Skrypt „nowy release PoB → dane gotowe” w < 30 min, próba na 0.22 → 0.23. |
 | **D-day** | 11.12+ | PoB wypuszcza dane 1.0 → odpalamy pipeline → ranking starterów i aktualizujemy wszystko. |
 
 ## 4. Ryzyka (szczerze)
