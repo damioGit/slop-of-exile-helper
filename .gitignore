@@ -6,3 +6,4 @@ data/
 *.db
 .env
 .claude/settings.local.json
+vendor/

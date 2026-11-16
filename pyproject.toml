@@ -1,0 +1,28 @@
+[project]
+name = "slop-of-exile-helper"
+version = "0.0.1"
+description = "PoE2 build optimizer on top of the Path of Building engine"
+requires-python = ">=3.12"
+dependencies = ["lupa>=2.4"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+soe = "soe.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["soe*"]
+
+[tool.setuptools.package-data]
+"soe.engine" = ["lua/*.lua"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+# LuaJIT on Windows raises SEH code 0xe24c4a02 for every caught Lua error; faulthandler reports it as fatal
+addopts = "-p no:faulthandler"

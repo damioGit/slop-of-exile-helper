@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: slop-of-exile-helper
+Version: 0.0.1
+Summary: PoE2 build optimizer on top of the Path of Building engine
+Requires-Python: >=3.12
+Requires-Dist: lupa>=2.4
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
