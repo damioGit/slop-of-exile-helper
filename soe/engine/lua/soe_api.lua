@@ -210,7 +210,9 @@ function soe.whatif(specJson)
 			override.repItem = item
 		end
 	end
-	local res = scalars(calcFunc(override, false))
+	local out = calcFunc(override, false)
+	local res = scalars(out)
+	res.MinionDPS = out.Minion and (out.Minion.CombinedDPS or out.Minion.TotalDPS) or 0
 	res.__points = points
 	return res
 end

@@ -10,7 +10,7 @@ from pathlib import Path
 from soe.engine.pob import PoB, SUMMARY_KEYS
 
 METRICS = {
-    "dps": "CombinedDPS", "hit_dps": "TotalDPS", "ehp": "TotalEHP", "life": "Life", "es": "EnergyShield",
+    "dps": "MainDPS", "combined_dps": "CombinedDPS", "hit_dps": "TotalDPS", "minion_dps": "MinionDPS", "ehp": "TotalEHP", "life": "Life", "es": "EnergyShield",
     "mana": "Mana", "evasion": "Evasion", "armour": "Armour", "speed": "Speed",
     "phys_max_hit": "PhysicalMaximumHitTaken", "chaos_max_hit": "ChaosMaximumHitTaken",
     "movement": "MovementSpeedMod",

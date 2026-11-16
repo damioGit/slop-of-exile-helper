@@ -17,7 +17,7 @@ DEFAULT_GOALS = {"damage": 2, "survive": 2, "mana": 1, "ease": 1, "speed": 1}
 SEV_W = {"bad": 3, "warn": 2, "info": 1}
 CERT_W = {"sure": 1.0, "likely": 0.8, "check": 0.5}
 # stats compared when deciding whether something "does nothing"
-EFFECT_KEYS = ("CombinedDPS", "TotalEHP", "Life", "EnergyShield", "Mana", "Spirit", "Evasion", "Armour",
+EFFECT_KEYS = ("MainDPS", "CombinedDPS", "TotalEHP", "Life", "EnergyShield", "Mana", "Spirit", "Evasion", "Armour",
                "DeflectChance", "FireResist", "ColdResist", "LightningResist", "ChaosResist",
                "MovementSpeedMod", "ManaRegenRecovery", "LifeRegenRecovery", "EnergyShieldRecharge",
                "Str", "Dex", "Int", "SpiritUnreserved")

@@ -56,8 +56,8 @@ def engine_check(pob_dir: Path = DEST) -> dict:
         try:
             pob.load_code(f.read_text(encoding="utf-8"))
             s = pob.summary()
-            ok = (s.get("Life") or 0) > 0 and (s.get("CombinedDPS") or 0) > 0
-            res["builds"][f.stem] = {"ok": ok, "main_skill": s.get("main_skill"), "dps": round(s.get("CombinedDPS") or 0),
+            ok = (s.get("Life") or 0) > 0 and (s.get("MainDPS") or 0) > 0
+            res["builds"][f.stem] = {"ok": ok, "main_skill": s.get("main_skill"), "dps": round(s.get("MainDPS") or 0),
                                      "ehp": round(s.get("TotalEHP") or 0)}
             res["ok"] &= ok
         except Exception as e:

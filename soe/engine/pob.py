@@ -16,7 +16,7 @@ POB_DIR = ROOT / "vendor" / "PathOfBuilding-PoE2"
 LUA_DIR = Path(__file__).resolve().parent / "lua"
 
 SUMMARY_KEYS = [
-    "TotalDPS", "CombinedDPS", "FullDPS", "AverageHit", "Speed", "CritChance", "CritMultiplier",
+    "MainDPS", "TotalDPS", "CombinedDPS", "MinionDPS", "FullDPS", "AverageHit", "Speed", "CritChance", "CritMultiplier",
     "Life", "EnergyShield", "Ward", "Mana", "Spirit", "Armour", "Evasion",
     "EvadeChance", "DeflectionRating", "DeflectChance",
     "FireResist", "ColdResist", "LightningResist", "ChaosResist",
@@ -39,13 +39,28 @@ def encode_build_code(xml: str) -> str:
     return base64.urlsafe_b64encode(zlib.compress(xml.encode("utf-8"), 9)).decode("ascii")
 
 
+IMMUNE = 1e12  # PoB uses math.huge (inf) for "cannot be hit by this"; inf is not valid JSON
+
+
+def _num(v):
+    if isinstance(v, float) and (v != v or v in (float("inf"), float("-inf"))):
+        return 0.0 if v != v else (IMMUNE if v > 0 else -IMMUNE)
+    return v
+
+
 def _lua_to_py(v):
     if hasattr(v, "items"):  # Lua table
         d = {k: _lua_to_py(x) for k, x in v.items()}
         if d and all(isinstance(k, int) for k in d):
             return [d[k] for k in sorted(d)]
         return d
-    return v
+    return _num(v)
+
+
+def _with_main_dps(d: dict) -> dict:
+    """MainDPS = the main skill's own DPS, or its minions' DPS for minion skills."""
+    d["MainDPS"] = d.get("CombinedDPS") or d.get("MinionDPS") or 0
+    return d
 
 
 class PoB:
@@ -238,7 +253,7 @@ class PoB:
             slot = self.resolve_slot(slot)
         spec = {k: v for k, v in dict(add_nodes=add_nodes, with_path=with_path, remove_nodes=remove_nodes,
                                        slot=slot, item_raw=item_raw).items() if v}
-        out = _lua_to_py(self._call(self.api.whatif, json.dumps(spec)))
+        out = _with_main_dps(_lua_to_py(self._call(self.api.whatif, json.dumps(spec))))
         points = out.pop("__points", 0)
         res = out if full else {k: out.get(k, 0) for k in SUMMARY_KEYS}
         res["points"] = points
@@ -252,7 +267,10 @@ class PoB:
     def output(self) -> dict:
         """Every scalar PoB shows in the sidebar / calcs tab for the main skill."""
         out = self.build.calcsTab.mainOutput
-        return {k: v for k, v in out.items() if isinstance(v, (int, float, bool, str))}
+        res = {k: _num(v) for k, v in out.items() if isinstance(v, (int, float, bool, str))}
+        m = out.Minion
+        res["MinionDPS"] = _num((m.CombinedDPS or m.TotalDPS or 0) if m else 0)
+        return _with_main_dps(res)
 
     def summary(self) -> dict:
         b = self.build

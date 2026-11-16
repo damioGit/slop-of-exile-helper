@@ -291,7 +291,7 @@ const views = {
     $("#btnRank").onclick = e => busy(e.target, async () => {
       const r = await api("/api/rank_passives?" + q({metric: $("#tMetric").value}));
       $("#rankOut").innerHTML = `<div class="tablewrap"><table><tr><th>Pasywka</th><th class="n">Pkt</th><th class="n">Zysk</th><th class="n">DPS Δ</th><th class="n">EHP Δ</th></tr>${
-        r.map(x => `<tr><td title="${esc((x.stats || []).join("\n"))}">${esc(x.node)}${x.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${x.points}</td><td class="n">${pct(x.gain_pct)}</td><td class="n">${fmt(x.d_CombinedDPS)}</td><td class="n">${fmt(x.d_TotalEHP)}</td></tr>`).join("")}</table></div>`;
+        r.map(x => `<tr><td title="${esc((x.stats || []).join("\n"))}">${esc(x.node)}${x.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${x.points}</td><td class="n">${pct(x.gain_pct)}</td><td class="n">${fmt(x.d_MainDPS)}</td><td class="n">${fmt(x.d_TotalEHP)}</td></tr>`).join("")}</table></div>`;
     });
     $("#btnRespec").onclick = e => busy(e.target, async () => {
       const r = await api("/api/rank_respec");

@@ -58,3 +58,24 @@ def test_alloc_dealloc(pob):
     assert pob.summary()["passives_allocated"] == base + cost
     assert pob.dealloc_node(node["id"])
     assert pob.summary()["passives_allocated"] < base + cost
+
+
+def test_minion_main_skill_has_main_dps(pob):
+    pob.new_build()
+    pob.set_class("Witch", "Infernalist")
+    pob.set_level(80)
+    pob.paste_gems("Skeletal Warrior 20/0  1")
+    s = pob.summary()
+    assert s["CombinedDPS"] == 0 and s["MinionDPS"] > 0
+    assert s["MainDPS"] == s["MinionDPS"]
+    w = pob.whatif()
+    assert w["MainDPS"] == pytest.approx(s["MainDPS"])
+
+
+def test_infinite_values_are_finite_json():
+    import json
+
+    from soe.engine.pob import IMMUNE, _lua_to_py
+
+    assert _lua_to_py(float("inf")) == IMMUNE and _lua_to_py(float("nan")) == 0.0
+    json.dumps({"x": _lua_to_py(float("-inf"))}, allow_nan=False)

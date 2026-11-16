@@ -22,7 +22,7 @@ def s(kb_path, spirit_walker_code):
 def test_diff_and_metrics():
     d = diff({"Life": 100, "Mana": 50}, {"Life": 150, "Mana": 50})
     assert d == {"Life": [100, 150, 50, 50.0]}
-    assert metric_key("dps") == "CombinedDPS" and metric_key("TotalEHP") == "TotalEHP"
+    assert metric_key("dps") == "MainDPS" and metric_key("TotalEHP") == "TotalEHP"
     with pytest.raises(ValueError):
         metric_key("nope")
 
@@ -56,7 +56,7 @@ def test_rank_matches_whatif(s):
     assert top and top[0]["per_point"] >= top[-1]["per_point"]
     w = s.whatif_passives(add=[top[0]["id"]])
     assert w["points"] == top[0]["points"]
-    assert w["changes"]["CombinedDPS"][2] == pytest.approx(top[0]["gain"], abs=0.01)
+    assert w["changes"]["MainDPS"][2] == pytest.approx(top[0]["gain"], abs=0.01)
 
 
 def test_whatif_item_and_unchanged_build(s):

@@ -18,7 +18,7 @@ def s(kb_path, spirit_walker_code):
     sess.close_pool()
 
 
-BASE = {"CombinedDPS": 100.0, "TotalEHP": 1000.0, "FireResist": 75, "ColdResist": 60, "LightningResist": 75,
+BASE = {"MainDPS": 100.0, "TotalEHP": 1000.0, "FireResist": 75, "ColdResist": 60, "LightningResist": 75,
         "ChaosResist": 0, "Str": 50, "ReqStr": 40, "Dex": 50, "ReqDex": 0, "Int": 50, "ReqInt": 0,
         "SpiritUnreserved": 5}
 
@@ -26,7 +26,7 @@ BASE = {"CombinedDPS": 100.0, "TotalEHP": 1000.0, "FireResist": 75, "ColdResist"
 def test_objective():
     o = Objective()
     assert o.score(BASE, BASE) == 0
-    assert o.score({**BASE, "CombinedDPS": 110.0}, BASE) == pytest.approx(9.53, abs=0.01)
+    assert o.score({**BASE, "MainDPS": 110.0}, BASE) == pytest.approx(9.53, abs=0.01)
     dmg_only = Objective(damage=1, survive=0)
     assert dmg_only.score({**BASE, "TotalEHP": 2000.0}, BASE) == 0
     # losing resistance below what you had costs; going from 60 to 55 cold costs 5 * 2

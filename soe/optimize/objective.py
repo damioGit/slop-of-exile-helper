@@ -18,7 +18,7 @@ class Objective:
     damage: float = 1.0
     survive: float = 1.0
     speed: float = 1.0            # movement speed (mapping comfort); 0 to ignore
-    dps_key: str = "CombinedDPS"
+    dps_key: str = "MainDPS"            # own DPS, or minion DPS for minion main skills
     ehp_key: str = "TotalEHP"
     speed_key: str = "MovementSpeedMod"
     res_penalty: float = 2.0      # per resistance point lost below min(before, cap)
