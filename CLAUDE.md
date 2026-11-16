@@ -36,3 +36,6 @@ When the user pastes a build code or asks about their build, use the `soe` tools
 - Only `soe/engine/lua/soe_api.lua` and `kb_export.lua` touch PoB internals. When updating PoB (`POB_VERSION`), fix those first
 - Lua table fields named `items`/`keys`/`values` must be read as `tbl["items"]` from Python (lupa)
 - Write files with the Write tool, not bash heredocs: the Bash tool here mangles long heredocs
+- Web app: `soe/web/app.py` (FastAPI over the same `Session`) + `soe/web/static/index.html` (one file, no build step, Polish UI). Run `soe web`; API docs at /api/docs
+- Launch day: `soe update [tag]` (fetch → engine check on tests/builds → new KB → patch report in data/), `soe compare old new`
+- Check-up and optimizer texts are English (MCP clients translate); the web UI shows them as they are

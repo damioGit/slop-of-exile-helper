@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slop of Exile Helper</title>
+<style>
+:root {
+  --bg: #f4f1ea; --panel: #fffdf8; --panel-2: #efe9dd; --text: #1d1a16; --muted: #6b6358; --line: #ddd3c2;
+  --accent: #a4561c; --accent-2: #c9782f; --good: #2f7d4a; --bad: #b2302a; --warn: #b07a12; --info: #3f6c9e;
+  --fire: #c4471d; --cold: #2f7fb8; --light: #b8950f; --chaos: #8a3f9e; --phys: #7a6a58;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.05);
+  --radius: 10px; --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14120f; --panel: #1d1a16; --panel-2: #26221c; --text: #ece5d8; --muted: #a39886; --line: #3a342b;
+    --accent: #e08a3c; --accent-2: #f0a35a; --good: #5cbf7c; --bad: #e0605a; --warn: #e0b040; --info: #6fa3dc;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14120f; --panel: #1d1a16; --panel-2: #26221c; --text: #ece5d8; --muted: #a39886; --line: #3a342b;
+  --accent: #e08a3c; --accent-2: #f0a35a; --good: #5cbf7c; --bad: #e0605a; --warn: #e0b040; --info: #6fa3dc;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 var(--sans); }
+a { color: var(--accent); }
+button, select, input, textarea { font: inherit; color: inherit; }
+button {
+  background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: .5em .9em; cursor: pointer;
+  font-weight: 600; white-space: nowrap;
+}
+button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button:disabled { opacity: .5; cursor: progress; }
+textarea, input[type=text], select {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .5em .6em; width: 100%;
+}
+textarea { font-family: var(--mono); font-size: 12px; min-height: 90px; resize: vertical; }
+header {
+  position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line);
+  padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+header h1 { font-size: 17px; margin: 0; letter-spacing: .3px; }
+header h1 span { color: var(--accent); }
+.badge { display: inline-flex; gap: 6px; align-items: center; background: var(--panel-2); border-radius: 999px;
+  padding: 3px 10px; font-size: 13px; color: var(--muted); }
+.badge b { color: var(--text); }
+.spacer { flex: 1; }
+main { max-width: 1180px; margin: 0 auto; padding: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 16px; margin-bottom: 14px; }
+.panel h2 { font-size: 15px; margin: 0 0 10px; }
+.panel h3 { font-size: 14px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; }
+.goals label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; }
+.goals input { width: 100%; accent-color: var(--accent); }
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; margin: 4px 0 14px; scrollbar-width: thin; }
+nav.tabs button { background: transparent; color: var(--muted); border: 1px solid transparent; font-weight: 600; }
+nav.tabs button.on { background: var(--panel); color: var(--text); border-color: var(--line); box-shadow: var(--shadow); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.tile { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
+.tile .k { font-size: 12px; color: var(--muted); }
+.tile .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gauge { display: grid; grid-template-columns: 90px 1fr 60px; gap: 8px; align-items: center; margin: 5px 0; font-size: 13px; }
+.bar { height: 10px; background: var(--panel-2); border-radius: 99px; overflow: hidden; position: relative; }
+.bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; }
+.bar .cap { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .5; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+.finding { border: 1px solid var(--line); border-left: 4px solid var(--info); border-radius: 8px; padding: 10px 12px; margin: 8px 0;
+  background: var(--panel); }
+.finding.bad { border-left-color: var(--bad); } .finding.warn { border-left-color: var(--warn); }
+.finding h4 { margin: 0 0 4px; font-size: 14.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.finding p { margin: 3px 0; font-size: 13.5px; }
+.finding ul { margin: 4px 0 0 18px; padding: 0; font-size: 13.5px; }
+.pill { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 1px 7px; border-radius: 99px;
+  background: var(--panel-2); color: var(--muted); }
+.pill.sure { color: var(--good); } .pill.likely { color: var(--warn); } .pill.check { color: var(--info); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { background: var(--panel-2); border-radius: 99px; padding: 2px 10px; font-size: 12.5px; }
+.chip.warn { background: color-mix(in srgb, var(--warn) 18%, var(--panel)); }
+.chip.dead { text-decoration: line-through; color: var(--bad); }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; background: var(--panel-2); padding: 8px; border-radius: 8px; margin: 6px 0; }
+.muted { color: var(--muted); } .small { font-size: 12.5px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.slotlist button { margin: 0 6px 6px 0; }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
+.toast.on { opacity: .95; }
+.busy { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 30px 10px; color: var(--muted); }
+@media (max-width: 600px) {
+  main { padding: 10px; } header { padding: 8px 10px; } .gauge { grid-template-columns: 70px 1fr 48px; }
+  .tile .v { font-size: 17px; } th, td { padding: 5px 6px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Slop of <span>Exile</span> Helper</h1>
+  <span id="buildBadge" class="badge">brak buildu</span>
+  <span class="spacer"></span>
+  <button class="ghost" id="btnExport" title="Skopiuj kod buildu do PoB">Kod PoB</button>
+  <button class="ghost" id="btnReset" title="Cofnij zastosowane zmiany">Reset</button>
+  <button class="ghost" id="btnTheme" title="Motyw">◐</button>
+</header>
+<main>
+  <details class="panel" id="loadPanel" open>
+    <summary><b>Wczytaj build</b> <span id="kbInfo" class="muted small"></span></summary>
+    <textarea id="code" style="margin-top:10px" placeholder="Wklej kod z Path of Building (Import/Export → Generate → Copy) albo XML"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="btnLoad">Wczytaj</button>
+    </div>
+  </details>
+
+  <section class="panel">
+    <div class="goals">
+      <div><label>Obrażenia <b id="gDamageV">2</b></label><input id="gDamage" type="range" min="0" max="3" step="0.5" value="2"></div>
+      <div><label>Przetrwanie <b id="gSurviveV">2</b></label><input id="gSurvive" type="range" min="0" max="3" step="0.5" value="2"></div>
+      <div><label>Prędkość ruchu <b id="gSpeedV">1</b></label><input id="gSpeed" type="range" min="0" max="3" step="0.5" value="1"></div>
+      <div><label>Mana <b id="gManaV">1</b></label><input id="gMana" type="range" min="0" max="3" step="0.5" value="1"></div>
+    </div>
+  </section>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="checkup" class="on">Check-up</button>
+    <button data-tab="overview">Przegląd</button>
+    <button data-tab="skills">Skille</button>
+    <button data-tab="gear">Gear</button>
+    <button data-tab="tree">Drzewko</button>
+    <button data-tab="combo">Combo</button>
+    <button data-tab="plan">Plan</button>
+    <button data-tab="search">Szukaj</button>
+  </nav>
+  <div id="view"><div class="panel empty">Wklej kod buildu, żeby zacząć.</div></div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = (v, d = 0) => v == null ? "–" : (typeof v === "number" ? v.toLocaleString("pl-PL", {maximumFractionDigits: d}) : esc(v));
+const pct = v => v == null ? "–" : `<span class="${v > 0 ? "pos" : v < 0 ? "neg" : ""}">${v > 0 ? "+" : ""}${fmt(v, 1)}%</span>`;
+const STAT_PL = {CombinedDPS: "DPS (łączny)", TotalDPS: "DPS (hit)", TotalEHP: "EHP", Life: "Życie", EnergyShield: "Energy Shield",
+  Mana: "Mana", Spirit: "Spirit", Evasion: "Evasion", Armour: "Armour", EvadeChance: "Unik %", DeflectChance: "Deflect %",
+  DeflectionRating: "Deflection", FireResist: "Res. ogień", ColdResist: "Res. zimno", LightningResist: "Res. błyskawice",
+  ChaosResist: "Res. chaos", Speed: "Ataki/s", CritChance: "Crit %", CritMultiplier: "Crit mnożnik", AverageHit: "Średni hit",
+  MovementSpeedMod: "Prędkość ruchu", SpiritUnreserved: "Wolny spirit", SpiritReserved: "Zarezerwowany spirit",
+  ManaPerSecondCost: "Koszt many/s", ManaRegenRecovery: "Regen many/s", Str: "Siła", Dex: "Zręczność", Int: "Inteligencja"};
+const SLOTS = ["Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt"];
+
+let state = {tab: "checkup", loaded: false, overview: null, cache: {}};
+
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 2200); }
+function goals() {
+  return {damage: +$("#gDamage").value, survive: +$("#gSurvive").value, speed: +$("#gSpeed").value, mana: +$("#gMana").value};
+}
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts.body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(opts.body)} : {});
+  const j = await r.json();
+  if (!r.ok || (j && j.error)) throw new Error(j.error || r.statusText);
+  return j;
+}
+const q = o => new URLSearchParams(Object.entries(o).filter(([, v]) => v != null && v !== "")).toString();
+
+async function busy(btn, fn) {
+  const old = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = `<span class="busy"></span> ${old}`; }
+  try { return await fn(); } catch (e) { toast("Błąd: " + e.message); console.error(e); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = old; } }
+}
+
+function diffTable(changes) {
+  const rows = Object.entries(changes || {});
+  if (!rows.length) return `<p class="muted small">Brak zmian w statach.</p>`;
+  return `<div class="tablewrap"><table><tr><th>Stat</th><th class="n">Przed</th><th class="n">Po</th><th class="n">Zmiana</th></tr>${
+    rows.map(([k, [a, b, d, p]]) => `<tr><td>${esc(STAT_PL[k] || k)}</td><td class="n">${fmt(a, 1)}</td><td class="n">${fmt(b, 1)}</td><td class="n">${p == null ? fmt(d, 1) : pct(p)}</td></tr>`).join("")
+  }</table></div>`;
+}
+function notes(list) { return (list || []).length ? `<ul class="small muted">${list.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""; }
+
+async function applySteps(steps, btn) {
+  if (!steps || !steps.length) return;
+  await busy(btn, async () => {
+    const r = await api("/api/apply", {body: {steps}});
+    state.cache = {};
+    await refreshBadge();
+    toast("Zastosowano. Nowy kod buildu w przycisku „Kod PoB”.");
+    render();
+    return r;
+  });
+}
+
+// ---------------------------------------------------------------- views
+const views = {
+  async checkup(el) {
+    const g = goals();
+    const r = await api("/api/checkup?" + q(g));
+    el.innerHTML = `<div class="panel"><h2>Co hamuje build</h2><p class="muted small">Kolejność według Twoich celów (suwaki). Wszystko policzone w Path of Building.</p>${
+      r.findings.map(f => `<div class="finding ${f.severity}"><h4>${esc(f.title)} <span class="pill ${f.certainty}">${{sure: "pewne", likely: "prawdopodobne", check: "do sprawdzenia"}[f.certainty]}</span></h4>
+        <p>${esc(f.why)}</p><p><b>Zysk:</b> ${esc(f.effect)}</p><ul>${f.action.map(a => `<li>${esc(a)}</li>`).join("")}</ul>
+        ${Object.keys(f.data || {}).length ? `<details><summary>szczegóły</summary><pre>${esc(JSON.stringify(f.data, null, 1))}</pre></details>` : ""}</div>`).join("") || `<p>Nic nie znaleziono.</p>`
+    }<p class="muted small">${esc(r.credit)}</p></div>`;
+  },
+
+  async overview(el) {
+    const o = state.overview || (state.overview = await api("/api/overview"));
+    const s = o.summary;
+    const tiles = [["DPS", s.CombinedDPS], ["EHP", s.TotalEHP], ["Życie", s.Life], ["Energy Shield", s.EnergyShield],
+      ["Mana", s.Mana], ["Spirit", `${fmt(s.SpiritReserved)} / ${fmt(s.Spirit)}`], ["Evasion", s.Evasion], ["Armour", s.Armour],
+      ["Unik", s.EvadeChance != null ? s.EvadeChance + "%" : "–"], ["Deflect", s.DeflectChance != null ? s.DeflectChance + "%" : "–"],
+      ["Ruch", s.MovementSpeedMod ? Math.round(s.MovementSpeedMod * 100) + "%" : "–"], ["Ataki/s", s.Speed]];
+    const res = [["Ogień", s.FireResist, "--fire"], ["Zimno", s.ColdResist, "--cold"], ["Błyskawice", s.LightningResist, "--light"], ["Chaos", s.ChaosResist, "--chaos"]];
+    const hits = ["Physical", "Fire", "Cold", "Lightning", "Chaos"].map(t => [t, s[t + "MaximumHitTaken"]]);
+    const maxHit = Math.max(...hits.map(h => h[1] || 0), 1);
+    const hitCol = {Physical: "--phys", Fire: "--fire", Cold: "--cold", Lightning: "--light", Chaos: "--chaos"};
+    const pts = o.passive_points;
+    el.innerHTML = `<div class="panel"><h2>${esc(s.class)} · ${esc(s.ascendancy)} · lvl ${s.level} · ${esc(s.main_skill)}</h2>
+      <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${typeof v === "number" ? fmt(v, v < 10 ? 2 : 0) : v}</div></div>`).join("")}</div></div>
+      <div class="grid2">
+        <div class="panel"><h2>Odporności</h2>${res.map(([k, v, c]) => `<div class="gauge"><span>${k}</span><div class="bar"><i style="width:${Math.max(0, Math.min(100, (v + 60) / 1.6))}%;background:var(${c})"></i><span class="cap" style="left:${(75 + 60) / 1.6}%"></span></div><b class="n">${v}%</b></div>`).join("")}
+          <p class="muted small">Kreska = cap 75%. Wróg: ${Object.entries(o.enemy || {}).map(([k, v]) => `${k} ${fmt(v)}`).join(", ")}</p></div>
+        <div class="panel"><h2>Największy hit, który przeżyjesz</h2>${hits.map(([k, v]) => `<div class="gauge"><span>${k}</span><div class="bar"><i style="width:${(v || 0) / maxHit * 100}%;background:var(${hitCol[k]})"></i></div><b class="n">${fmt(v)}</b></div>`).join("")}</div>
+        <div class="panel"><h2>Punkty pasywne</h2><p>Wydane <b>${pts.used}</b> z <b>${pts.available}</b> · zestawy broni ${pts.weapon_set_1}/${pts.weapon_set_2} (max ${pts.weapon_set_max}) · ascendancy ${pts.ascendancy_used}/${pts.ascendancy_max}</p>
+          <p class="muted small">Aktywny zestaw broni: ${pts.active_weapon_set}. ${esc(pts.note || "")}</p></div>
+        <div class="panel"><h2>Config w PoB</h2><div class="chips">${Object.entries(o.config).filter(([, v]) => v != null && v !== false).map(([k, v]) => `<span class="chip">${esc(k)}: ${esc(v)}</span>`).join("")}</div></div>
+      </div>`;
+  },
+
+  async skills(el) {
+    const o = state.overview || (state.overview = await api("/api/overview"));
+    el.innerHTML = `<div class="panel"><h2>DPS każdego skilla</h2><div class="tablewrap"><table><tr><th>Skill</th><th class="n">Hit DPS</th><th class="n">DoT</th><th class="n">Minion</th><th class="n">Ataki/s</th></tr>${
+      o.skill_dps.map(d => `<tr><td>${esc(d.name)} <span class="muted small">gr. ${d.group}</span></td><td class="n">${fmt(d.TotalDPS)}</td><td class="n">${fmt(d.TotalDotDPS)}</td><td class="n">${fmt(d.MinionDPS)}</td><td class="n">${fmt(d.Speed, 2)}</td></tr>`).join("")
+    }</table></div></div>
+    <div class="panel"><h2>Grupy gemów</h2>${o.skill_groups.filter(g => g.gems.length).map(g => `<div style="margin:8px 0"><b>${g.group}.</b> ${g.main ? '<span class="pill sure">główny</span> ' : ""}${esc(g.skills.join(", ") || "—")} <span class="muted small">${esc(g.slot || "")}</span>
+      <div class="chips" style="margin-top:4px">${g.gems.map(x => `<span class="chip ${/nie|cannot/.test(x) ? "dead" : ""}">${esc(x)}</span>`).join("")}</div></div>`).join("")}</div>
+    <div class="panel"><h2>Optymalizator supportów (główny skill)</h2><p class="muted small">Każdy pasujący support w każdym slocie, pełne przeliczenia PoB. Trwa ~25 s.</p>
+      <button id="btnSup">Szukaj najlepszych supportów</button><div id="supOut"></div></div>`;
+    $("#btnSup").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/optimize_supports?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
+      const c = r.best_combination;
+      $("#supOut").innerHTML = `<h3>Wartość obecnych supportów (bez niego)</h3><div class="tablewrap"><table><tr><th>Support</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
+        Object.entries(r.current_supports).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${pct(v.dps_pct)}</td><td class="n">${pct(v.ehp_pct)}</td></tr>`).join("")}</table></div>
+        ${c ? `<h3>Najlepszy zestaw zmian (sprawdzony razem)</h3><p>${c.swaps.map(s => `${esc(s.replace)} → <b>${esc(s.with)}</b>`).join("<br>")}</p><p>DPS ${pct(c.dps_pct)} · EHP ${pct(c.ehp_pct)}</p><button id="btnSupApply">Zastosuj</button>` : "<p>Brak lepszego zestawu.</p>"}
+        <h3>Najlepsze pojedyncze (etap 1)</h3><div class="chips">${r.stage1_top.map(x => `<span class="chip">${esc(x.support)} ${pct(x.dps_pct)}</span>`).join("")}</div>
+        <p class="muted small">${esc(r.note)} · ${r.evaluated} przeliczeń w ${r.seconds} s</p>`;
+      if (c) $("#btnSupApply").onclick = ev => applySteps(c.apply_steps, ev.target);
+    });
+  },
+
+  async gear(el) {
+    const o = state.overview || (state.overview = await api("/api/overview"));
+    const slots = o.items.filter(i => !/^(Flask|Charm)/.test(i.slot));
+    el.innerHTML = `<div class="panel"><h2>Itemy w użyciu</h2><div class="slotlist">${slots.map(i => `<button class="ghost" data-slot="${esc(i.slot)}">${esc(i.slot)}: ${esc(i.name.split(",")[0])}</button>`).join("")}</div></div>
+      <div id="slotOut"></div>
+      <div class="panel"><h2>Ile wart jest każdy stat</h2><p class="muted small">Jedna linia dodana do biżuterii, policzona w PoB. Szukaj na gearze statów z góry listy.</p><button id="btnSW">Policz wagi statów</button><div id="swOut"></div></div>
+      <div class="panel"><h2>Unikat, który Ci się podoba</h2><div class="row"><input type="text" id="uName" placeholder="np. Headhunter" style="flex:1;min-width:180px"><button id="btnTryU">Sprawdź</button></div><div id="tryUOut"></div></div>`;
+    el.querySelectorAll("[data-slot]").forEach(b => b.onclick = () => slotView(b.dataset.slot));
+    $("#btnSW").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/stat_weights?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
+      $("#swOut").innerHTML = `<div class="tablewrap"><table><tr><th>Stat</th><th class="n">DPS</th><th class="n">EHP</th><th class="n">Wynik</th></tr>${
+        r.weights.map(w => `<tr><td>${esc(w.stat)}</td><td class="n">${pct(w.dps_pct)}</td><td class="n">${pct(w.ehp_pct)}</td><td class="n">${fmt(w.score, 2)}</td></tr>`).join("")}</table></div><p class="muted small">${esc(r.note)}</p>`;
+    });
+    $("#btnTryU").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/try_unique?" + q({name: $("#uName").value, damage: g.damage, survive: g.survive}));
+      $("#tryUOut").innerHTML = `<h3>${esc(r.unique)} (${esc(r.base)}) w ${esc(r.slot)} zamiast ${esc(r.replaces || "pustego slotu")}</h3>
+        <p>DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}${r.penalty ? ` · <span class="neg">kara ${fmt(r.penalty, 1)}</span>` : ""}</p>${diffTable(r.changes)}${notes(r.notes)}
+        <details><summary>mody unikatu</summary><pre>${esc(r.unique_mods.join("\n"))}</pre></details>`;
+    });
+  },
+
+  async tree(el) {
+    el.innerHTML = `<div class="grid2">
+      <div class="panel"><h2>Najlepsze nowe pasywki</h2><div class="row"><select id="tMetric"><option value="dps">DPS</option><option value="ehp">EHP</option><option value="life">Życie</option><option value="es">ES</option><option value="movement">Prędkość ruchu</option></select><button id="btnRank">Policz</button></div><div id="rankOut"></div></div>
+      <div class="panel"><h2>Co zwolnić (respec)</h2><button id="btnRespec">Policz</button><div id="respecOut"></div></div></div>
+      <div class="panel"><h2>Optymalizator drzewka</h2><p class="muted small">Zwalnia słabe pasywki i bierze mocne, każdy ruch sprawdzony w PoB (~10–30 s).</p><button id="btnTree">Optymalizuj</button><div id="treeOut"></div></div>`;
+    $("#btnRank").onclick = e => busy(e.target, async () => {
+      const r = await api("/api/rank_passives?" + q({metric: $("#tMetric").value}));
+      $("#rankOut").innerHTML = `<div class="tablewrap"><table><tr><th>Pasywka</th><th class="n">Pkt</th><th class="n">Zysk</th><th class="n">DPS Δ</th><th class="n">EHP Δ</th></tr>${
+        r.map(x => `<tr><td title="${esc((x.stats || []).join("\n"))}">${esc(x.node)}${x.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${x.points}</td><td class="n">${pct(x.gain_pct)}</td><td class="n">${fmt(x.d_CombinedDPS)}</td><td class="n">${fmt(x.d_TotalEHP)}</td></tr>`).join("")}</table></div>`;
+    });
+    $("#btnRespec").onclick = e => busy(e.target, async () => {
+      const r = await api("/api/rank_respec");
+      $("#respecOut").innerHTML = `<p class="small">Punkty: ${r.points.used}/${r.points.available}</p><div class="tablewrap"><table><tr><th>Pasywka</th><th class="n">Zwalnia</th><th class="n">Strata DPS</th><th class="n">EHP Δ</th></tr>${
+        r.cheapest_refunds.map(x => `<tr><td>${esc(x.node)}${x.not_calculated ? ' <span class="pill check">PoB nie liczy</span>' : ""}</td><td class="n">${x.points_freed}</td><td class="n">${fmt(x.loss_pct, 2)}%</td><td class="n">${fmt(x.d_TotalEHP)}</td></tr>`).join("")}</table></div>
+        ${r.inactive_weapon_set_nodes.length ? `<p class="muted small">${r.inactive_weapon_set_nodes.length} pasywek w drugim zestawie broni (nieaktywne w obliczeniach).</p>` : ""}`;
+    });
+    $("#btnTree").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/optimize_tree?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
+      $("#treeOut").innerHTML = r.moves.length ? `<div class="tablewrap"><table><tr><th>Weź</th><th>Zwolnij</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
+        r.moves.map(m => `<tr><td><b>${esc(m.add)}</b> (${m.add_points} pkt)</td><td class="small">${esc(m.refund.join(", ") || "—")}</td><td class="n">${pct(m.dps_pct)}</td><td class="n">${pct(m.ehp_pct)}</td></tr>`).join("")}</table></div>
+        <p>Razem: DPS ${pct(r.total.dps_pct)} · EHP ${pct(r.total.ehp_pct)} · punkty ${r.points.before} → ${r.points.after}</p><button id="btnTreeApply">Zastosuj ruchy</button><p class="muted small">${esc(r.note)}</p>` : "<p>Nie znalazłem ruchu, który się opłaca.</p>";
+      if (r.moves.length) $("#btnTreeApply").onclick = ev => applySteps(r.apply_steps, ev.target);
+    });
+  },
+
+  async combo(el) {
+    el.innerHTML = `<div class="panel"><h2>Combo i synergie</h2><p class="muted small">Co build tworzy, z czego korzysta, co do tego pasuje. ~10 s.</p><button id="btnCombo">Analizuj</button><div id="comboOut"></div></div>`;
+    $("#btnCombo").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/combos?" + q({damage: g.damage, survive: g.survive}));
+      const block = (title, obj) => Object.entries(obj).map(([m, b]) => `<h3>${title}: ${esc(m)}</h3>
+        ${(b.supports || []).length ? `<p class="small"><b>Supporty:</b> ${b.supports.map(x => `${esc(x.support)} ${pct(x.dps_pct)}`).join(", ")}</p>` : ""}
+        ${b.passives.length ? `<p class="small"><b>Pasywki:</b> ${b.passives.map(x => `${esc(x.passive)} (${x.points} pkt) ${pct(x.dps_pct)}`).join(", ")}</p>` : ""}
+        ${b.uniques.length ? `<p class="small"><b>Unikaty do sprawdzenia:</b> ${b.uniques.map(x => esc(x.unique)).join(", ")}</p>` : ""}`).join("");
+      $("#comboOut").innerHTML = `
+        ${r.config_check.length ? `<div class="finding warn"><h4>Config zakłada rzeczy, których build nie robi</h4><ul>${r.config_check.map(c => `<li><b>${esc(c.mechanic)}</b> (${esc(c.config)}) – DPS może być zawyżony</li>`).join("")}</ul></div>` : ""}
+        <h3>Tworzy</h3><div class="chips">${Object.entries(r.profile.produces).map(([k, v]) => `<span class="chip" title="${esc(v.join("\n"))}">${esc(k)}</span>`).join("")}</div>
+        <h3>Korzysta z</h3><div class="chips">${Object.entries(r.profile.benefits_from).map(([k, v]) => `<span class="chip ${r.profile.produces[k] ? "" : "warn"}" title="${esc(v.join("\n"))}">${esc(k)}</span>`).join("")}</div>
+        ${block("Wykorzystaj", r.payoffs)}${block("Brakuje źródła", r.enablers)}<p class="muted small">${esc(r.note)}</p>`;
+    });
+  },
+
+  async plan(el) {
+    el.innerHTML = `<div class="panel"><h2>Plan ulepszeń</h2><p class="muted small">Supporty, drzewko, mody na gearze i poziom gemu, posortowane wg zysku, plus wszystko razem. ~1 min.</p><button id="btnPlan">Ułóż plan</button><div id="planOut"></div></div>`;
+    $("#btnPlan").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/plan?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
+      const t = r.all_together;
+      $("#planOut").innerHTML = `<div class="tablewrap"><table><tr><th>Zmiana</th><th class="n">DPS</th><th class="n">EHP</th><th>Koszt</th></tr>${
+        r.top_changes.map(x => `<tr><td>${esc(x.what)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td><td class="small muted">${esc(x.cost)}</td></tr>`).join("")}</table></div>
+        ${t ? `<h3>Gemy + drzewko razem (zmierzone)</h3><p>DPS ${pct(t.dps_pct)} · EHP ${pct(t.ehp_pct)}</p><button id="btnPlanApply">Zastosuj gemy i drzewko</button>` : ""}
+        <h3>Czego szukać na gearze</h3><div class="chips">${r.gear_stat_priorities.map(x => `<span class="chip">${esc(x.stat)}</span>`).join("")}</div>
+        <p class="muted small">${esc(r.note)} · ${r.seconds} s</p>`;
+      if (t) $("#btnPlanApply").onclick = ev => applySteps(t.steps, ev.target);
+    });
+  },
+
+  async search(el) {
+    el.innerHTML = `<div class="panel"><h2>Baza wiedzy</h2><div class="row"><input type="text" id="sq" placeholder="np. life leech, twister, headhunter" style="flex:1;min-width:180px">
+      <select id="sk" style="width:auto"><option value="">wszystko</option><option>gem</option><option>unique</option><option>node</option><option>mod</option><option>base</option><option>skill</option></select><button id="btnS">Szukaj</button></div><div id="sOut"></div></div>`;
+    const go = e => busy($("#btnS"), async () => {
+      const r = await api("/api/kb/search?" + q({q: $("#sq").value, kind: $("#sk").value}));
+      $("#sOut").innerHTML = `<div class="tablewrap"><table>${r.map(x => `<tr><td><span class="pill">${esc(x.kind)}</span></td><td><b>${esc(x.name)}</b><div class="small muted">${esc(x.snippet).replace(/\[/g, "<b>").replace(/\]/g, "</b>")}</div></td></tr>`).join("") || "<tr><td>Nic.</td></tr>"}</table></div>`;
+    });
+    $("#btnS").onclick = go;
+    $("#sq").onkeydown = e => { if (e.key === "Enter") go(); };
+  },
+};
+
+async function slotView(slot) {
+  const out = $("#slotOut");
+  out.innerHTML = `<div class="panel"><span class="busy"></span> ${esc(slot)}…</div>`;
+  const g = goals();
+  const gq = q({slot, damage: g.damage, survive: g.survive});
+  try {
+    const [item, up, uq] = await Promise.all([api("/api/item?" + q({slot})), api("/api/mod_upgrades?" + gq), api("/api/uniques?" + gq).catch(() => null)]);
+    out.innerHTML = `<div class="panel"><h2>${esc(item.slot)}: ${esc(item.name)}</h2><div class="grid2">
+      <div><pre>${esc(item.raw.replace(/\{[^}]*\}/g, ""))}</pre>
+        <h3>Sprawdź inny item (wklej z gry lub trade)</h3><textarea id="wiText" placeholder="Ctrl+C na itemie w grze i wklej tutaj"></textarea><button id="btnWI" style="margin-top:6px">Porównaj</button><div id="wiOut"></div></div>
+      <div><h3>Lepsze mody na tym itemie</h3>${up.corrupted ? "<p>Item jest skorumpowany, nie da się go zmienić.</p>" :
+        up.upgrades.length ? `<div class="tablewrap"><table><tr><th>Zamień</th><th>Na</th><th class="n">DPS</th><th class="n">EHP</th></tr>${up.upgrades.map(u => `<tr><td class="small">${esc(u.replace)}<div class="muted">${esc(u.replace_as)}</div></td><td class="small"><b>${esc(u.with)}</b>${u.essence.length ? `<div class="muted">esencja: ${esc(u.essence.join(", "))}</div>` : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td></tr>`).join("")}</table></div>` : "<p class='muted'>Nic lepszego w puli modów.</p>"}
+        ${up.not_changeable_or_unknown.length ? `<p class="muted small">Spoza zwykłej puli: ${esc(up.not_changeable_or_unknown.join("; "))}</p>` : ""}
+        <button class="ghost" id="btnIdeal">Pokaż idealny item na ten slot</button><div id="idealOut"></div>
+        ${uq ? `<h3>Unikaty na ten slot</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
+      </div></div></div>`;
+    $("#btnWI").onclick = e => busy(e.target, async () => {
+      const r = await api("/api/whatif_item", {body: {slot, item_text: $("#wiText").value}});
+      $("#wiOut").innerHTML = diffTable(r.changes) + notes(r.notes);
+    });
+    $("#btnIdeal").onclick = e => busy(e.target, async () => {
+      const r = await api("/api/ideal_item?" + gq);
+      $("#idealOut").innerHTML = `<p>Sufit vs obecny: DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}</p><ul class="small">${r.mods.map(m => `<li>${esc(m.type)}: <b>${esc(m.text)}</b> <span class="muted">(lvl ${m.level})</span></li>`).join("")}</ul>`;
+    });
+  } catch (e) { out.innerHTML = `<div class="panel neg">${esc(e.message)}</div>`; }
+}
+
+// ---------------------------------------------------------------- shell
+async function render() {
+  const el = $("#view");
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
+  if (!state.loaded && state.tab !== "search") { el.innerHTML = `<div class="panel empty">Wklej kod buildu, żeby zacząć.</div>`; return; }
+  el.innerHTML = `<div class="panel"><span class="busy"></span> Liczę w Path of Building…</div>`;
+  try { await views[state.tab](el); } catch (e) { el.innerHTML = `<div class="panel"><b class="neg">Błąd:</b> ${esc(e.message)}</div>`; }
+}
+async function refreshBadge() {
+  const s = await api("/api/status");
+  state.loaded = s.loaded;
+  state.overview = null;
+  $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}` : "· brak bazy wiedzy: uruchom soe kb build";
+  $("#loadPanel").open = !s.loaded;
+  if (s.loaded) {
+    const m = s.summary;
+    $("#buildBadge").innerHTML = `<b>${esc(m.ascendancy || m.class)}</b> lvl ${m.level} · ${esc(m.main_skill)} · DPS <b>${fmt(m.CombinedDPS)}</b> · EHP <b>${fmt(m.TotalEHP)}</b>`;
+  }
+}
+
+$("#tabs").onclick = e => { const t = e.target.closest("button"); if (t) { state.tab = t.dataset.tab; render(); } };
+$("#btnLoad").onclick = e => busy(e.target, async () => {
+  const code = $("#code").value.trim();
+  if (!code) return toast("Wklej kod buildu.");
+  await api("/api/load", {body: {code}});
+  await refreshBadge();
+  $("#code").value = "";
+  state.tab = "checkup";
+  render();
+});
+$("#btnExport").onclick = e => busy(e.target, async () => {
+  const r = await api("/api/export");
+  try { await navigator.clipboard.writeText(r.code); toast("Kod buildu skopiowany."); } catch { prompt("Kod buildu:", r.code); }
+});
+$("#btnReset").onclick = e => busy(e.target, async () => { await api("/api/reset", {body: {}}); await refreshBadge(); render(); toast("Build jak po wczytaniu."); });
+$("#btnTheme").onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("soe-theme", next); } catch {}
+};
+for (const id of ["gDamage", "gSurvive", "gSpeed", "gMana"]) {
+  $("#" + id).oninput = () => { $("#" + id + "V").textContent = $("#" + id).value; };
+  $("#" + id).onchange = () => { if (state.tab === "checkup") render(); };
+}
+try { const t = localStorage.getItem("soe-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+refreshBadge().then(render).catch(() => render());
+</script>
+</body>
+</html>

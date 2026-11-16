@@ -90,6 +90,20 @@ def main(argv=None):
     m.add_argument("--domain", default="Item", help="Item, Jewel, Flask, Charm, Runes, Corruption, Desecrated, ...")
     k.set_defaults(func=cmd_kb)
 
+    u = sub.add_parser("update", help="launch day: new PoB release -> engine check -> knowledge base -> patch report")
+    u.add_argument("tag", nargs="?", help="PoB tag (default: latest release)")
+    u.add_argument("--no-pin", action="store_true", help="do not write POB_VERSION")
+    u.set_defaults(func=lambda a: _out(__import__("soe.pipeline.update", fromlist=["update"]).update(a.tag, not a.no_pin)))
+    c = sub.add_parser("compare", help="patch report between two PoB versions (current setup untouched)")
+    c.add_argument("old")
+    c.add_argument("new")
+    c.set_defaults(func=lambda a: _out(__import__("soe.pipeline.update", fromlist=["compare"]).compare(a.old, a.new)))
+
+    w = sub.add_parser("web", help="local web app (http://127.0.0.1:8765)")
+    w.add_argument("--port", type=int, default=8765)
+    w.add_argument("--host", default="127.0.0.1")
+    w.set_defaults(func=lambda a: __import__("soe.web.app", fromlist=["main"]).main(a.host, a.port))
+
     args = ap.parse_args(argv)
     args.func(args)
 

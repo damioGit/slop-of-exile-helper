@@ -3,7 +3,7 @@
 Optymalizator buildów do Path of Exile 2, oparty na silniku Path of Building (PoE2) i Claude'zie.
 Plan i harmonogram: [PLAN.md](PLAN.md).
 
-**Status:** fazy 0–5 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
+**Status:** fazy 0–6 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`). Do buildu masz doradcę w Claude Code (MCP), lokalną appkę webową i pipeline na dzień premiery.
 
 ## Setup (Windows)
 
@@ -11,15 +11,42 @@ Plan i harmonogram: [PLAN.md](PLAN.md).
 py -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"
 .venv/Scripts/python scripts/fetch_pob.py      # PoB w wersji z POB_VERSION -> vendor/
+.venv/Scripts/soe kb build                     # baza wiedzy
 .venv/Scripts/python -m pytest
 ```
 
 ## Użycie
 
 ```bash
+.venv/Scripts/soe web                           # appka: http://127.0.0.1:8765
 .venv/Scripts/soe eval <kod buildu PoB>         # podsumowanie: DPS, EHP, resy, atrybuty
 .venv/Scripts/soe eval build.txt --full         # wszystkie staty, które liczy PoB
 ```
+
+## Appka webowa
+
+`soe web` uruchamia lokalną stronę na tym samym silniku co doradca MCP. Wklejasz kod buildu i masz zakładki:
+- **Check-up**: co hamuje build, kolejność według suwaków celów
+- **Przegląd**: kafle statów, mierniki resów do capu, max hit per typ, punkty, config
+- **Skille**: DPS każdego skilla, gemy (supporty, które nie działają, są przekreślone), optymalizator supportów z „Zastosuj”
+- **Gear**: widok slotu (tekst itemu, lepsze mody z esencjami, idealny item, unikaty na slot, porównanie wklejonego itemu), wagi statów, „unikat, który mi się podoba”
+- **Drzewko**: najlepsze nowe pasywki, co zwolnić, optymalizator drzewka z „Zastosuj”
+- **Combo**: co build tworzy / z czego korzysta, payoffy, enablery, ostrzeżenia z configu
+- **Plan**: wszystkie zmiany posortowane, razem zmierzone, „Zastosuj gemy i drzewko”
+- **Szukaj**: baza wiedzy
+
+„Kod PoB” kopiuje aktualny build (ze zmianami) do schowka, a „Reset” wraca do wczytanego. Jest jasny i ciemny motyw, a układ działa na telefonie.
+
+## Dzień premiery (PoB z danymi 1.0)
+
+```bash
+.venv/Scripts/soe update             # najnowszy release PoB: pobierz -> test silnika -> nowa baza -> raport zmian
+.venv/Scripts/soe update v1.0.0      # konkretny tag
+.venv/Scripts/soe compare v0.22.0 v0.23.1   # sam raport różnic między wersjami
+```
+
+`update` testuje silnik na buildach z `tests/builds/`. Jeśli test padnie, wraca do poprzedniej wersji. Raport zmian (gemy, unikaty, notable, ascendancy, mody, bazy) trafia do `data/patch-<stara>-<nowa>.md`. Przykład z próby: [docs/patch-example-v0.22.0-v0.23.1.md](docs/patch-example-v0.22.0-v0.23.1.md) (~1 min).
+Po aktualizacji zrestartuj serwer MCP i appkę, a potem odpal testy. Liczby z `tests/test_reference_builds.py` (poe.ninja) trzeba będzie podmienić na buildach z 1.0.
 
 ## Doradca w Claude Code (MCP)
 

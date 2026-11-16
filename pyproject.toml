@@ -3,10 +3,10 @@ name = "slop-of-exile-helper"
 version = "0.0.1"
 description = "PoE2 build optimizer on top of the Path of Building engine"
 requires-python = ">=3.12"
-dependencies = ["lupa>=2.4", "mcp>=2.3,<3"]
+dependencies = ["lupa>=2.4", "mcp>=2.3,<3", "fastapi>=0.115", "uvicorn>=0.30"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "httpx>=0.27"]
 
 [project.scripts]
 soe = "soe.cli:main"
@@ -20,6 +20,7 @@ include = ["soe*"]
 
 [tool.setuptools.package-data]
 "soe.engine" = ["lua/*.lua"]
+"soe.web" = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -107,8 +107,10 @@ def _j(v) -> str:
     return json.dumps(v, ensure_ascii=False)
 
 
-def build(db_path: Path | None = None, game_data: dict | None = None, pob_version: str | None = None) -> dict:
-    """Build the knowledge base. Without db_path: a new versioned file in data/ that becomes current."""
+def build(db_path: Path | None = None, game_data: dict | None = None, pob_version: str | None = None,
+          pob_dir: Path | None = None) -> dict:
+    """Build the knowledge base. Without db_path: a new versioned file in data/ that becomes current.
+    pob_dir: build from another PoB checkout (e.g. an older version for a patch comparison)."""
     t0 = time.perf_counter()
     managed = db_path is None
     if managed:
@@ -116,7 +118,7 @@ def build(db_path: Path | None = None, game_data: dict | None = None, pob_versio
     if game_data is None:
         from soe.engine.pob import PoB
 
-        pob = PoB()
+        pob = PoB(pob_dir) if pob_dir else PoB()
         pob.new_build()
         game_data = pob.export_game_data()
     if pob_version is None:
