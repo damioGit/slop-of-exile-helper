@@ -140,6 +140,22 @@ def added_tags(mods: list[dict]) -> set:
     return out
 
 
+# Mod groups PoB keeps apart that the game treats as one family (only one of them per item).
+# Checked on the trade site (2026-11): no item has natural "+# to Level of all Spell Skills" together with
+# lightning/cold/... spell levels, or spell + minion / melee + projectile levels. The ones that seem to are a
+# crafted +1 (Verisium), a rune or an enchant.
+_FAMILIES = [
+    (re.compile(r"^(GlobalIncrease\w*SkillGemLevel(Weapon)?|Essence\w*SkillLevel|MarkSkillGemLevels)$"), "SkillGemLevels"),
+]
+
+
+def family(group: str) -> str:
+    for rx, name in _FAMILIES:
+        if rx.match(group or ""):
+            return name
+    return group
+
+
 def _mod_of(ident: tuple, groups) -> dict | None:
     atype, grp, tier = ident
     tiers = groups.get((atype, grp))
@@ -173,7 +189,7 @@ def ideal_item(session, slot: str, objective: Objective | None = None, ilvl: int
         tags = base_tags | added_tags([m for _, m in chosen])  # mods already picked can block others
         for key, tiers in groups.items():
             atype, _ = key
-            if counts[atype] >= MAX_AFFIX[atype] or any(k == key for k, _ in chosen):
+            if counts[atype] >= MAX_AFFIX[atype] or any(family(k[1]) == family(key[1]) for k, _ in chosen):
                 continue
             top = tiers[0]
             if not can_roll(top, tags):
@@ -210,7 +226,7 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
     real_slot = pob.resolve_slot(slot)
     skip_tags = ("{fractured}", "{crafted}", "{desecrated}", "{enchant}", "{rune}")
     base_tags = set((kb.base(base) or {}).get("tags") or [])
-    present: dict[tuple[str, str], int] = {}
+    present: dict[str, int] = {}  # mod family -> the line that has it (one mod per family on an item)
     lines_info: list[list] = []
     line_mods: list[dict | None] = []  # the mod each line is, for the tags it puts on the item
     for i, line in enumerate(exp):
@@ -220,12 +236,14 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
             continue
         ident = identify(line, groups)
         line_mods.append(_mod_of(ident[0], groups) if ident else None)
-        if line.startswith(skip_tags):  # fractured/desecrated stay, but still block what they block
+        if ident and not line.startswith("{crafted}"):  # fractured/desecrated stay and keep their family;
+            present.setdefault(family(ident[0][1]), i)  # a crafted mod (Verisium) can sit next to its family
+        if line.startswith(skip_tags):
             lines_info.append([])
             continue
         lines_info.append(ident)
         for atype, grp, _ in ident:
-            present.setdefault((atype, grp), i)
+            present.setdefault(family(grp), i)
     rows, seen = [], set()
     corrupted = any(_clean(x) == "Corrupted" for x in exp)
     for i, idents in enumerate(lines_info):
@@ -233,7 +251,8 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
         tags = base_tags | added_tags([m for j, m in enumerate(line_mods) if m and j != i])
         for atype, grp, tier in idents:
             for key, tiers in groups.items():
-                if key[0] != atype or (key in present and present[key] != i):
+                fam = family(key[1])
+                if key[0] != atype or (fam in present and present[fam] != i):
                     continue
                 if key == (atype, grp) and tier == 1:
                     continue

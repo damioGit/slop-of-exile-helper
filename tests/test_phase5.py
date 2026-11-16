@@ -63,7 +63,9 @@ def test_mod_upgrades_finds_cold_on_kraken_whorl(s):
     r = mod_upgrades(s, "Ring 2")
     assert not r["corrupted"]
     top = r["upgrades"][0]
-    assert "Rarity" in top["replace"] and "damage to Attacks" in top["with"] and top["dps_pct"] > 3
+    assert "Rarity" in top["replace"] and "Cold damage to Attacks" in top["with"] and top["dps_pct"] > 2
+    # the fractured lightning line keeps its family: no second "Adds # Lightning damage to Attacks"
+    assert not any("Lightning damage to Attacks" in u["with"] for u in r["upgrades"])
     assert "Adds 1 to 99 Lightning damage to Attacks" in r["not_changeable_or_unknown"]  # fractured
 
 
@@ -118,4 +120,15 @@ def test_mod_blocking_tags(s):
     assert "no_cold_spell_mods" in light["adds_tags"]
     with_light = staff | added_tags([light])
     assert can_roll(cold, staff) and not can_roll(cold, with_light)  # lightning levels block cold levels
-    assert can_roll(allsp, with_light)  # but "all spell skills" still fits next to it
+    assert can_roll(allsp, with_light)  # tags allow it; the shared mod family does not (see the test below)
+
+
+def test_skill_level_suffixes_are_one_family():
+    from soe.items.craft import family
+
+    # the game allows one "+# to Level of all ... Skills" suffix per item, whatever PoB's group says
+    fams = {family(g) for g in ("GlobalIncreaseSpellSkillGemLevelWeapon", "GlobalIncreaseLightningSpellSkillGemLevelWeapon",
+                                "GlobalIncreaseMinionSpellSkillGemLevel", "GlobalIncreaseProjectileSkillGemLevelWeapon",
+                                "EssenceSpellSkillLevel")}
+    assert fams == {"SkillGemLevels"}
+    assert family("IncreasedCastSpeed") == "IncreasedCastSpeed"
