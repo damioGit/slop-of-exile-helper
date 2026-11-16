@@ -210,11 +210,44 @@ def kb_unique(name: str):
     return session.kb.unique(name)
 
 
-def main(host: str = "127.0.0.1", port: int = 8765):
+def _already_running(url: str) -> bool:
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url + "/api/status", timeout=1) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def main(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False):
+    import threading
+    import time
+    import webbrowser
+
     import uvicorn
 
+    url = f"http://{host}:{port}"
+    if _already_running(url):  # second click on the launcher: just show the app
+        print(f"Slop of Exile Helper już działa: {url}")
+        if open_browser:
+            webbrowser.open(url)
+        return
+
+    if open_browser:
+        def opener():
+            for _ in range(120):
+                if _already_running(url):
+                    webbrowser.open(url)
+                    return
+                time.sleep(0.5)
+        threading.Thread(target=opener, daemon=True).start()
+
+    print(f"Slop of Exile Helper: {url}  (zamknij to okno, żeby wyłączyć)")
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(open_browser="--open" in sys.argv)

@@ -102,7 +102,8 @@ def main(argv=None):
     w = sub.add_parser("web", help="local web app (http://127.0.0.1:8765)")
     w.add_argument("--port", type=int, default=8765)
     w.add_argument("--host", default="127.0.0.1")
-    w.set_defaults(func=lambda a: __import__("soe.web.app", fromlist=["main"]).main(a.host, a.port))
+    w.add_argument("--open", action="store_true", help="open the browser when the app is ready")
+    w.set_defaults(func=lambda a: __import__("soe.web.app", fromlist=["main"]).main(a.host, a.port, a.open))
 
     args = ap.parse_args(argv)
     args.func(args)

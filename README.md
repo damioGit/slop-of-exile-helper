@@ -23,6 +23,14 @@ py -m venv .venv
 .venv/Scripts/soe eval build.txt --full         # wszystkie staty, które liczy PoB
 ```
 
+## Odpalanie jednym kliknięciem
+
+Kliknij dwa razy **`Slop of Exile Helper`** (skrót z pomarańczowym kryształem w głównym folderze). Uruchomi appkę i sam otworzy ją w przeglądarce. Przy pierwszym razie, jeśli trzeba, pobierze PoB i zbuduje bazę wiedzy.
+- Appka działa, dopóki jest otwarte jej okno (zminimalizowane na pasku zadań). Zamknięcie okna wyłącza appkę.
+- Drugie kliknięcie przy działającej appce tylko otwiera ją w przeglądarce.
+- Skrót wskazuje na `scripts/start.bat`, a ikona leży w `assets/soe.ico` (rysuje ją `scripts/make_icon.py`).
+- Jeśli przeniesiesz folder, skrót przestanie działać. Wtedy uruchom `scripts/start.bat` albo zrób nowy skrót do niego.
+
 ## Appka webowa
 
 `soe web` uruchamia lokalną stronę na tym samym silniku co doradca MCP. Wklejasz kod buildu i masz zakładki:
