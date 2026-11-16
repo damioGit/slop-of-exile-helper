@@ -130,10 +130,11 @@ def apply_changes(payload: dict = Body(...)):
 
 
 @app.get("/api/optimize_supports")
-def optimize_supports(group: int | None = None, damage: float = 1, survive: float = 1, speed: float = 1):
+def optimize_supports(group: int | None = None, damage: float = 1, survive: float = 1, speed: float = 1,
+                      budget: float | None = None):
     from soe.optimize.supports import optimize_supports as opt
 
-    return locked(opt, session, group, _goals(damage, survive, speed))
+    return locked(opt, session, group, _goals(damage, survive, speed), budget_divine=budget)
 
 
 @app.get("/api/optimize_tree")
@@ -144,10 +145,11 @@ def optimize_tree(damage: float = 1, survive: float = 1, speed: float = 1, max_m
 
 
 @app.get("/api/plan")
-def plan(damage: float = 1, survive: float = 1, speed: float = 1, top: int = 12):
+def plan(damage: float = 1, survive: float = 1, speed: float = 1, top: int = 12, budget: float | None = None):
     from soe.optimize.plan import improvement_plan
 
-    return locked(improvement_plan, session, {"damage": damage, "survive": survive, "speed": speed}, top=top)
+    return locked(improvement_plan, session, {"damage": damage, "survive": survive, "speed": speed}, top=top,
+                  budget_divine=budget)
 
 
 @app.get("/api/uniques")

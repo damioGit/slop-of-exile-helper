@@ -13,6 +13,7 @@ When the user pastes a build code or asks about their build, use the `soe` tools
    Items: "I like unique X" → `try_unique`; "best unique for this slot" → `rank_uniques`; "what to craft / how to improve this item" → `mod_upgrades` (per mod, with essences) and `ideal_item` (the ceiling); odds of hitting mods → `craft_odds`. Crafting odds use equal weights and are estimates; say so.
    Synergies: `suggest_combos` shows what the build creates and feeds on, payoffs, enablers, and **config conditions that nothing in the build creates**. Mention those first, because they mean the DPS shown is optimistic.
    Prices: `price_check` (poe.ninja, current league, never guessed). Uniques, lineage supports, essences, Uncut Skill Gem and Exalted-based craft odds carry prices in their results. Quote them with the league and say that unlisted means unknown, not free.
+   Ask for the player's budget and pass `budget_divine` to `optimize_supports` / `improvement_plan`. If `current_supports_that_lower_the_score` is not empty, ask why the player uses those supports before suggesting a swap.
    Optimizer gains are PoB numbers under the current config. Before recommending, check what each gain depends on, for example Ferocity needs frenzy charges, Stand and Deliver needs enemies within 2 m, and lineage supports (unique names) are rare. Show the bundle result (`all_together`) as the honest total, because single gains do not add up.
    Read the `notes` in tool results: they explain empty changes (inactive weapon set, mechanics PoB does not calculate, conditions switched off).
 2. Look things up with `kb_*`: gem text, supports for a skill, unique mods, which mods can roll on a slot. Patch-specific details (numbers, what a unique does) come from the KB, not from memory.
@@ -38,5 +39,6 @@ When the user pastes a build code or asks about their build, use the `soe` tools
 - Lua table fields named `items`/`keys`/`values` must be read as `tbl["items"]` from Python (lupa)
 - Write files with the Write tool, not bash heredocs: the Bash tool here mangles long heredocs
 - Web app: `soe/web/app.py` (FastAPI over the same `Session`) + `soe/web/static/index.html` (one file, no build step, Polish UI). Run `soe web`; API docs at /api/docs
+- Real-character check: `scripts/fetch_corpus.py` then `scripts/run_corpus.py` (data/corpus, never commit other players' characters). Run it after engine changes.
 - Launch day: `soe update [tag]` (fetch → engine check on tests/builds → new KB → patch report in data/), `soe compare old new`
 - Check-up and optimizer texts are English (MCP clients translate); the web UI shows them as they are

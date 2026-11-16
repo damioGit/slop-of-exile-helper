@@ -37,7 +37,7 @@ def test_overview(s):
     assert ov["summary"]["main_skill"] == "Twister"
     assert ov["weapon_set"] == "second (swap)"
     assert ov["config"]["enemyIsBoss"] == "Pinnacle"
-    names = {d["name"] for d in ov["skill_dps"]}
+    names = {d.get("base_name", d["name"]) for d in ov["skill_dps"]}
     assert {"Twister", "Whirling Slash", "Wild Protector"} <= names
     assert any(i["slot"] == "Weapon 1 Swap" for i in ov["items"])
     assert not any(i["slot"] == "Weapon 1" for i in ov["items"])  # inactive set hidden

@@ -306,16 +306,67 @@ function soe.all_skill_dps()
 	for i, g in ipairs(groups) do
 		if g.enabled and g.displaySkillList then
 			for j, s in ipairs(g.displaySkillList) do
-				build.mainSocketGroup = i
-				g.mainActiveSkill = j
-				g.mainActiveSkillCalcs = j
-				soe.recalc()
-				local o = build.calcsTab.mainOutput
-				local m = o.Minion
-				res[#res + 1] = { group = i, skill = j, name = s.activeEffect.grantedEffect.name,
-					TotalDPS = o.TotalDPS or 0, CombinedDPS = o.CombinedDPS or 0, TotalDotDPS = o.TotalDotDPS or 0,
-					MinionDPS = m and (m.CombinedDPS or m.TotalDPS) or 0,
-					Speed = o.Speed or 0, CritChance = o.CritChance or 0 }
+				local ge = s.activeEffect.grantedEffect
+				local src = s.activeEffect.srcInstance
+				-- skills with several stat sets (e.g. a wall and its explosion) are calculated set by set
+				local sets = (src and ge.statSets and #ge.statSets > 1) and #ge.statSets or 1
+				local prevSet = src and src.statSet and src.statSet[ge.id]
+				for k = 1, sets do
+					if sets > 1 then
+						src.statSet = src.statSet or {}
+						src.statSet[ge.id] = k
+					end
+					build.mainSocketGroup = i
+					g.mainActiveSkill = j
+					g.mainActiveSkillCalcs = j
+					soe.recalc()
+					local function read(o)
+						local m = o.Minion
+						return { TotalDPS = o.TotalDPS or 0, CombinedDPS = o.CombinedDPS or 0, TotalDotDPS = o.TotalDotDPS or 0,
+							MinionDPS = m and (m.CombinedDPS or m.TotalDPS) or 0, Speed = o.Speed or 0, CritChance = o.CritChance or 0 }
+					end
+					local r = read(build.calcsTab.mainOutput)
+					local weaponSet = build.itemsTab.activeItemSet.useSecondWeaponSet and 2 or 1
+					if r.TotalDPS == 0 and r.TotalDotDPS == 0 and r.MinionDPS == 0 then
+						-- skills that need the other weapon set (e.g. a shield skill on a swap set) are measured there
+						local itemSet = build.itemsTab.activeItemSet
+						itemSet.useSecondWeaponSet = not itemSet.useSecondWeaponSet
+						soe.recalc()
+						local r2 = read(build.calcsTab.mainOutput)
+						itemSet.useSecondWeaponSet = not itemSet.useSecondWeaponSet
+						if r2.TotalDPS > 0 or r2.TotalDotDPS > 0 or r2.MinionDPS > 0 then
+							r = r2
+							weaponSet = 3 - weaponSet
+						end
+					end
+					local label = sets > 1 and ge.statSets[k].label or nil
+					r.group, r.skill, r.weapon_set = i, j, weaponSet
+					r.name = label and label ~= ge.name and (ge.name .. ": " .. label) or ge.name
+					r.base_name, r.stat_set = ge.name, sets > 1 and k or nil
+					res[#res + 1] = r
+					-- minions with several skills: each one on its own
+					local ms = build.calcsTab.mainEnv.player.mainSkill
+					local minion = ms and ms.minion
+					if src and minion and minion.activeSkillList and #minion.activeSkillList > 1 and r.MinionDPS > 0 then
+						local first = minion.activeSkillList[1].activeEffect.grantedEffect.name
+						r.name = r.name .. " / " .. first
+						local count = #minion.activeSkillList
+						local prevMs = src.skillMinionSkill
+						for ki = 2, count do
+							src.skillMinionSkill = ki
+							soe.recalc()
+							local m2 = build.calcsTab.mainEnv.player.mainSkill
+							local mname = m2 and m2.minion and m2.minion.activeSkillList[ki]
+								and m2.minion.activeSkillList[ki].activeEffect.grantedEffect.name or tostring(ki)
+							local r3 = read(build.calcsTab.mainOutput)
+							r3.group, r3.skill, r3.weapon_set, r3.base_name = i, j, weaponSet, ge.name
+							r3.name, r3.minion_skill = ge.name .. " / " .. mname, ki
+							res[#res + 1] = r3
+						end
+						src.skillMinionSkill = prevMs
+					end
+				end
+				if sets > 1 then src.statSet[ge.id] = prevSet end
 			end
 		end
 	end

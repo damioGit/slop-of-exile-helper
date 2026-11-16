@@ -83,18 +83,23 @@ def run_one(path: Path, quick: bool) -> dict:
             out["mismatch"][ok] = [nd[nk], round(base[ok], 1)]
     ninja_skills = [x for x in rec.get("ninja_skills") or [] if x.get("dps")]
     ours = tool("all_skill_dps", s.pob.all_skill_dps) or []
-    values = {}
+    # poe.ninja splits hit DPS (`dps`, minions included) and damage over time (`dotDps`)
+    hits, dots = {}, {}
     for d in ours:
-        values.setdefault(d["name"], []).append(max(d["TotalDPS"], d.get("MinionDPS") or 0))
+        key = d.get("base_name") or d["name"]
+        hits.setdefault(key, []).append(max(d["TotalDPS"], d.get("MinionDPS") or 0))
+        dots.setdefault(key, []).append(d.get("TotalDotDPS") or 0)
     matched, unmatched = 0, []
     for n in ninja_skills:
-        by_name = values.get(n["name"])
-        if by_name:
-            if not any(close(n["dps"], v, rel=0.03, abs_=50) for v in by_name):
-                out["mismatch"][f"dps:{n['name']}"] = [n["dps"], round(max(by_name))]
-            else:
+        h = hits.get(n["name"])
+        if h:
+            ok_hit = any(close(n["dps"], v, rel=0.03, abs_=50) for v in h)
+            ok_dot = not n.get("dotDps") or any(close(n["dotDps"], v, rel=0.03, abs_=50) for v in dots[n["name"]])
+            if ok_hit and ok_dot:
                 matched += 1
-        elif any(close(n["dps"], v, rel=0.01, abs_=5) for vs in values.values() for v in vs):
+            else:
+                out["mismatch"][f"dps:{n['name']}"] = [[n["dps"], n.get("dotDps")], [round(max(h)), round(max(dots[n["name"]]))]]
+        elif any(close(n["dps"], v, rel=0.01, abs_=5) for vs in hits.values() for v in vs):
             matched += 1  # same number under another name (minion skill vs its summon gem)
         else:
             unmatched.append(f"{n['name']} {n['dps']:.0f}")

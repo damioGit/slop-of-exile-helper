@@ -22,7 +22,7 @@ COST = {
 
 
 def improvement_plan(session, goals: dict | None = None, use_supports: bool = True, use_tree: bool = True,
-                     tree_moves: int = 6, top: int = 10) -> dict:
+                     tree_moves: int = 6, top: int = 10, budget_divine: float | None = None) -> dict:
     session._need_build()
     t0 = time.perf_counter()
     obj = Objective.from_goals(goals)
@@ -31,7 +31,7 @@ def improvement_plan(session, goals: dict | None = None, use_supports: bool = Tr
     items: list[dict] = []
 
     if use_supports:
-        sup = optimize_supports(session, objective=obj)
+        sup = optimize_supports(session, objective=obj, budget_divine=budget_divine)
         best_combo = sup["best_combination"]
         # one row per swap of the best set, each with its own (single swap) gain
         singles = {(r["replace"], r["with"]): r for rows in sup["best_per_slot"].values() for r in rows}

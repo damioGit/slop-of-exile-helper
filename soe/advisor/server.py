@@ -150,13 +150,16 @@ def stat_weights(damage: float = 1, survive: float = 1) -> dict:
 
 
 @tool
-def optimize_supports(group: int | None = None, damage: float = 1, survive: float = 1) -> dict:
+def optimize_supports(group: int | None = None, damage: float = 1, survive: float = 1,
+                      budget_divine: float | None = None) -> dict:
     """Try every compatible support gem in every support slot of a skill group (default: main skill)
     with full PoB recalculations in parallel (~20-30 s). Returns the value of each current support,
-    the best swaps per slot and the best set of swaps checked together with apply_steps."""
+    the best swaps per slot and the best set of swaps checked together with apply_steps.
+    budget_divine skips lineage supports priced above it on poe.ninja (ask the player's budget).
+    Supports whose removal raises the score are listed: ask why the player uses them before replacing."""
     from soe.optimize.supports import optimize_supports as opt
 
-    return opt(session, group, _goals(damage, survive))
+    return opt(session, group, _goals(damage, survive), budget_divine=budget_divine)
 
 
 @tool
@@ -172,13 +175,13 @@ def optimize_tree(damage: float = 1, survive: float = 1, max_moves: int = 6, max
 
 
 @tool
-def improvement_plan(damage: float = 1, survive: float = 1, top: int = 10) -> dict:
+def improvement_plan(damage: float = 1, survive: float = 1, top: int = 10, budget_divine: float | None = None) -> dict:
     """The answer to "what should I change?": best support swaps, main skill gem level, passive moves,
     ranked by gain, plus everything together measured as one bundle, plus which stats to look for on
     gear. Takes ~1 minute. damage/survive weight the goal."""
     from soe.optimize.plan import improvement_plan as plan
 
-    return plan(session, {"damage": damage, "survive": survive}, top=top)
+    return plan(session, {"damage": damage, "survive": survive}, top=top, budget_divine=budget_divine)
 
 
 @tool

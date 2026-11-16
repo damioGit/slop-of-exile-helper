@@ -130,6 +130,7 @@ pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; backgrou
       <div><label>Przetrwanie <b id="gSurviveV">2</b></label><input id="gSurvive" type="range" min="0" max="3" step="0.5" value="2"></div>
       <div><label>Prędkość ruchu <b id="gSpeedV">1</b></label><input id="gSpeed" type="range" min="0" max="3" step="0.5" value="1"></div>
       <div><label>Mana <b id="gManaV">1</b></label><input id="gMana" type="range" min="0" max="3" step="0.5" value="1"></div>
+      <div><label>Budżet (divine) <span class="muted">puste = bez limitu</span></label><input id="gBudget" type="text" inputmode="decimal" placeholder="np. 5"></div>
     </div>
   </section>
 
@@ -164,7 +165,9 @@ let state = {tab: "checkup", loaded: false, overview: null, cache: {}};
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 2200); }
 function goals() {
-  return {damage: +$("#gDamage").value, survive: +$("#gSurvive").value, speed: +$("#gSpeed").value, mana: +$("#gMana").value};
+  const b = parseFloat(($("#gBudget").value || "").replace(",", "."));
+  return {damage: +$("#gDamage").value, survive: +$("#gSurvive").value, speed: +$("#gSpeed").value, mana: +$("#gMana").value,
+          budget: isNaN(b) ? null : b};
 }
 async function api(path, opts = {}) {
   const r = await fetch(path, opts.body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(opts.body)} : {});
@@ -249,10 +252,12 @@ const views = {
       <button id="btnSup">Szukaj najlepszych supportów</button><div id="supOut"></div></div>`;
     $("#btnSup").onclick = e => busy(e.target, async () => {
       const g = goals();
-      const r = await api("/api/optimize_supports?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
+      const r = await api("/api/optimize_supports?" + q({damage: g.damage, survive: g.survive, speed: g.speed, budget: g.budget}));
       const c = r.best_combination;
       $("#supOut").innerHTML = `<h3>Wartość obecnych supportów (bez niego)</h3><div class="tablewrap"><table><tr><th>Support</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
         Object.entries(r.current_supports).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${pct(v.dps_pct)}</td><td class="n">${pct(v.ehp_pct)}</td></tr>`).join("")}</table></div>
+        ${r.current_supports_that_lower_the_score.length ? `<div class="finding warn"><h4>Te supporty w PoB obniżają wynik</h4><p class="small">${r.current_supports_that_lower_the_score.map(x => esc(x.support)).join(", ")}: bez nich jest lepiej. Pewnie dają coś, czego PoB nie liczy (obrona, użyteczność, więcej celów). Sprawdź, zanim wymienisz.</p></div>` : ""}
+        ${r.skipped_over_budget && r.skipped_over_budget.length ? `<p class="muted small">Pominięte ponad budżet: ${esc(r.skipped_over_budget.join(", "))}</p>` : ""}
         ${c ? `<h3>Najlepszy zestaw zmian (sprawdzony razem)</h3><p>${c.swaps.map(s => `${esc(s.replace)} → <b>${esc(s.with)}</b>${s.price ? ` <span class="muted small">(${esc(s.price.text)})</span>` : ""}`).join("<br>")}</p><p>DPS ${pct(c.dps_pct)} · EHP ${pct(c.ehp_pct)}</p><button id="btnSupApply">Zastosuj</button>` : "<p>Brak lepszego zestawu.</p>"}
         <h3>Najlepsze pojedyncze (etap 1)</h3><div class="chips">${r.stage1_top.map(x => `<span class="chip">${esc(x.support)} ${pct(x.dps_pct)}${x.price ? " · " + esc(x.price.text) : ""}</span>`).join("")}</div>
         <p class="muted small">${esc(r.note)} · ${r.evaluated} przeliczeń w ${r.seconds} s</p>`;
@@ -330,7 +335,7 @@ const views = {
     el.innerHTML = `<div class="panel"><h2>Plan ulepszeń</h2><p class="muted small">Supporty, drzewko, mody na gearze i poziom gemu, posortowane wg zysku, plus wszystko razem. ~1 min.</p><button id="btnPlan">Ułóż plan</button><div id="planOut"></div></div>`;
     $("#btnPlan").onclick = e => busy(e.target, async () => {
       const g = goals();
-      const r = await api("/api/plan?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
+      const r = await api("/api/plan?" + q({damage: g.damage, survive: g.survive, speed: g.speed, budget: g.budget}));
       const t = r.all_together;
       $("#planOut").innerHTML = `<div class="tablewrap"><table><tr><th>Zmiana</th><th class="n">DPS</th><th class="n">EHP</th><th>Koszt</th></tr>${
         r.top_changes.map(x => `<tr><td>${esc(x.what)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td><td class="small muted">${esc(x.cost)}</td></tr>`).join("")}</table></div>

@@ -54,8 +54,9 @@ def _swap_job(group: int, idx: int, old: dict, new_name: str | None) -> dict:
 
 
 def optimize_supports(session, group: int | None = None, objective: Objective | None = None,
-                      top: int = 5, finalists: int = 12) -> dict:
-    """Best support swaps for one skill group (default: main skill)."""
+                      top: int = 5, finalists: int = 12, budget_divine: float | None = None) -> dict:
+    """Best support swaps for one skill group (default: main skill).
+    budget_divine: skip supports whose poe.ninja price is above it (unlisted supports are kept)."""
     session._need_build()
     pob, kb = session.pob, session.kb
     obj = objective or Objective()
@@ -82,7 +83,20 @@ def optimize_supports(session, group: int | None = None, objective: Objective | 
     weakest_idx, weakest = max(slots, key=lambda s: current.get(s[1]["name"], {}).get("score", 0))
 
     # stage 1: every candidate in the weakest slot
-    cands = candidates(kb, active["name"], gems, weakest)
+    from soe.prices import safe_price
+
+    over_budget = set()
+
+    def affordable(name: str) -> bool:
+        if budget_divine is None:
+            return True
+        pr = safe_price(name)
+        if pr and pr["divine"] > budget_divine:
+            over_budget.add(name)
+            return False
+        return True
+
+    cands = [c for c in candidates(kb, active["name"], gems, weakest) if affordable(c)]
     res = run([_swap_job(gi, weakest_idx, weakest, c) for c in cands])
     stage1 = sorted(((c, obj.explain(r["result"], session.base)) for c, r in zip(cands, res) if r["ok"]),
                     key=lambda x: x[1]["score"], reverse=True)
@@ -92,7 +106,7 @@ def optimize_supports(session, group: int | None = None, objective: Objective | 
     per_slot: dict[int, list] = {idx: [] for idx, _ in slots}
     jobs, meta = [], []
     for idx, gem in slots:
-        allowed = set(candidates(kb, active["name"], gems, gem))
+        allowed = {c for c in candidates(kb, active["name"], gems, gem) if affordable(c)}
         for c in best_names:
             if c in allowed:
                 if idx == weakest_idx:
@@ -133,16 +147,21 @@ def optimize_supports(session, group: int | None = None, objective: Objective | 
                      **obj.explain(r["result"], session.base),
                      "apply_steps": [{"op": "set_gem", **kw} for _, kw in do]}
 
-    from soe.prices import safe_price
+    # current supports that cost damage/defence in PoB: likely kept for something PoB does not count
+    suspicious = [{"support": k, **v} for k, v in current.items() if v["score"] > 1]
 
     return {
         "group": gi, "skill": active["name"], "evaluated": n_eval, "seconds": round(time.perf_counter() - t, 1),
         "current_supports": current,
+        "current_supports_that_lower_the_score": suspicious,
+        "budget_divine": budget_divine, "skipped_over_budget": sorted(over_budget)[:20],
         "stage1_top": [{"support": c, **ex, "price": safe_price(c)} for c, ex in stage1[:top * 2]],
         "best_per_slot": {per_slot[idx][0]["replace"] if per_slot[idx] else gem["name"]: per_slot[idx][:top]
                           for idx, gem in slots},
         "best_combination": combo,
         "note": "score ≈ % gain on the weighted DPS/EHP objective minus penalties. A current support worth 0 "
-                "is either not modelled by PoB or useless here. price comes from poe.ninja (lineage supports); "
+                "is either not modelled by PoB or useless here; one whose removal RAISES the score (listed separately) "
+                "is probably there for an effect PoB does not count (defence, utility, more targets): ask before "
+                "replacing it. price comes from poe.ninja (lineage supports); "
                 "None = regular support (cut from an uncut support gem, cheap) or not listed.",
     }

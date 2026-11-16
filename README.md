@@ -120,3 +120,19 @@ Wagi modów w danych PoB to tylko 0/1 (patrz PLAN.md, ryzyko 4).
 - **Cache:** `data/prices/<liga>/` na 1 h. Bez internetu używany jest ostatni cache, oznaczony jako nieaktualny.
 - **Brak ceny = nieznana.** Nic nie jest zgadywane.
 - **Gdzie widać ceny:** `price_check`, ranking i test unikatów, optymalizator supportów (lineage), esencje w `mod_upgrades`, `craft_odds` (oczekiwana liczba exaltów i koszt), `improvement_plan` (koszt, zysk na divine, znany koszt całości) oraz appka.
+
+## Test na prawdziwych postaciach (poe.ninja)
+
+```bash
+.venv/Scripts/python scripts/fetch_corpus.py --league runesofaldur   # po 1 postaci na ascendancy -> data/corpus/ (poza repo)
+.venv/Scripts/python scripts/run_corpus.py [--quick]                # wszystkie narzędzia + porównanie z liczbami poe.ninja
+```
+
+Raport trafia do `data/corpus_report.md` i `.json`. poe.ninja ostro limituje zapytania (429), więc skrypt pobiera powoli i ponawia, a przy kolejnym uruchomieniu dociąga brakujące ascendancy.
+
+Ostatni wynik (16.11, Runes of Aldur + 2 postacie z Forbidden Rites, 23/23 ascendancy):
+- 0 błędów we wszystkich narzędziach;
+- staty obronne zgodne z poe.ninja u wszystkich postaci;
+- 79 skilli z DPS zgodnym co do ±3% (hit i DoT osobno, miniony, stat sety, skille z drugiego zestawu broni);
+- żadne narzędzie nie zmieniło buildu;
+- znane drobne różnice: część skilli minionów z kilkoma atakami (Ruzhan's Brand, Skeletal Arsonist, Wild Protector).

@@ -134,11 +134,15 @@ def test_config_boss_setting(pob, base):
 # ---- all skills -----------------------------------------------------------------------
 def test_all_skill_dps_matches_poe_ninja(pob, base):
     by_name = {}
-    for d in pob.all_skill_dps():
-        by_name.setdefault(d["name"], d)
-    assert by_name["Twister"]["TotalDPS"] == pytest.approx(197_000, rel=0.005)
-    assert by_name["Whirling Slash"]["TotalDPS"] == pytest.approx(8_000, rel=0.01)
-    assert by_name["Wild Protector"]["MinionDPS"] == pytest.approx(700, rel=0.05)
+    for d in pob.all_skill_dps():  # skills with stat sets / minion skills get one row each
+        by_name.setdefault(d["base_name"], []).append(d)
+
+    def near(name, key, value, rel):
+        return any(d[key] == pytest.approx(value, rel=rel) for d in by_name[name])
+
+    assert near("Twister", "TotalDPS", 197_000, 0.005)
+    assert near("Whirling Slash", "TotalDPS", 8_000, 0.01)
+    assert near("Wild Protector", "MinionDPS", 700, 0.05)
     assert pob.summary() == base  # main skill restored
 
 

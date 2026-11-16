@@ -88,3 +88,14 @@ def test_improvement_plan(s):
     assert r["all_together"]["dps_pct"] > max(x["dps_pct"] for x in r["top_changes"])
     assert r["gear_stat_priorities"]
     assert s.pob.summary() == s.base
+
+
+def test_support_budget_skips_expensive(s, monkeypatch):
+    import soe.prices
+
+    monkeypatch.setattr(soe.prices, "safe_price",
+                        lambda n: {"divine": 50.0, "text": "50 div"} if n == "Zerphi's Infamy" else None)
+    r = optimize_supports(s, budget_divine=5)
+    assert "Zerphi's Infamy" in r["skipped_over_budget"]
+    assert all(x["with"] != "Zerphi's Infamy" for x in (r["best_combination"] or {}).get("swaps", []))
+    assert isinstance(r["current_supports_that_lower_the_score"], list)
