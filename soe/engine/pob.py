@@ -16,9 +16,13 @@ LUA_DIR = Path(__file__).resolve().parent / "lua"
 
 SUMMARY_KEYS = [
     "TotalDPS", "CombinedDPS", "FullDPS", "AverageHit", "Speed", "CritChance", "CritMultiplier",
-    "Life", "EnergyShield", "Mana", "Spirit", "Armour", "Evasion",
+    "Life", "EnergyShield", "Ward", "Mana", "Spirit", "Armour", "Evasion",
+    "EvadeChance", "DeflectionRating", "DeflectChance",
     "FireResist", "ColdResist", "LightningResist", "ChaosResist",
-    "TotalEHP", "Str", "Dex", "Int",
+    "TotalEHP", "PhysicalMaximumHitTaken", "FireMaximumHitTaken", "ColdMaximumHitTaken",
+    "LightningMaximumHitTaken", "ChaosMaximumHitTaken",
+    "LifeRegenRecovery", "ManaRegenRecovery", "EnergyShieldRecharge",
+    "MovementSpeedMod", "Str", "Dex", "Int",
 ]
 
 
