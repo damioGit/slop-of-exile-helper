@@ -15,6 +15,25 @@ Nie piszemy własnego kalkulatora obrażeń (to by zajęło rok i byłoby błęd
 które pozwala *zmieniać build i liczyć wynik tysiące razy*, a na to kładziemy:
 bazę wiedzy, optymalizatory, silnik interakcji i Claude'a jako mózg rozmowy z graczem.
 
+## 1b. Scenariusz główny (test akceptacyjny nr 1)
+
+> **Gracz:** „Podoba mi się unikat X, a to moja postać” *(kod PoB / import postaci)*.
+
+Co robi helper, krok po kroku:
+
+1. **Wczytuje postać** do silnika PoB i liczy stan wyjściowy: DPS, EHP, resy, atrybuty, sloty.
+2. **Czyta unikat z KB**: jego mody, tagi, mechaniki, np. „konwertuje X na Y” albo „triggeruje Z”.
+3. **Analizuje dopasowanie** przez silnik combo: które obecne skille i supporty z nim działają, a co się gryzie albo traci wartość.
+4. **Liczy na prawdziwym PoB**: wkłada unikat w slot i pokazuje różnicę (DPS, EHP, co się zepsuło: resy, atrybuty, requirementy).
+5. **Naprawia build**: optymalizator szuka zmian, które wykorzystują unikat, czyli przepięcie supportów, inny main skill, przestawienie node'ów na drzewku, zmiana ascendancy.
+6. **Uzupełnia dziury**: stat weights mówią, czego brakuje na gearze („potrzebujesz +40% fire res i ~60 str”), a crafting podpowiada, jak to zrobić najtaniej.
+7. **Werdykt i plan** od Claude'a, ludzkim językiem:
+   - „Tak, możesz pod to zagrać. Będzie optymalnie, jeśli zrobisz A, B, C” (z liczbami przed i po),
+   - albo „Nie warto, bo…, ale ten unikat świetnie działa z buildem W”,
+   - lista: gemy, supporty, node'y, crafty w kolejności priorytetu i kosztu.
+
+Każdy moduł poniżej istnieje po to, żeby ten scenariusz działał.
+
 ## 2. Architektura
 
 ```
