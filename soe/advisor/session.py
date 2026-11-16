@@ -61,6 +61,28 @@ class Session:
         self.base: dict = {}
         self.original_code: str | None = None
 
+    # ---- process pool (parallel full recalculations) ------------------------------
+    _pool = None
+    _pool_xml = None
+    pool_workers: int | None = None
+
+    def pool(self):
+        """Pool of PoB processes loaded with the current build state (rebuilt when the build changed)."""
+        from soe.engine.pool import PoBPool
+
+        self._need_build()
+        xml = self.pob.export_xml()
+        if self._pool is None or self._pool_xml != xml:
+            self.close_pool()
+            self._pool = PoBPool(xml=xml, workers=self.pool_workers)
+            self._pool_xml = xml
+        return self._pool
+
+    def close_pool(self):
+        if self._pool is not None:
+            self._pool.close()
+            self._pool = None
+
     # ---- lazy resources ----------------------------------------------------------
     @property
     def pob(self) -> PoB:

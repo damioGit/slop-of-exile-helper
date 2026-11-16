@@ -3,7 +3,7 @@
 Optymalizator buildów do Path of Exile 2, oparty na silniku Path of Building (PoE2) i Claude'zie.
 Plan i harmonogram: [PLAN.md](PLAN.md).
 
-**Status:** fazy 0–3 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
+**Status:** fazy 0–4 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
 
 ## Setup (Windows)
 
@@ -25,7 +25,8 @@ py -m venv .venv
 
 Serwer `soe` jest zarejestrowany w `.mcp.json`. Claude Code w tym folderze pyta przy starcie, czy go włączyć.
 Wymaga zbudowanej bazy (`soe kb build`). Narzędzia: `load_build`, `build_overview`, `checkup`, `get_item`, `build_config`,
-`whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `rank_respec`, `export_build`, `reset_build`,
+`whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `rank_respec`,
+`stat_weights`, `optimize_supports`, `optimize_tree`, `improvement_plan`, `export_build`, `reset_build`,
 `kb_search`, `kb_gem`, `kb_supports_for`, `kb_unique`, `kb_mods`, `kb_node`. Zasady odpowiadania są w [CLAUDE.md](CLAUDE.md).
 
 `checkup` to lista tego, co hamuje build: resy, najsłabszy max hit, atrybuty, spirit, mana, supporty, które nie działają,
@@ -34,6 +35,14 @@ Wynik ułożony jest wg wag celów gracza. Format jest wzorowany na [Exile Build
 (reytla, MIT), szczegóły w [NOTICE](NOTICE).
 
 Ręczne uruchomienie: `.venv/Scripts/python -m soe.advisor.server` (stdio).
+
+### Optymalizatory (`soe/optimize/`)
+
+- `objective.py`: cel = waga_dmg · ln(DPS) + waga_surv · ln(EHP), z karami za spadek resów, niespełnione atrybuty i przekroczony spirit
+- `stat_weights.py`: ile wart jest każdy z ~45 statów gearowych (dodany do biżuterii, what-if, < 0.5 s)
+- `supports.py`: wszystkie pasujące supporty w każdym slocie, pełne przeliczenia PoB na puli procesów, 2 etapy (~25 s); reguły: support raz na skill, jedna rodzina gemów
+- `tree.py`: zachłanne ruchy na drzewku (zwolnij słabe → weź mocne), każdy ruch sprawdzony w PoB; pasywek, których PoB nie liczy, nie rusza
+- `plan.py`: `improvement_plan` łączy wszystko, mierzy całość razem i dokłada priorytety statów na gear
 
 ## Baza wiedzy
 

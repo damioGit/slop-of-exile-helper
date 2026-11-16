@@ -155,6 +155,10 @@ class PoB:
         """Passive point budget: used, available, unspent, weapon set points, ascendancy points."""
         return _lua_to_py(self._call(self.api.points))
 
+    def mod_supported(self, line: str) -> bool:
+        """True if PoB's mod parser understands the stat line (otherwise it does nothing in calcs)."""
+        return bool(self._call(self.api.mod_supported, line))
+
     def enemy_resists(self) -> dict:
         """Enemy resistances/armour/evasion as the current config (e.g. boss preset) sets them."""
         return _lua_to_py(self._call(self.api.enemy_resists)) or {}

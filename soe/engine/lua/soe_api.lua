@@ -411,6 +411,12 @@ function soe.unequip(slotName)
 	return true
 end
 
+-- Can PoB's mod parser turn this stat line into modifiers? (unparsed lines do nothing in calcs)
+function soe.mod_supported(line)
+	local list, extra = modLib.parseMod(line)
+	return list ~= nil and #list > 0 and not extra
+end
+
 -- ---- save -------------------------------------------------------------------------
 function soe.export_xml()
 	return build:SaveDB("soe")

@@ -4,6 +4,7 @@ Jobs are plain dicts so they cross process boundaries:
     {"call": "whatif", "kwargs": {...}}                     -> any PoB method, result returned as is
     {"trial": [["set_gem", {...}], ["equip", {...}]]}       -> apply steps, return summary(), roll back
     {"trial": [...], "then": "all_skill_dps"}               -> same, but return another method's result
+    {"do": [[...]], "undo": [[...]]}                        -> apply, summary(), explicit undo (fast, no snapshot)
 
 Usage:
     with PoBPool(build_code) as pool:
@@ -29,6 +30,15 @@ def _run(job: dict):
     try:
         if "call" in job:
             return {"ok": True, "result": getattr(_pob, job["call"])(**job.get("kwargs", {}))}
+        if "do" in job:
+            # fast path: apply steps, read summary, apply explicit undo steps (no XML snapshot)
+            try:
+                for name, kwargs in job["do"]:
+                    getattr(_pob, name)(**kwargs)
+                return {"ok": True, "result": getattr(_pob, job.get("then", "summary"))()}
+            finally:
+                for name, kwargs in job["undo"]:
+                    getattr(_pob, name)(**kwargs)
         with _pob.trial():
             for name, kwargs in job["trial"]:
                 getattr(_pob, name)(**kwargs)

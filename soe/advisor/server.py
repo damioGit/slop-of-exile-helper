@@ -132,6 +132,55 @@ def checkup(damage: int = 2, survive: int = 2, mana: int = 1, ease: int = 1, spe
     return run_checkup(session, {"damage": damage, "survive": survive, "mana": mana, "ease": ease, "speed": speed}, deep)
 
 
+def _goals(damage, survive):
+    from soe.optimize.objective import Objective
+
+    return Objective.from_goals({"damage": damage, "survive": survive})
+
+
+@tool
+def stat_weights(damage: float = 1, survive: float = 1) -> dict:
+    """What each common gear stat is worth to this build (life, ES, resistances, attributes, crit, speed,
+    added damage, +skill levels, penetration...): DPS %, EHP % and objective score per stat line,
+    measured by adding the line to equipped jewellery. Use it to tell the player what to look for on gear.
+    damage/survive weight the score (e.g. survive=2 for a tanky build)."""
+    from soe.optimize.stat_weights import stat_weights as sw
+
+    return sw(session.pob, session.base, _goals(damage, survive))
+
+
+@tool
+def optimize_supports(group: int | None = None, damage: float = 1, survive: float = 1) -> dict:
+    """Try every compatible support gem in every support slot of a skill group (default: main skill)
+    with full PoB recalculations in parallel (~20-30 s). Returns the value of each current support,
+    the best swaps per slot and the best set of swaps checked together with apply_steps."""
+    from soe.optimize.supports import optimize_supports as opt
+
+    return opt(session, group, _goals(damage, survive))
+
+
+@tool
+def optimize_tree(damage: float = 1, survive: float = 1, max_moves: int = 6, max_path: int = 5,
+                  include_small: bool = False) -> dict:
+    """Greedy passive tree optimizer: spends free points and moves points from weak passives to strong
+    ones (refund + allocate), verified in PoB after each move (~10-30 s). Keeps passives PoB cannot
+    calculate. Returns the moves, total DPS/EHP change, apply_steps and the final build code.
+    The loaded build is not changed."""
+    from soe.optimize.tree import optimize_tree as opt
+
+    return opt(session, _goals(damage, survive), max_moves=max_moves, max_path=max_path, include_small=include_small)
+
+
+@tool
+def improvement_plan(damage: float = 1, survive: float = 1, top: int = 10) -> dict:
+    """The answer to "what should I change?": best support swaps, main skill gem level, passive moves,
+    ranked by gain, plus everything together measured as one bundle, plus which stats to look for on
+    gear. Takes ~1 minute. damage/survive weight the goal."""
+    from soe.optimize.plan import improvement_plan as plan
+
+    return plan(session, {"damage": damage, "survive": survive}, top=top)
+
+
 @tool
 def rank_respec(metric: str = "dps", limit: int = 15) -> dict:
     """Allocated passives ordered by the smallest loss per refunded point (node + nodes that only connect
