@@ -99,7 +99,7 @@ Konsekwencja: dochodzi warstwa **`api/`** (lokalny serwer HTTP, FastAPI), z któ
 |---|---|---|
 | **0. Bootstrap** ✅ | 16.11 | Repo, submoduł PoB2, `lupa` ładuje PoB headless, wklejam kod buildu → dostaję DPS/EHP w JSON. |
 | **1. Engine API** ✅ | 16.11 | `mutate()` dla node'ów drzewka, gemów, itemów, configu; snapshot/rollback; pula instancji; test wydajności (cel: >20 evali/s). |
-| **2. Knowledge Base** | 21–25.11 | SQLite ze wszystkimi gemami/supportami/modami/unikatami/drzewkiem, wyszukiwarka, CLI `soe kb search "fire spell"`. |
+| **2. Knowledge Base** ✅ | 16.11 | SQLite ze wszystkimi gemami/supportami/modami/unikatami/drzewkiem, wyszukiwarka, CLI `soe kb search "fire spell"`. |
 | **3. MCP + Advisor v1** | 24–28.11 | Claude w Claude Code widzi narzędzia, odpowiada na „jak zwiększyć DPS tego buildu” na prawdziwych liczbach. |
 | **4. Optymalizatory** | 26.11–4.12 | Stat weights, optymalizacja drzewka i supportów, raport „top 10 zmian za najmniej”. |
 | **5. Combo + Crafting** | 1–9.12 | Graf interakcji i sugestie combosów; planer craftu (o ile dane wag modów będą dostępne). |
@@ -111,7 +111,7 @@ Konsekwencja: dochodzi warstwa **`api/`** (lokalny serwer HTTP, FastAPI), z któ
 1. **PoB 1.0 może wyjść z opóźnieniem** względem gry (zwykle godziny–2 dni). Pipeline musi być gotowy, żeby zadziałał w minuty po releasie.
 2. **Headless PoB na Windows** — potrzebuje LuaJIT + kilku modułów C (np. `lua-utf8`, zlib do kodów buildu). Zamiast tego dekodujemy kody w Pythonie, a moduły stubujemy. Fallback: build LuaJIT ze źródeł albo WSL.
 3. **Wydajność** — pełny przelicz PoB to ~50–300 ms. Optymalizator musi być sprytny (heurystyka + PoB do weryfikacji), plus wiele procesów równolegle.
-4. **Wagi modów do craftingu** — PoB ma mody i tiery, ale nie zawsze spawn weights. Może trzeba będzie dociągnąć dane z exportu plików gry (narzędzia typu RePoE/poe2db). Do sprawdzenia w fazie 2.
+4. **Wagi modów do craftingu** — sprawdzone 16.11: PoB ma dla każdego moda tylko 0/1 („może wypaść na tym slocie” albo nie), bez prawdziwych wag. Wg r/pathofexiledev pliki PoE2 w ogóle nie mają wag, bo GGG trzyma je na serwerze. Plan na fazę 5: liczymy, co może wypaść na danej bazie i ilvl (pula modów, tiery, grupy, prefix/suffix) przy równych wagach, a wagi od społeczności (wiki PoE2 ma tabelę spawn weights) dokładamy jako opcjonalną poprawkę. Szanse pokazujemy jako przybliżone.
 5. **„Wszystko”** — robimy to warstwami. Każda faza daje coś, czego da się używać od razu, zamiast jednego wielkiego wybuchu 10 grudnia.
 6. **ToS** — tylko dane z PoB, publiczne API i pliki gry offline. Zero automatyzacji klienta gry.
 

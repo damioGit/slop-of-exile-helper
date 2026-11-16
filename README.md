@@ -3,7 +3,7 @@
 Optymalizator buildów do Path of Exile 2, oparty na silniku Path of Building (PoE2) i Claude'zie.
 Plan i harmonogram: [PLAN.md](PLAN.md).
 
-**Status:** faza 0 i 1 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
+**Status:** fazy 0–2 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
 
 ## Setup (Windows)
 
@@ -20,6 +20,20 @@ py -m venv .venv
 .venv/Scripts/soe eval <kod buildu PoB>         # podsumowanie: DPS, EHP, resy, atrybuty
 .venv/Scripts/soe eval build.txt --full         # wszystkie staty, które liczy PoB
 ```
+
+## Baza wiedzy
+
+```bash
+.venv/Scripts/soe kb build                       # data/kb.sqlite z danych PoB (~2 s)
+.venv/Scripts/soe kb search life leech           # szuka we wszystkim: gemy, skille, mody, bazy, unikaty, notable, ascendancy
+.venv/Scripts/soe kb gem Twister                 # typy skilla, tagi, staty na max poziomie jako tekst
+.venv/Scripts/soe kb supports Twister            # supporty, które PoB pozwala podpiąć
+.venv/Scripts/soe kb unique Headhunter           # aktualny wariant: implicity i mody
+.venv/Scripts/soe kb mods "maximum Life" --slot ring --type Prefix
+```
+
+W Pythonie: `from soe.kb import KB` i dalej `KB().search(...)`, `gem`, `supports_for`, `unique`, `base`, `node`, `mods(slot=...)`, `mod_tiers(group, slot=...)`, `classes()`.
+Wagi modów w danych PoB to tylko 0/1 (patrz PLAN.md, ryzyko 4).
 
 ## Jak to działa
 

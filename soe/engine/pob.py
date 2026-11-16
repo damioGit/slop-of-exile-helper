@@ -83,6 +83,13 @@ class PoB:
         with self._cwd():
             return fn(*args)
 
+    def export_game_data(self) -> dict:
+        """All game data PoB has loaded (gems, skills, mods, bases, uniques, passive tree) as a dict."""
+        if not self.g.soe.kb_export:
+            with self._cwd():
+                self.lua.execute((LUA_DIR / "kb_export.lua").read_text(encoding="utf-8"))
+        return json.loads(self._call(self.api.kb_export))
+
     # ---- loading / saving ----------------------------------------------
     def new_build(self) -> None:
         self._call(self.g.newBuild)
