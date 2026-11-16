@@ -11,8 +11,23 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = ROOT / "data" / "kb.sqlite"
-SCHEMA_VERSION = 1
+DATA_DIR = ROOT / "data"
+POINTER = DATA_DIR / "kb.current"  # name of the current database file
+LEGACY_DB = DATA_DIR / "kb.sqlite"
+SCHEMA_VERSION = 2
+
+
+def current_db_path() -> Path:
+    """The database `soe kb build` made last. Each build writes a new file and moves this pointer,
+    because on Windows a database open in a running MCP server cannot be replaced."""
+    if POINTER.exists():
+        p = DATA_DIR / POINTER.read_text(encoding="utf-8").strip()
+        if p.exists():
+            return p
+    return LEGACY_DB
+
+
+DB_PATH = LEGACY_DB  # kept for imports; use current_db_path()
 
 SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -48,6 +63,8 @@ CREATE TABLE nodes (
 );
 CREATE INDEX nodes_name ON nodes(name COLLATE NOCASE);
 CREATE TABLE classes (class TEXT, ascendancy TEXT);
+CREATE TABLE essences (id TEXT, name TEXT, family TEXT, tier_level INT, item_type TEXT, mod_id TEXT);
+CREATE INDEX essences_mod ON essences(mod_id);
 CREATE VIRTUAL TABLE search USING fts5(kind UNINDEXED, ref UNINDEXED, name, body, tokenize = 'unicode61 remove_diacritics 2');
 """
 
@@ -90,8 +107,12 @@ def _j(v) -> str:
     return json.dumps(v, ensure_ascii=False)
 
 
-def build(db_path: Path = DB_PATH, game_data: dict | None = None, pob_version: str | None = None) -> dict:
+def build(db_path: Path | None = None, game_data: dict | None = None, pob_version: str | None = None) -> dict:
+    """Build the knowledge base. Without db_path: a new versioned file in data/ that becomes current."""
     t0 = time.perf_counter()
+    managed = db_path is None
+    if managed:
+        db_path = DATA_DIR / f"kb-{time.strftime('%Y%m%d-%H%M%S')}.sqlite"
     if game_data is None:
         from soe.engine.pob import PoB
 
@@ -179,15 +200,27 @@ def build(db_path: Path = DB_PATH, game_data: dict | None = None, pob_version: s
             if a:
                 search.append(("ascendancy", a, a, c["name"]))
 
+    for e in game_data.get("essences", []):
+        con.execute("INSERT INTO essences VALUES (?,?,?,?,?,?)",
+                    (e["id"], e["name"], e.get("family"), e.get("tier_level"), e["item_type"], e["mod_id"]))
+
     con.executemany("INSERT INTO search VALUES (?,?,?,?)", search)
     meta = {"schema": SCHEMA_VERSION, "pob_version": pob_version, "tree_version": game_data.get("tree_version"),
             "built_at": time.strftime("%Y-%m-%d %H:%M:%S")}
     con.executemany("INSERT INTO meta VALUES (?,?)", [(k, str(v)) for k, v in meta.items()])
     counts = {t: con.execute(f"SELECT count(*) FROM {t}").fetchone()[0]
-              for t in ("gems", "skills", "mods", "bases", "uniques", "nodes")}
+              for t in ("gems", "skills", "mods", "bases", "uniques", "nodes", "essences")}
     con.commit()
     con.close()
     tmp.replace(db_path)
+    if managed:
+        POINTER.write_text(db_path.name, encoding="utf-8")
+        for old in list(DATA_DIR.glob("kb-*.sqlite")) + [LEGACY_DB]:
+            if old != db_path and old.exists():
+                try:
+                    old.unlink()
+                except OSError:
+                    pass  # still open somewhere (e.g. a running MCP server); removed next time
     return {**meta, **counts, "seconds": round(time.perf_counter() - t0, 1), "path": str(db_path)}
 
 

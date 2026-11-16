@@ -66,6 +66,23 @@ def improvement_plan(session, goals: dict | None = None, use_supports: bool = Tr
                           "score": m["gain"], "dps_pct": m["dps_pct"], "ehp_pct": m["ehp_pct"],
                           "cost": COST["respec"], "steps": m["steps"]})
 
+    # gear: best single mod change per equipped slot
+    from soe.items.craft import mod_upgrades
+
+    for it in pob.items(active_only=True):
+        if it["slot"].startswith(("Flask", "Charm", "Weapon")):
+            continue
+        try:
+            up = mod_upgrades(session, it["slot"], obj, limit=1)
+        except Exception:
+            continue
+        if up["upgrades"] and not up["corrupted"]:
+            u = up["upgrades"][0]
+            items.append({"kind": "gear", "what": f"{up['slot']} ({it['name']}): {u['replace']} -> {u['with']}",
+                          "score": u["score"], "dps_pct": u["dps_pct"], "ehp_pct": u["ehp_pct"],
+                          "cost": COST["gear"] + (f"; essence: {', '.join(u['essence'])}" if u["essence"] else ""),
+                          "steps": []})
+
     weights = stat_weights(pob, base, obj)
     gear_targets = [{"stat": w["stat"], "score": w["score"], "dps_pct": w["dps_pct"], "ehp_pct": w["ehp_pct"]}
                     for w in weights["weights"][:8]]

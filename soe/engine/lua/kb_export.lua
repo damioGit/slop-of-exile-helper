@@ -176,6 +176,15 @@ function soe.kb_export()
 		out.classes[#out.classes + 1] = { name = cls.name, ascendancies = asc }
 	end
 
+	-- essences: guaranteed mod per item type
+	out.essences = {}
+	for id, e in pairs(data.essences or {}) do
+		for itemType, modId in pairs(e.mods or {}) do
+			out.essences[#out.essences + 1] = { id = id, name = e.name, family = e.type, tier_level = e.tierLevel,
+				item_type = itemType, mod_id = modId }
+		end
+	end
+
 	out.tree_version = build.spec.treeVersion
 	return json.encode(out)
 end

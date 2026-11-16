@@ -6,7 +6,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from soe.kb.build import DB_PATH
+from soe.kb.build import current_db_path
 
 _JSON_COLS = {
     "tags", "stats_text", "skill_types", "minion_types", "require_types", "add_types", "exclude_types",
@@ -50,7 +50,8 @@ def _fts_query(text: str) -> str:
 
 
 class KB:
-    def __init__(self, path: Path = DB_PATH):
+    def __init__(self, path: Path | None = None):
+        path = path or current_db_path()
         if not Path(path).exists():
             raise FileNotFoundError(f"{path} missing; run: soe kb build")
         self.con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
@@ -165,6 +166,29 @@ class KB:
         for i, r in enumerate(rows, 1):
             r["tier"] = i
         return rows
+
+    def mod_pool(self, base_name: str, ilvl: int = 100, domain: str = "Item") -> list[dict]:
+        """Mods that can roll on a base at an item level, using the game's rule: the first weight key in
+        the mod's list that the base has decides (weight 0 = cannot roll). Real weights are not in PoB, so
+        every possible mod has weight 1 here."""
+        base = self.base(base_name)
+        if not base:
+            raise ValueError(f"unknown base {base_name!r}")
+        tags = set(base["tags"])
+        out = []
+        for m in self._rows("SELECT * FROM mods WHERE domain = ? AND level <= ? AND type IN ('Prefix','Suffix')",
+                            (domain, ilvl)):
+            w = next((v for k, v in zip(m["weight_keys"], m["weight_vals"]) if k in tags), 0)
+            if w > 0:
+                out.append(m)
+        return out
+
+    def essences_for(self, mod_id: str) -> list[dict]:
+        return self._rows("SELECT name, family AS essence_type, tier_level, item_type FROM essences WHERE mod_id = ?",
+                          (mod_id,))
+
+    def uniques_for_base_type(self, base_type: str) -> list[dict]:
+        return self._rows("SELECT u.* FROM uniques u JOIN bases b ON b.name = u.base WHERE b.type = ?", (base_type,))
 
     def classes(self) -> dict[str, list[str]]:
         res: dict[str, list[str]] = {}

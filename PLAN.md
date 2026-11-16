@@ -102,7 +102,7 @@ Konsekwencja: dochodzi warstwa **`api/`** (lokalny serwer HTTP, FastAPI), z któ
 | **2. Knowledge Base** ✅ | 16.11 | SQLite ze wszystkimi gemami/supportami/modami/unikatami/drzewkiem, wyszukiwarka, CLI `soe kb search "fire spell"`. |
 | **3. MCP + Advisor v1** ✅ | 16.11 | Claude w Claude Code widzi narzędzia, odpowiada na „jak zwiększyć DPS tego buildu” na prawdziwych liczbach. |
 | **4. Optymalizatory** ✅ | 16.11 | Check-up z wagami celów, ranking respecu, budżet punktów, wagi statów do gearu, optymalizator supportów (pula procesów), optymalizator drzewka (respec + nowe ścieżki), improvement_plan łączący wszystko. |
-| **5. Combo + Crafting** | 1–9.12 | Graf interakcji i sugestie combosów; planer craftu (o ile dane wag modów będą dostępne). |
+| **5. Combo + Crafting** ✅ | 16.11 | Silnik mechanik (tworzy/korzysta, payoffy, enablery, sprawdzenie configu), ranking i test unikatów, crafting: pula modów, tiery, wymiany modów z esencjami, idealny item, szanse (równe wagi). |
 | **6. Web appka + launch pipeline** | 3–10.12 | Lokalna appka (build, staty, drzewko, plan zmian). Skrypt „nowy release PoB → dane gotowe” w < 30 min, próba na 0.22 → 0.23. |
 
 ### Web appka: zakres (pomysły m.in. z Exile Build Advisor, reytla, MIT)

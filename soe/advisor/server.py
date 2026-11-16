@@ -132,10 +132,10 @@ def checkup(damage: int = 2, survive: int = 2, mana: int = 1, ease: int = 1, spe
     return run_checkup(session, {"damage": damage, "survive": survive, "mana": mana, "ease": ease, "speed": speed}, deep)
 
 
-def _goals(damage, survive):
+def _goals(damage, survive, speed=1.0):
     from soe.optimize.objective import Objective
 
-    return Objective.from_goals({"damage": damage, "survive": survive})
+    return Objective.from_goals({"damage": damage, "survive": survive, "speed": speed})
 
 
 @tool
@@ -179,6 +179,63 @@ def improvement_plan(damage: float = 1, survive: float = 1, top: int = 10) -> di
     from soe.optimize.plan import improvement_plan as plan
 
     return plan(session, {"damage": damage, "survive": survive}, top=top)
+
+
+@tool
+def try_unique(name: str, slot: str | None = None, damage: float = 1, survive: float = 1) -> dict:
+    """"I like unique X": puts the unique in the build (best fitting slot unless given) and reports the
+    stat changes, what it replaces, lines PoB cannot calculate and what it breaks (resistances, attributes)."""
+    from soe.items.uniques import try_unique as tu
+
+    return tu(session, name, slot, _goals(damage, survive))
+
+
+@tool
+def rank_uniques(slot: str, damage: float = 1, survive: float = 1, limit: int = 15) -> dict:
+    """Every unique of the item type in `slot` (e.g. 'Ring 1', 'Body Armour', 'Weapon 1'), ranked against
+    the item worn now, measured in PoB."""
+    from soe.items.uniques import rank_uniques as ru
+
+    return ru(session, slot, _goals(damage, survive), limit)
+
+
+@tool
+def mod_upgrades(slot: str, damage: float = 1, survive: float = 1, limit: int = 10) -> dict:
+    """Crafting: for each mod on the item in `slot`, the best replacement of the same affix type (prefix or
+    suffix) that can roll on its base at its item level, with the gain and an essence that guarantees it.
+    Lines from outside the normal pool (fractured, desecrated, runes, catalyst-boosted values) are listed."""
+    from soe.items.craft import mod_upgrades as mu
+
+    return mu(session, slot, _goals(damage, survive), limit)
+
+
+@tool
+def ideal_item(slot: str, damage: float = 1, survive: float = 1, item_level: int | None = None) -> dict:
+    """The best 3 prefixes + 3 suffixes for this build on the base in `slot` (top tier, top rolls), and how
+    much better it is than the current item. A ceiling to aim at and a list of what to look for."""
+    from soe.items.craft import ideal_item as ii
+
+    return ii(session, slot, _goals(damage, survive), item_level)
+
+
+@tool
+def craft_odds(base: str, item_level: int, want_groups: list[str]) -> dict:
+    """Chance that one random added prefix/suffix lands in the wanted mod families (names as in
+    ideal_item / mod_upgrades 'group'). Equal weights: PoB has no real spawn weights, so it is an estimate."""
+    from soe.items.craft import craft_odds as co
+
+    return co(session, base, item_level, want_groups)
+
+
+@tool
+def suggest_combos(damage: float = 1, survive: float = 1, max_cost: int = 6) -> dict:
+    """Combo engine (~10 s): which mechanics the build creates (shock, blind, frenzy charges, whirlwinds,
+    heralds...) and which it feeds on; payoffs that use what it creates and enablers for what it lacks
+    (supports and passives measured in PoB, uniques as leads); and config conditions switched on in PoB
+    that nothing in the build creates (optimistic numbers)."""
+    from soe.combo.mechanics import suggest_combos as sc
+
+    return sc(session, _goals(damage, survive), max_cost)
 
 
 @tool

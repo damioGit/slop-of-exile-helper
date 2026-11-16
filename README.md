@@ -3,7 +3,7 @@
 Optymalizator buildów do Path of Exile 2, oparty na silniku Path of Building (PoE2) i Claude'zie.
 Plan i harmonogram: [PLAN.md](PLAN.md).
 
-**Status:** fazy 0–4 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
+**Status:** fazy 0–5 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`), ładuje buildy z kodu lub XML, zmienia je przez API i liczy staty.
 
 ## Setup (Windows)
 
@@ -26,7 +26,8 @@ py -m venv .venv
 Serwer `soe` jest zarejestrowany w `.mcp.json`. Claude Code w tym folderze pyta przy starcie, czy go włączyć.
 Wymaga zbudowanej bazy (`soe kb build`). Narzędzia: `load_build`, `build_overview`, `checkup`, `get_item`, `build_config`,
 `whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `rank_respec`,
-`stat_weights`, `optimize_supports`, `optimize_tree`, `improvement_plan`, `export_build`, `reset_build`,
+`stat_weights`, `optimize_supports`, `optimize_tree`, `improvement_plan`, `try_unique`, `rank_uniques`,
+`mod_upgrades`, `ideal_item`, `craft_odds`, `suggest_combos`, `export_build`, `reset_build`,
 `kb_search`, `kb_gem`, `kb_supports_for`, `kb_unique`, `kb_mods`, `kb_node`. Zasady odpowiadania są w [CLAUDE.md](CLAUDE.md).
 
 `checkup` to lista tego, co hamuje build: resy, najsłabszy max hit, atrybuty, spirit, mana, supporty, które nie działają,
@@ -42,7 +43,14 @@ Ręczne uruchomienie: `.venv/Scripts/python -m soe.advisor.server` (stdio).
 - `stat_weights.py`: ile wart jest każdy z ~45 statów gearowych (dodany do biżuterii, what-if, < 0.5 s)
 - `supports.py`: wszystkie pasujące supporty w każdym slocie, pełne przeliczenia PoB na puli procesów, 2 etapy (~25 s); reguły: support raz na skill, jedna rodzina gemów
 - `tree.py`: zachłanne ruchy na drzewku (zwolnij słabe → weź mocne), każdy ruch sprawdzony w PoB; pasywek, których PoB nie liczy, nie rusza
-- `plan.py`: `improvement_plan` łączy wszystko, mierzy całość razem i dokłada priorytety statów na gear
+- `plan.py`: `improvement_plan` łączy wszystko (supporty, drzewko, najlepsza zmiana moda na każdym slocie), mierzy całość razem i dokłada priorytety statów na gear
+
+### Itemy i combo (`soe/items/`, `soe/combo/`)
+
+- `uniques.py`: `try_unique` (wstaw unikat, zobacz zmiany, linie, których PoB nie liczy, co psuje) i `rank_uniques` (wszystkie unikaty danego typu vs obecny item, ~0.5 s)
+- `craft.py`: pula modów bazy dla ilvl (zasada pierwszego pasującego tagu wagi), rozpoznawanie tieru moda (z zakresem, też ponad tiery po katalizatorach), `mod_upgrades` (co wymienić, na co, esencja), `ideal_item` (sufit 3+3), `craft_odds` (równe wagi = szacunek)
+- `mechanics.py`: słownik ~25 mechanik (ailmenty, charge'e, whirlwind, infusion, ground, herald...), profil buildu (tworzy / korzysta), payoffy i enablery mierzone w PoB, sprawdzenie warunków włączonych w configu bez źródła w buildzie (~10 s z pulą)
+- baza wiedzy: tabela esencji; każda budowa to nowy plik `data/kb-*.sqlite` + wskaźnik `data/kb.current` (na Windows otwartej bazy nie da się podmienić)
 
 ## Baza wiedzy
 

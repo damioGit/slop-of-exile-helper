@@ -17,8 +17,10 @@ RES_CAP = 75
 class Objective:
     damage: float = 1.0
     survive: float = 1.0
+    speed: float = 1.0            # movement speed (mapping comfort); 0 to ignore
     dps_key: str = "CombinedDPS"
     ehp_key: str = "TotalEHP"
+    speed_key: str = "MovementSpeedMod"
     res_penalty: float = 2.0      # per resistance point lost below min(before, cap)
     attr_penalty: float = 50.0    # flat, per attribute with an unmet requirement
     spirit_penalty: float = 50.0  # flat, if Spirit becomes over-reserved
@@ -26,7 +28,8 @@ class Objective:
     @classmethod
     def from_goals(cls, goals: dict | None) -> "Objective":
         g = goals or {}
-        return cls(damage=float(g.get("damage", 1)), survive=float(g.get("survive", 1)))
+        return cls(damage=float(g.get("damage", 1)), survive=float(g.get("survive", 1)),
+                   speed=float(g.get("speed", 1)))
 
     def _ratio(self, after: float, before: float) -> float:
         if before <= 0:
@@ -37,6 +40,8 @@ class Objective:
         """Improvement of `after` over `base`; 0 = same, ~1 = +1% on a weight-1 goal."""
         s = 100 * (self.damage * self._ratio(after.get(self.dps_key, 0), base.get(self.dps_key, 0))
                    + self.survive * self._ratio(after.get(self.ehp_key, 0), base.get(self.ehp_key, 0)))
+        if self.speed and base.get(self.speed_key):
+            s += 100 * self.speed * self._ratio(after.get(self.speed_key, 0), base[self.speed_key])
         return s - self.penalty(after, base)
 
     def penalty(self, after: dict, base: dict) -> float:
@@ -57,5 +62,9 @@ class Objective:
         def pct(k):
             b = base.get(k, 0)
             return round((after.get(k, 0) - b) / b * 100, 2) if b else None
-        return {"score": round(self.score(after, base), 2), "dps_pct": pct(self.dps_key),
-                "ehp_pct": pct(self.ehp_key), "penalty": round(self.penalty(after, base), 2)}
+        res = {"score": round(self.score(after, base), 2), "dps_pct": pct(self.dps_key),
+               "ehp_pct": pct(self.ehp_key), "penalty": round(self.penalty(after, base), 2)}
+        ms = pct(self.speed_key)
+        if ms:
+            res["move_speed_pct"] = ms
+        return res
