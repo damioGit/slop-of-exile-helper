@@ -58,6 +58,18 @@ def ask(question: str, skill: str | None = None, goal: str | None = None, budget
 
 
 @tool
+def find_upgrade(slot: str, wanted_mod: str | None = None, budget_divine: float | None = None,
+                 damage: float = 1, survive: float = 1) -> dict:
+    """Search the official trade site (current league) for a real item to replace the one in `slot`: keeps the
+    current item's strongest mods (at ~80% of its rolls) and adds `wanted_mod` (game text, e.g.
+    '+3 to Level of all Lightning Spell Skills'). Every listing is priced and measured in PoB in this build.
+    Returns the best items with stats, price, gain and a link to the same search."""
+    from soe.prices.trade import find_upgrade as run
+
+    return run(session, slot, wanted_mod, budget_divine, _goals(damage, survive))
+
+
+@tool
 def import_character(account_or_link: str, character: str | None = None) -> dict:
     """Load a public character from poe.ninja (Path of Exile 2): either a poe.ninja character link, or the
     account name as shown in game (Name#1234) plus the character name. Finds the league automatically.

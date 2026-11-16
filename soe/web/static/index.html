@@ -105,6 +105,7 @@ button.small { padding: .25em .6em; font-size: 12.5px; }
 .treebox { position: relative; height: 520px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); touch-action: none; }
 .treebox canvas { display: block; cursor: grab; }
 .treetip { position: absolute; display: none; max-width: 250px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; box-shadow: var(--shadow); pointer-events: none; }
+.market { border-left: 3px solid var(--info); padding: 6px 10px; margin-top: 6px; background: var(--panel-2); border-radius: 6px; }
 .empty { text-align: center; padding: 30px 10px; color: var(--muted); }
 @media (max-width: 600px) {
   main { padding: 10px; } header { padding: 8px 10px; } .gauge { grid-template-columns: 70px 1fr 48px; }
@@ -237,7 +238,7 @@ const views = {
       <div class="chips" style="margin:8px 0">${examples.map(x => `<button class="ghost small ex" style="font-weight:500">${esc(x)}</button>`).join("")}</div>
       <div class="row">
         <label class="small muted">Skill: <select id="qSkill" style="width:auto">${skills.map(s => `<option value="${s.group}:${s.skill}" ${s.main ? "selected" : ""}>${esc(s.label)}${s.main ? " (główny)" : ""}</option>`).join("")}</select></label>
-        <label class="small muted">Cel: <select id="qGoal" style="width:auto"><option value="">z pytania</option><option value="dps">DPS</option><option value="hit">pojedynczy hit (oneshot)</option><option value="survive">przetrwanie</option><option value="mana">mana</option><option value="speed">prędkość ruchu</option></select></label>
+        <label class="small muted">Cel: <select id="qGoal" style="width:auto"><option value="">z pytania</option><option value="dps">DPS</option><option value="hit">pojedynczy hit (oneshot)</option><option value="survive">przetrwanie</option><option value="clear">clear map</option><option value="mana">mana</option><option value="speed">prędkość ruchu</option></select></label>
         <button id="btnAsk">Zapytaj</button>
       </div>
       <p class="muted small">Liczenie trwa ~20–60 s: sprawdzam supporty, drzewko, gear i unikaty. Budżet bierzemy z pola nad zakładkami albo z pytania („za 5 div”).</p></div>
@@ -433,6 +434,18 @@ function findingDetails(d) {
   return `<details><summary>szczegóły</summary>${body}<p class="muted small">Klik w nazwę otwiera opis na poe2wiki.</p></details>`;
 }
 
+function marketCard(m) {
+  if (!m) return "";
+  if (m.error) return `<div class="small muted">Rynek: ${esc(m.error)}</div>`;
+  const b = m.best;
+  const link = m.link ? ` <a target="_blank" href="${m.link}">otwórz wyszukiwanie na trade</a>` : "";
+  return `<div class="market"><b>Na rynku:</b> ${esc(m.verdict)}${link}
+    ${b ? `<div class="small"><b>${esc(b.name)}</b> · ${esc(b.price)}${b.price_divine != null ? ` (≈${fmt(b.price_divine, 2)} div)` : ""} · ${pct(b.dps_pct)} DPS · ${pct(b.ehp_pct)} EHP
+      <pre>${esc([...(b.implicits || []), ...(b.grants_skill || []).map(x => "Grants Skill: " + x), "--", ...(b.mods || [])].join("\n"))}</pre></div>` : ""}
+    ${m.warning ? `<div class="small muted">${esc(m.warning)}</div>` : ""}
+    <div class="small muted">Szukane: ${esc((m.searched || []).join(" + "))} · znalezionych ofert: ${m.found}</div></div>`;
+}
+
 function renderAnswer(r) {
   const out = $("#answer");
   const kindPl = {gem: "gem", dead_support: "support nie działa", support: "support", tree: "drzewko", gear: "gear", unique: "unikat"};
@@ -446,8 +459,10 @@ function renderAnswer(r) {
       <div><b>${esc(s.title)}</b> <span class="pill">${kindPl[s.kind] || s.kind}</span></div>
       <div class="small muted">${esc(s.how || "")}</div>
       <div class="small">Zysk: <b class="pos">${esc(s.gain)}</b> · Koszt: ${esc(s.cost || "-")}</div>
+      ${marketCard(s.market)}
       <div class="row" style="margin-top:4px">${s.apply ? `<button class="ghost small" data-apply="${i}">Zastosuj w buildzie</button>` : ""}${s.node ? `<button class="ghost small" data-tree="${esc(s.node)}">Pokaż na drzewku</button>` : ""}</div>
     </div></div>`).join("")}
+    ${(r.beyond_budget || []).length ? `<details class="finding"><summary><b>Poza budżetem ${fmt(r.budget_divine, 1)} div (${r.beyond_budget.length})</b>: realne zyski, ale drożej albo loteria</summary>${r.beyond_budget.map(s => `<div class="step"><div style="flex:1"><b>${esc(s.title)}</b><div class="small muted">${esc(s.how || "")}</div><div class="small">Zysk: ${esc(s.gain)} · Koszt: ${esc(s.cost)}</div>${marketCard(s.market)}</div></div>`).join("")}</details>` : ""}
     ${r.all_together ? `<div class="finding"><h4>Wszystko, co da się zastosować, naraz (zmierzone razem)</h4><p>${esc(r.all_together.gain)}</p><button id="btnAll">Zastosuj wszystko</button></div>` : ""}
     ${r.look_for_on_gear.length ? `<h3>Na nowym gearze szukaj</h3><ul class="small">${r.look_for_on_gear.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
     <p class="muted small">Policzone w ${r.seconds} s. „Zastosuj” zmienia build w appce. „Kod PoB” na górze daje kod do wklejenia w Path of Building.</p></div>`;
@@ -565,11 +580,20 @@ async function slotView(slot) {
         up.upgrades.length ? `<div class="tablewrap"><table><tr><th>Zamień</th><th>Na</th><th class="n">DPS</th><th class="n">EHP</th></tr>${up.upgrades.map(u => `<tr><td class="small">${esc(u.replace)}<div class="muted">${esc(u.replace_as)}</div></td><td class="small"><b>${esc(u.with)}</b>${u.essence.length ? `<div class="muted">esencja: ${esc(u.essence.join(", "))}</div>` : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td></tr>`).join("")}</table></div>` : "<p class='muted'>Nic lepszego w puli modów.</p>"}
         ${up.not_changeable_or_unknown.length ? `<p class="muted small">Spoza zwykłej puli: ${esc(up.not_changeable_or_unknown.join("; "))}</p>` : ""}
         <button class="ghost" id="btnIdeal">Pokaż idealny item na ten slot</button><div id="idealOut"></div>
+        <h3>Ulepszenie z rynku</h3><p class="muted small">Szuka na trade itemu, który zachowa najmocniejsze mody Twojego i doda wybrany mod. Każda oferta przeliczona w PoB. Budżet z pola nad zakładkami.</p>
+        <div class="row"><select id="mktWanted" style="flex:1"><option value="">(tylko zachowaj obecne mody)</option>${up.upgrades.map(u => `<option>${esc(u.with)}</option>`).join("")}</select><button class="ghost" id="btnMarket">Szukaj na rynku</button></div><div id="marketOut"></div>
         ${uq ? `<h3>Unikaty na ten slot</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td><td class="n small">${u.price ? esc(u.price.text) : "–"}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
       </div></div></div>`;
     $("#btnWI").onclick = e => busy(e.target, async () => {
       const r = await api("/api/whatif_item", {body: {slot, item_text: $("#wiText").value}});
       $("#wiOut").innerHTML = diffTable(r.changes) + notes(r.notes);
+    });
+    $("#btnMarket").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const m = await api("/api/find_upgrade", {body: {slot, wanted: $("#mktWanted").value, budget: g.budget, damage: g.damage, survive: g.survive, speed: g.speed}});
+      const best = m.items.find(x => x.score > 0.5);
+      $("#marketOut").innerHTML = marketCard({...m, searched: m.searched_mods, best, verdict: best ? `${best.name} za ${best.price}` : "nic lepszego od obecnego w budżecie"})
+        + (m.items.length ? `<div class="tablewrap"><table><tr><th>Item</th><th class="n">Cena</th><th class="n">DPS</th><th class="n">EHP</th></tr>${m.items.map(x => `<tr><td class="small"><b>${esc(x.name)}</b><div class="muted">${esc((x.mods || []).join("; "))}</div></td><td class="n">${esc(x.price)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td></tr>`).join("")}</table></div>` : "");
     });
     $("#btnIdeal").onclick = e => busy(e.target, async () => {
       const r = await api("/api/ideal_item?" + gq);

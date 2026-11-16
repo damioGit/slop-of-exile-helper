@@ -31,6 +31,12 @@ Kliknij dwa razy **`Slop of Exile Helper`** (skrót z pomarańczowym kryształem
 - Skrót wskazuje na `scripts/start.bat`, a ikona leży w `assets/soe.ico` (rysuje ją `scripts/make_icon.py`).
 - Jeśli przeniesiesz folder, skrót przestanie działać. Wtedy uruchom `scripts/start.bat` albo zrób nowy skrót do niego.
 
+## Rynek (oficjalny trade)
+
+Przy sugestiach gearu asystent i zakładka Gear szukają **prawdziwych ofert** na trade (bieżąca liga). Szukany jest item, który zachowa najmocniejsze mody Twojego obecnego (na ~80% Twoich rolli) i doda wybrany mod. Każda oferta jest przeliczana w PoB na Twoim buildzie, a wynik pokazuje item ze statami, cenę (≈ div), zysk i link do tego samego wyszukiwania na trade. Jeśli w budżecie nic nie bije obecnego itemu, appka mówi to wprost.
+- **Mody na gearze** są oceniane po realnym rollu (środkowy tier). Najlepszy możliwy roll jest pokazany osobno, z szansą na exalta.
+- **Cel „clear”** dla pytań o czyszczenie map: liczy DPS, pociski, obszar i ruch.
+
 ## Import postaci z profilu (poe.ninja)
 
 W appce, w panelu „Wczytaj build”, podaj konto tak jak w grze (`Nazwa#1234`) i nazwę postaci albo wklej link do postaci z poe.ninja, potem „Importuj”. Liga dobiera się sama. „⟳ Synchronizuj” pobiera postać jeszcze raz, np. po zmianach w grze, gdy poe.ninja ją odświeży. W Claude Code działają narzędzia `import_character` i `resync_character`.

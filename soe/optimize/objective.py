@@ -24,6 +24,7 @@ class Objective:
     res_penalty: float = 2.0      # per resistance point lost below min(before, cap)
     attr_penalty: float = 50.0    # flat, per attribute with an unmet requirement
     spirit_penalty: float = 50.0  # flat, if Spirit becomes over-reserved
+    extra: dict | None = None     # more stats in the goal, {stat key: weight}, e.g. projectiles for clear speed
 
     @classmethod
     def from_goals(cls, goals: dict | None) -> "Objective":
@@ -42,6 +43,9 @@ class Objective:
                    + self.survive * self._ratio(after.get(self.ehp_key, 0), base.get(self.ehp_key, 0)))
         if self.speed and base.get(self.speed_key):
             s += 100 * self.speed * self._ratio(after.get(self.speed_key, 0), base[self.speed_key])
+        for key, weight in (self.extra or {}).items():
+            if base.get(key):
+                s += 100 * weight * self._ratio(after.get(key, 0), base[key])
         return s - self.penalty(after, base)
 
     def penalty(self, after: dict, base: dict) -> float:
@@ -67,4 +71,8 @@ class Objective:
         ms = pct(self.speed_key)
         if ms:
             res["move_speed_pct"] = ms
+        for key in self.extra or {}:
+            v = pct(key)
+            if v:
+                res[f"{key}_pct"] = v
         return res

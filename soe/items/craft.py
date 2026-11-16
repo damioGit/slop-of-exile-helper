@@ -28,6 +28,8 @@ def resolve_ranges(text: str, mode: str = "max") -> str:
     def sub(m):
         a, b = float(m.group(1)), float(m.group(2))
         v = b if mode == "max" else (a + b) / 2
+        if mode != "max" and a == int(a) and b == int(b):
+            v = float(int(v))  # whole-number stats (skill levels, flat values) roll whole numbers
         return str(int(v)) if v == int(v) else f"{v:.1f}"
     return _RANGE.sub(sub, text)
 
@@ -201,23 +203,40 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
                 if sig in seen:
                     continue
                 seen.add(sig)
-                new = exp[:i] + _mod_lines(top) + exp[i + 1:]
-                w = pob.whatif(slot=real_slot, item_raw=join_item(head, imp, new), exact_slot=True)
-                ex = obj.explain(w, session.base)
-                if ex["score"] > 0.05:
-                    rows.append({"replace": _clean(exp[i]),
-                                 "replace_as": f"{atype} T{tier}" if tier else f"{atype}, value above normal tiers",
-                                 "with": " / ".join(_mod_lines(top)), "group": key[1], **ex,
-                                 "essence": _essences(kb, top["id"], real_slot)})
-    rows.sort(key=lambda r: r["score"], reverse=True)
+                # typical = the middle tier with a middle roll: what you realistically hit or can afford;
+                # top = the best tier with the best roll: the ceiling, usually a lottery
+                typical = tiers[len(tiers) // 2]
+                evals = {}
+                for label, mod, mode in (("typical", typical, "mid"), ("top", top, "max")):
+                    lines = [resolve_ranges(p, mode) for p in mod["text"].split(" / ")]
+                    w = pob.whatif(slot=real_slot, item_raw=join_item(head, imp, exp[:i] + lines + exp[i + 1:]),
+                                   exact_slot=True)
+                    evals[label] = (lines, obj.explain(w, session.base))
+                t_lines, t_ex = evals["typical"]
+                top_lines, top_ex = evals["top"]
+                if t_ex["score"] <= 0.05:
+                    continue  # a typical roll that is not better than what you have is no suggestion
+                total = sum(len(t) for (a, _), t in groups.items() if a == atype)
+                rows.append({"replace": _clean(exp[i]),
+                             "replace_as": f"{atype} T{tier}" if tier else f"{atype}, value above normal tiers",
+                             "with": " / ".join(t_lines), "with_tier": f"T{len(tiers) // 2 + 1} z {len(tiers)}",
+                             "group": key[1], **t_ex,
+                             "top": {"with": " / ".join(top_lines), "level": top["level"], **top_ex},
+                             "odds": {"family_pct": round(len(tiers) / total * 100, 1),
+                                      "top_tier_pct": round(100 / total, 2),
+                                      "exalts_for_top_tier": total},
+                             "essence": _essences(kb, typical["id"], real_slot) or _essences(kb, top["id"], real_slot)})
+    rows.sort(key=lambda r: r["score"], reverse=True)  # ranked by the realistic (typical) roll
     unknown = [_clean(exp[i]) for i, x in enumerate(lines_info) if not x and exp[i].strip()
                and _clean(exp[i]) not in ("Corrupted", "Mirrored")]
     return {"slot": real_slot, "item": cur["name"], "base": base, "item_level": ilvl, "corrupted": corrupted,
             "upgrades": rows[:limit],
             "not_changeable_or_unknown": unknown,
             "note": ("Corrupted item: it cannot be modified." if corrupted else
-                     "Replace = annul/chaos the old mod and add the new one (or an essence that guarantees it). "
-                     "Fractured, desecrated and rune lines are left as they are.")}
+                     "Ranked by a typical (middle tier, middle roll) replacement; 'top' is the best possible roll and "
+                     "'odds' the chance per Exalted Orb with equal weights (estimate). A top tier at well under 1% is "
+                     "a lottery or an expensive trade item; poe.ninja does not price rare items. Replacing a mod means "
+                     "removing the old one first (annul is random) or an essence that guarantees the new one.")}
 
 
 def craft_odds(session, base: str, ilvl: int, want_groups: list[str]) -> dict:

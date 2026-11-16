@@ -28,6 +28,7 @@ GOAL_WORDS = {
     "survive": [r"umier", r"gin(e|ie|a)", r"zgon", r"przezy", r"tank", r"obron", r"defens", r"ehp", r"zycia",
                 r"oneshot\w* mnie", r"zabija mnie", r"dostaje", r"\bdie\b", r"dying", r"survive"],
     "mana": [r"\bman[aey]\b", r"\bmanie\b", r"mana", r"sustain"],
+    "clear": [r"clear", r"czysc", r"mapy", r"mapowa", r"mapping", r"farm"],
     "speed": [r"szybciej (biega|chodz|porusz)", r"predkosc ruchu", r"movement", r"move speed"],
     "dps": [r"\bdps\b", r"obrazen", r"\bdmg\b", r"damage", r"bic (mocniej|wiecej|szybciej)", r"wiecej bic",
             r"mocniej", r"zabija(c|m)", r"za slab", r"bossy?", r"clear", r"czysci"],
@@ -44,11 +45,12 @@ def parse_question(text: str, skills: list[str]) -> dict:
         goal = "survive"
         understood.append("ktoś Cię oneshotuje → przetrwanie")
     else:
-        for g in ("hit", "survive", "mana", "speed", "dps"):
+        for g in ("hit", "survive", "mana", "clear", "speed", "dps"):
             if any(re.search(p, t) for p in GOAL_WORDS[g]):
                 goal = g
                 understood.append({"hit": "chodzi o pojedynczy, mocny hit (oneshot)", "survive": "chodzi o przetrwanie",
                                    "mana": "chodzi o manę", "speed": "chodzi o prędkość ruchu",
+                                   "clear": "chodzi o czyszczenie map (clear)",
                                    "dps": "chodzi o obrażenia (DPS)"}[g])
                 break
     goal = goal or "dps"
@@ -87,7 +89,8 @@ def parse_question(text: str, skills: list[str]) -> dict:
     return {"goal": goal, "skill": skill, "budget_divine": budget, "understood": understood}
 
 
-GOAL_LABEL = {"dps": "DPS", "hit": "średni hit", "survive": "EHP", "mana": "regeneracja many", "speed": "prędkość ruchu"}
+GOAL_LABEL = {"dps": "DPS", "hit": "średni hit", "survive": "EHP", "mana": "regeneracja many", "speed": "prędkość ruchu",
+              "clear": "clear (DPS + pociski + obszar + ruch)"}
 
 
 def _objective(goal: str, base: dict) -> Objective:
@@ -100,7 +103,18 @@ def _objective(goal: str, base: dict) -> Objective:
         return Objective(damage=0.1, survive=0.1, speed=0, dps_key="ManaRegenRecovery")
     if goal == "speed":
         return Objective(damage=0.2, survive=0.2, speed=1)
+    if goal == "clear":
+        # clearing maps: damage still first, then more projectiles / bigger area / projectile speed / moving faster
+        return Objective(damage=1, survive=0.1, speed=0.6,
+                         extra={"ProjectileCount": 0.5, "AreaOfEffectRadiusMetres": 0.5, "ProjectileSpeedMod": 0.2})
     return Objective(damage=1, survive=0.15, speed=0.3)
+
+
+def _exalt_divine() -> float | None:
+    from soe.prices import safe_price
+
+    p = safe_price("Exalted Orb")
+    return p["divine"] if p else None
 
 
 def _skill_list(pob) -> list[dict]:
@@ -123,16 +137,20 @@ def _gain_text(ex: dict, goal: str) -> str:
     parts = []
     main = ex.get("dps_pct")
     if main:
-        parts.append(f"{GOAL_LABEL.get(goal, 'DPS') if goal != 'survive' else 'DPS'} {main:+.1f}%")
+        parts.append(f"{'średni hit' if goal == 'hit' else 'regeneracja many' if goal == 'mana' else 'DPS'} {main:+.1f}%")
     if ex.get("ehp_pct"):
         parts.append(f"EHP {ex['ehp_pct']:+.1f}%")
     if ex.get("move_speed_pct"):
         parts.append(f"ruch {ex['move_speed_pct']:+.1f}%")
+    if ex.get("ProjectileCount_pct"):
+        parts.append(f"pociski {ex['ProjectileCount_pct']:+.0f}%")
+    if ex.get("AreaOfEffectRadiusMetres_pct"):
+        parts.append(f"obszar {ex['AreaOfEffectRadiusMetres_pct']:+.0f}%")
     return ", ".join(parts) or "bez zmian w liczbach"
 
 
 def ask(session, question: str, skill: str | None = None, goal: str | None = None,
-        budget_divine: float | None = None, deep: bool = True) -> dict:
+        budget_divine: float | None = None, deep: bool = True, market: bool = True) -> dict:
     """Answer a free-text question with a measured to-do list. Takes ~20-60 s with deep=True."""
     from soe.combo.mechanics import config_check, profile
     from soe.items.craft import mod_upgrades
@@ -184,6 +202,7 @@ def ask(session, question: str, skill: str | None = None, goal: str | None = Non
             if best_set != prev_set:
                 understood.append(f"liczę część skilla nr {best_set} (ta zadaje obrażenia)")
     steps: list[dict] = []
+    beyond: list[dict] = []  # real gains that the budget does not cover (lotteries, expensive items)
     warnings: list[str] = []
     try:
         base = session.base
@@ -219,7 +238,7 @@ def ask(session, question: str, skill: str | None = None, goal: str | None = Non
 
         # 3. support swaps (damage goals)
         combo = None
-        if deep and goal in ("dps", "hit") and group and any(x["support"] for x in group["gems"]):
+        if deep and goal in ("dps", "hit", "clear") and group and any(x["support"] for x in group["gems"]):
             sup = optimize_supports(session, target["group"], obj, budget_divine=budget)
             combo = sup.get("best_combination")
             singles = {(r["replace"], r["with"]): r for rows in sup["best_per_slot"].values() for r in rows}
@@ -257,9 +276,26 @@ def ask(session, question: str, skill: str | None = None, goal: str | None = Non
             if up["upgrades"] and not up["corrupted"] and up["upgrades"][0]["score"] > 1:
                 u = up["upgrades"][0]
                 ess = f" Esencja: {', '.join(u['essence'])}." if u["essence"] else ""
-                steps.append({"kind": "gear", "title": f"{up['slot']}: zamień „{u['replace']}” na „{u['with']}”",
-                              "how": f"Na {it['name'].split(',')[0]}.{ess}", "gain": _gain_text(u, goal),
-                              "score": u["score"], "cost": "craft / nowy item", "apply": None})
+                odds = u.get("odds") or {}
+                exalts = round(100 / odds["family_pct"]) if odds.get("family_pct") else None
+                ex_price = _exalt_divine()
+                est = exalts * ex_price if exalts and ex_price else None
+                top = u.get("top") or {}
+                top_txt = (f" Najlepszy możliwy roll („{top['with']}”, wymaga item level {top['level']}) dałby "
+                           f"{_gain_text(top, goal)}, ale szansa na niego to ok. {odds.get('top_tier_pct', '?')}% na exalta:"
+                           " loteria albo drogi item z rynku.") if top and top.get("with") != u["with"] else ""
+                step = {"kind": "gear", "slot": up["slot"], "wanted": u["with"],
+                        "title": f"{up['slot']}: zamień „{u['replace']}” na „{u['with']}” ({u.get('with_tier', '')})",
+                        "how": (f"Na {it['name'].split(',')[0]}. Realny roll (środkowy tier).{ess}{top_txt} "
+                                "Najpierw trzeba usunąć stary mod (annul jest losowy) albo kupić item z tym modem."),
+                        "gain": _gain_text(u, goal), "score": u["score"],
+                        "cost": (f"craft: ok. {exalts} exaltów na trafienie tej rodziny modów"
+                                 + (f" (≈{est:.1f} div)" if est and est >= 1 else "") + ", szacunek") if exalts else "craft / nowy item",
+                        "apply": None}
+                if budget is not None and est is not None and est > budget:
+                    beyond.append(step)
+                else:
+                    steps.append(step)
         if deep:
             for it in pob.items(active_only=True):
                 if it["slot"].startswith(("Flask", "Charm")):
@@ -269,14 +305,15 @@ def ask(session, question: str, skill: str | None = None, goal: str | None = Non
                 except Exception:
                     continue
                 for u in ru["ranking"]:
-                    if u["score"] > 2 and not u["penalty"] and (budget is None or not u.get("price")
-                                                                 or u["price"]["divine"] <= budget):
-                        steps.append({"kind": "unique", "title": f"{ru['slot']}: załóż {u['unique']} zamiast {ru['current'].split(',')[0]}",
-                                      "how": "Policzone ze średnimi rollami unikatu." + (
-                                          " Część efektów PoB nie liczy." if u.get("not_calculated") else ""),
-                                      "gain": _gain_text(u, goal), "score": u["score"],
-                                      "cost": u["price"]["text"] if u.get("price") else "brak ceny na poe.ninja",
-                                      "apply": None})
+                    if u["score"] > 2 and not u["penalty"]:
+                        step = {"kind": "unique", "title": f"{ru['slot']}: załóż {u['unique']} zamiast {ru['current'].split(',')[0]}",
+                                "how": "Policzone ze średnimi rollami unikatu." + (
+                                    " Część efektów PoB nie liczy." if u.get("not_calculated") else ""),
+                                "gain": _gain_text(u, goal), "score": u["score"],
+                                "cost": u["price"]["text"] if u.get("price") else "brak ceny na poe.ninja",
+                                "apply": None}
+                        over = budget is not None and u.get("price") and u["price"]["divine"] > budget
+                        (beyond if over else steps).append(step)
 
         # 6. what to look for on new gear
         weights = stat_weights(pob, base, obj)["weights"][:6]
@@ -288,6 +325,26 @@ def ask(session, question: str, skill: str | None = None, goal: str | None = Non
                             "a nic w buildzie tego nie robi. Realne obrażenia mogą być niższe.")
 
         steps.sort(key=lambda s: s["score"], reverse=True)
+
+        # real items on the trade site for the two best gear ideas: priced, measured, within budget
+        if deep and market:
+            from soe.prices.trade import TradeError, find_upgrade
+
+            for st in [s for s in steps + beyond if s["kind"] == "gear"][:2]:
+                try:
+                    m = find_upgrade(session, st["slot"], st["wanted"], budget, obj)
+                except TradeError as e:
+                    st["market"] = {"error": str(e)}
+                    continue
+                best = next((x for x in m["items"] if x["score"] > 0.5), None)
+                st["market"] = {"link": m.get("link"), "searched": m.get("searched_mods", []), "found": m.get("found", 0),
+                                "warning": m.get("warning"),
+                                "best": {k: best[k] for k in ("name", "price", "price_divine", "mods", "implicits",
+                                                               "grants_skill", "dps_pct", "ehp_pct", "score")} if best else None,
+                                "verdict": (f"Na rynku: {best['name']} za {best['price']} daje {_gain_text(best, goal)}."
+                                            if best else
+                                            "Na rynku nie ma teraz itemu w budżecie, który zachowa siłę Twojego obecnego "
+                                            "i doda ten mod. Lepiej craftować albo odłożyć więcej waluty.")}
 
         # everything that can be applied, measured together
         together = None
@@ -314,7 +371,7 @@ def ask(session, question: str, skill: str | None = None, goal: str | None = Non
         if switched:
             session.apply_changes([{"op": "set_main_skill", "group": prev["group"], "skill": prev["skill"]}])
     return {"question": question, "understood": understood or ["nie rozpoznałem celu: liczę obrażenia"],
-            **head, "budget_divine": budget, "steps": steps[:12], "all_together": together,
+            **head, "budget_divine": budget, "steps": steps[:12], "beyond_budget": beyond[:6], "all_together": together,
             "look_for_on_gear": look_for, "warnings": warnings, "skills": [s["name"] for s in skills],
             "seconds": round(time.perf_counter() - t0, 1)}
 

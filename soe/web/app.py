@@ -66,6 +66,14 @@ def ask(payload: dict = Body(...)):
                   payload.get("goal") or None, payload.get("budget"))
 
 
+@app.post("/api/find_upgrade")
+def find_upgrade(payload: dict = Body(...)):
+    from soe.prices.trade import find_upgrade as run
+
+    return locked(run, session, payload["slot"], payload.get("wanted") or None, payload.get("budget"),
+                  _goals(payload.get("damage", 1), payload.get("survive", 1), payload.get("speed", 1)))
+
+
 @app.get("/api/skills")
 def skills():
     from soe.advisor.assistant import _skill_list

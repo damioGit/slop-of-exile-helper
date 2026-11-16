@@ -25,6 +25,7 @@ SUMMARY_KEYS = [
     "LifeRegenRecovery", "ManaRegenRecovery", "EnergyShieldRecharge",
     "SpiritReserved", "SpiritUnreserved", "ManaCost", "ManaPerSecondCost",
     "MovementSpeedMod", "Str", "Dex", "Int", "ReqStr", "ReqDex", "ReqInt",
+    "ProjectileCount", "ProjectileSpeedMod", "AreaOfEffectRadiusMetres",
 ]
 
 
