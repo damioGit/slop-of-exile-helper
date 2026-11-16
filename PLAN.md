@@ -15,7 +15,19 @@ Nie piszemy własnego kalkulatora obrażeń (to by zajęło rok i byłoby błęd
 które pozwala *zmieniać build i liczyć wynik tysiące razy*, a na to kładziemy:
 bazę wiedzy, optymalizatory, silnik interakcji i Claude'a jako mózg rozmowy z graczem.
 
-## 1b. Scenariusz główny (test akceptacyjny nr 1)
+## 1b. Scenariusze (przykłady, nie zamknięta lista)
+
+Helper ma odpowiadać na **dowolne** pytanie o build, np.:
+- „Podoba mi się unikat X, zagram pod to?” (rozpisane niżej jako wzór),
+- „Jak zwiększyć DPS / przeżywalność za mniej niż N divine?”,
+- „Jaki skill + supporty dają najlepszy clear przy tym gearze?”,
+- „Co craftować na ten slot i jak?”,
+- „Jakie combo wykorzystuje mechanikę Y?”,
+- „Zrób mi league startera pod styl Z”.
+
+Każdy działa tym samym schematem: **wczytaj → zrozum (KB + combo) → przelicz na PoB → zoptymalizuj → wyjaśnij**.
+
+### Przykład rozpisany: build pod unikat
 
 > **Gracz:** „Podoba mi się unikat X, a to moja postać” *(kod PoB / import postaci)*.
 
