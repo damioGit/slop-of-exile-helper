@@ -141,7 +141,8 @@ function soe.points()
 	local quest = build.acts and build.maxActs and build.acts[build.maxActs] and build.acts[build.maxActs].questPoints or 0
 	local level = build.characterLevel or 1
 	local normalUsed = used - math.min(ws1, ws2)
-	local available = math.min(99 + (build.maxWeaponSets or 0) + extra, level - 1 + quest + extra + (build.maxWeaponSets or 0))
+	-- same as PoB's estimate: level points + all quest points + extra points, capped at level 100's total
+	local available = math.min(99 + (build.maxWeaponSets or 0) + extra, level - 1 + quest + extra)
 	return { used = normalUsed, available = available, unspent = available - normalUsed,
 		weapon_set_1 = ws1, weapon_set_2 = ws2, weapon_set_max = maxWS,
 		ascendancy_used = ascUsed, ascendancy_max = 8, jewel_sockets = sockets, active_weapon_set = activeWeaponSet() }
@@ -213,6 +214,8 @@ function soe.whatif(specJson)
 	local out = calcFunc(override, false)
 	local res = scalars(out)
 	res.MinionDPS = out.Minion and (out.Minion.CombinedDPS or out.Minion.TotalDPS) or 0
+	local hand = out.MainHand or out.OffHand
+	res.HandAverageHit = hand and hand.AverageHit or 0
 	res.__points = points
 	return res
 end
@@ -226,16 +229,36 @@ local function groupInfo(i, g)
 			if eff.grantedEffect then applied[eff.grantedEffect] = true end
 		end
 	end
+	local skillTypeName = {}
+	for name, id in pairs(SkillType) do skillTypeName[id] = name end
+	local firstSkill = g.displaySkillList and g.displaySkillList[1]
 	local gems = {}
 	for j, gem in ipairs(g.gemList) do
 		local ge = gem.gemData and gem.gemData.grantedEffect
 		local isSupport = (ge and ge.support) and true or false
+		local applies = (not isSupport) or (ge ~= nil and applied[ge] == true)
+		local why
+		if isSupport and not applies and ge and firstSkill then
+			-- explain with PoB's own rule: which excluded type the skill has, or which required type it lacks
+			local types = firstSkill.skillTypes or {}
+			local hit, missing = {}, {}
+			for _, t in ipairs(ge.excludeSkillTypes or {}) do
+				if type(t) == "number" and types[t] then hit[#hit + 1] = skillTypeName[t] end
+			end
+			if #hit == 0 then
+				for _, t in ipairs(ge.requireSkillTypes or {}) do
+					if type(t) == "number" and not types[t] then missing[#missing + 1] = skillTypeName[t] end
+				end
+			end
+			why = { excluded_by = hit, missing = missing }
+		end
 		gems[j] = {
 			name = gem.nameSpec, level = gem.level, quality = gem.quality,
 			enabled = gem.enabled and true or false,
 			support = isSupport,
 			valid = gem.gemData ~= nil,
-			applies = (not isSupport) or (ge ~= nil and applied[ge] == true),
+			applies = applies,
+			not_applied = why,
 		}
 	end
 	local skills = {}
@@ -244,6 +267,7 @@ local function groupInfo(i, g)
 	end
 	return { index = i, label = g.label, slot = g.slot, enabled = g.enabled and true or false,
 		include_full_dps = g.includeInFullDPS and true or false, main = (build.mainSocketGroup == i),
+		main_skill_index = g.mainActiveSkill or 1,
 		source = g.source, gems = gems, skills = skills }
 end
 
@@ -294,6 +318,30 @@ function soe.set_main(groupIdx, skillIdx)
 	g.mainActiveSkillCalcs = skillIdx or 1
 	soe.recalc()
 	return true
+end
+
+-- Choose which stat set of a skill PoB calculates (e.g. a skill's explosion instead of its first part).
+-- Returns the number of stat sets the skill has.
+function soe.set_stat_set(groupIdx, skillIdx, setIdx)
+	local g = build.skillsTab.socketGroupList[groupIdx]
+	local s = g and g.displaySkillList and g.displaySkillList[skillIdx or 1]
+	if not s then return 0 end
+	local ge, src = s.activeEffect.grantedEffect, s.activeEffect.srcInstance
+	local n = ge.statSets and #ge.statSets or 1
+	if src and setIdx and n > 1 then
+		src.statSet = src.statSet or {}
+		src.statSet[ge.id] = math.max(1, math.min(setIdx, n))
+		soe.recalc()
+	end
+	return n
+end
+
+function soe.get_stat_set(groupIdx, skillIdx)
+	local g = build.skillsTab.socketGroupList[groupIdx]
+	local s = g and g.displaySkillList and g.displaySkillList[skillIdx or 1]
+	if not s or not s.activeEffect.srcInstance then return 1 end
+	local st = s.activeEffect.srcInstance.statSet
+	return st and st[s.activeEffect.grantedEffect.id] or 1
 end
 
 -- DPS of every active skill in every enabled group; the main skill is restored afterwards

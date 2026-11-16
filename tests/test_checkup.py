@@ -79,7 +79,7 @@ def test_split_join_item_roundtrip():
 def test_checkup(s):
     r = run_checkup(s)
     ids = [f["id"] for f in r["findings"]]
-    for expected in ("tree-dead", "mana-main", "hit-physical", "gear-dead", "tree-inactive-set", "tree-unmodelled"):
+    for expected in ("tree-conditional", "mana-main", "hit-physical", "gear-dead", "tree-inactive-set", "tree-unmodelled"):
         assert expected in ids
     scores = [f["score"] for f in r["findings"]]
     assert scores == sorted(scores, reverse=True)
@@ -97,3 +97,12 @@ def test_goals_reorder(s):
     pos = lambda r, i: [f["id"] for f in r["findings"]].index(i)
     assert pos(surv, "hit-physical") < pos(surv, "mana-main")
     assert pos(mana, "mana-main") < pos(mana, "hit-physical")
+
+
+def test_conditional_passives_are_not_called_dead(s):
+    r = run_checkup(s)
+    by = {f["id"]: f for f in r["findings"]}
+    cond = by["tree-conditional"]["data"]["nodes"]
+    assert "Killer Instinct" in cond  # "while on Full Life": a condition, not a dead node
+    dead = by.get("tree-dead", {"data": {"nodes": []}})["data"]["nodes"]
+    assert "Duration" not in dead  # changes skill durations even though DPS/EHP stay the same

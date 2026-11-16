@@ -157,6 +157,7 @@ class _Ctx:
         self.uniques = session.kb._rows("SELECT name, base, slot_type, implicits, mods FROM uniques")
         self.node_scores: dict[int, dict] = {}
         self.support_scores: dict[str, tuple] = {}
+        self.unique_scores: dict[str, dict | None] = {}
 
 
 def _measure_supports(session, ctx: _Ctx, mechanic: str, kind: str, obj: Objective, limit: int) -> list[dict]:
@@ -215,19 +216,36 @@ def _measure_notables(session, ctx: _Ctx, mechanic: str, kind: str, obj: Objecti
     return rows[:limit]
 
 
-def _leads(session, ctx: _Ctx, mechanic: str, kind: str, limit: int) -> list[dict]:
-    """Uniques whose text matches (not measured: slot fit is for try_unique)."""
+def _leads(session, ctx: _Ctx, mechanic: str, kind: str, limit: int, obj: Objective) -> list[dict]:
+    """Uniques whose text matches, each put in its slot and measured; only real gains are kept."""
+    from soe.items.uniques import try_unique
+
     rx = _PROD[mechanic] if kind == "produces" else _BEN[mechanic]
     out = []
     for r in ctx.uniques:
         hits = [ln for ln in r["implicits"] + r["mods"] if rx.search(ln)]
-        if hits:
-            out.append({"unique": r["name"], "base": r["base"], "text": hits[:2]})
+        if not hits:
+            continue
+        if r["name"] not in ctx.unique_scores:
+            try:
+                t = try_unique(session, r["name"], objective=obj)
+                ctx.unique_scores[r["name"]] = {k: t[k] for k in ("slot", "score", "dps_pct", "ehp_pct", "price")}
+            except Exception:
+                ctx.unique_scores[r["name"]] = None
+        sc = ctx.unique_scores[r["name"]]
+        if sc and sc["score"] > MIN_GAIN:
+            out.append({"unique": r["name"], "base": r["base"], **sc, "text": hits[:2]})
+    out.sort(key=lambda x: x["score"], reverse=True)
     return out[:limit]
+
+
+MIN_GAIN = 0.5  # objective points (≈ %): below this a suggestion is noise
 
 
 def suggest_combos(session, objective: Objective | None = None, max_cost: int = 6, per_mechanic: int = 4,
                    measure_supports: bool = True) -> dict:
+    """Only suggestions that measure as a real gain in PoB are returned; a mechanic with nothing that
+    helps is left out instead of listing loose text matches."""
     session._need_build()
     obj = objective or Objective()
     prof = profile(session)
@@ -236,10 +254,12 @@ def suggest_combos(session, objective: Objective | None = None, max_cost: int = 
     payoffs, enablers = {}, {}
     for target, mechanics, kind in ((payoffs, sorted(produced), "benefits"), (enablers, sorted(wants - produced), "produces")):
         for m in mechanics:
-            block = {"passives": _measure_notables(session, ctx, m, kind, obj, per_mechanic),
-                     "uniques": _leads(session, ctx, m, kind, per_mechanic)}
+            block = {"passives": [x for x in _measure_notables(session, ctx, m, kind, obj, per_mechanic * 2)
+                                  if x["score"] > MIN_GAIN][:per_mechanic],
+                     "uniques": _leads(session, ctx, m, kind, per_mechanic, obj)}
             if measure_supports:
-                block["supports"] = _measure_supports(session, ctx, m, kind, obj, per_mechanic)
+                block["supports"] = [x for x in _measure_supports(session, ctx, m, kind, obj, per_mechanic * 2)
+                                     if x["score"] > MIN_GAIN][:per_mechanic]
             if any(block.values()):
                 target[m] = block
     return {
@@ -247,7 +267,6 @@ def suggest_combos(session, objective: Objective | None = None, max_cost: int = 
         "config_check": config_check(session, prof),
         "payoffs": payoffs,
         "enablers": enablers,
-        "note": "Mechanics are read from item, gem and passive text with patterns, so treat the profile as a "
-                "strong hint. Supports and passives are measured in PoB (score vs now); uniques are leads, "
-                "measure them with try_unique.",
+        "note": "Every listed support, passive and unique was measured in PoB and gains at least "
+                f"{MIN_GAIN}% on the goal; the mechanic profile itself is read from item, gem and passive text.",
     }

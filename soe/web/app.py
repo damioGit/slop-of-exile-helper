@@ -58,6 +58,54 @@ def load(payload: dict = Body(...)):
     return locked(session.load, payload["code"], payload.get("name") or "build")
 
 
+@app.post("/api/ask")
+def ask(payload: dict = Body(...)):
+    from soe.advisor.assistant import ask as run
+
+    return locked(run, session, payload.get("question") or "", payload.get("skill") or None,
+                  payload.get("goal") or None, payload.get("budget"))
+
+
+@app.get("/api/skills")
+def skills():
+    from soe.advisor.assistant import _skill_list
+
+    return locked(lambda: _skill_list(session.pob))
+
+
+@app.post("/api/main_skill")
+def main_skill(payload: dict = Body(...)):
+    return locked(session.apply_changes, [{"op": "set_main_skill", "group": payload["group"], "skill": payload["skill"]}])
+
+
+_TREE_CACHE: dict = {}
+
+
+@app.get("/api/tree")
+def tree():
+    """Passive tree geometry (from the knowledge base) + what this build has allocated."""
+    def build():
+        asc = session.base.get("ascendancy")
+        key = (session.kb.meta().get("built_at"), asc)
+        if key not in _TREE_CACHE:
+            nodes = session.kb._rows("SELECT id, name, type, ascendancy, stats, linked, x, y FROM nodes")
+            _TREE_CACHE.clear()
+            _TREE_CACHE[key] = [n for n in nodes if n["x"] is not None and (not n["ascendancy"] or n["ascendancy"] == asc)
+                                and n["type"] not in ("ClassStart",)]
+        alloc = {n["id"]: n["weapon_set"] for n in session.pob.allocated_nodes()}
+        return {"nodes": _TREE_CACHE[key], "allocated": alloc,
+                "active_weapon_set": session.pob.points()["active_weapon_set"]}
+    return locked(build)
+
+
+@app.get("/api/node_path")
+def node_path(id: int):
+    def run():
+        info = session.pob.node_info(id)
+        return {"path": session.pob.node_path(id), "node": info}
+    return locked(run)
+
+
 @app.post("/api/import")
 def import_character(payload: dict = Body(...)):
     return locked(session.import_character, payload["ref"], payload.get("name") or None)

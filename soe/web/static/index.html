@@ -99,6 +99,12 @@ pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; backgrou
 .busy { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
   border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.step { display: flex; gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; background: var(--panel); }
+.stepn { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
+button.small { padding: .25em .6em; font-size: 12.5px; }
+.treebox { position: relative; height: 520px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); touch-action: none; }
+.treebox canvas { display: block; cursor: grab; }
+.treetip { position: absolute; display: none; max-width: 250px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; box-shadow: var(--shadow); pointer-events: none; }
 .empty { text-align: center; padding: 30px 10px; color: var(--muted); }
 @media (max-width: 600px) {
   main { padding: 10px; } header { padding: 8px 10px; } .gauge { grid-template-columns: 70px 1fr 48px; }
@@ -111,6 +117,7 @@ pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; backgrou
   <h1>Slop of <span>Exile</span> Helper</h1>
   <span id="buildBadge" class="badge">brak buildu</span>
   <span class="spacer"></span>
+  <label class="small muted" id="mainSkillWrap" style="display:none">Główny skill: <select id="mainSkill" style="width:auto;padding:.3em .5em"></select></label>
   <button class="ghost" id="btnSync" title="Pobierz postać jeszcze raz z poe.ninja" style="display:none">⟳ Synchronizuj</button>
   <button class="ghost" id="btnExport" title="Skopiuj kod buildu do PoB">Kod PoB</button>
   <button class="ghost" id="btnReset" title="Cofnij zastosowane zmiany">Reset</button>
@@ -143,12 +150,13 @@ pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; backgrou
   </section>
 
   <nav class="tabs" id="tabs">
-    <button data-tab="checkup" class="on">Check-up</button>
+    <button data-tab="assistant" class="on">Asystent</button>
+    <button data-tab="checkup">Problemy</button>
     <button data-tab="overview">Przegląd</button>
     <button data-tab="skills">Skille</button>
     <button data-tab="gear">Gear</button>
     <button data-tab="tree">Drzewko</button>
-    <button data-tab="combo">Combo</button>
+    <button data-tab="combo">Synergie</button>
     <button data-tab="plan">Plan</button>
     <button data-tab="search">Szukaj</button>
   </nav>
@@ -169,7 +177,7 @@ const STAT_PL = {CombinedDPS: "DPS (łączny)", TotalDPS: "DPS (hit)", TotalEHP:
   ManaPerSecondCost: "Koszt many/s", ManaRegenRecovery: "Regen many/s", Str: "Siła", Dex: "Zręczność", Int: "Inteligencja"};
 const SLOTS = ["Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt"];
 
-let state = {tab: "checkup", loaded: false, overview: null, cache: {}};
+let state = {tab: "assistant", loaded: false, overview: null, cache: {}};
 
 function toast(msg, ms) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), ms || (msg.startsWith("Błąd") ? 9000 : 2500)); }
 function goals() {
@@ -215,13 +223,85 @@ async function applySteps(steps, btn) {
 
 // ---------------------------------------------------------------- views
 const views = {
+  async assistant(el) {
+    const skills = await api("/api/skills");
+    const examples = [
+      "Nie jestem w stanie oneshotować moba, co zrobić żeby bić mocniej?",
+      "Jak zwiększyć DPS za 5 div?",
+      "Ciągle umieram na bossach, co poprawić?",
+      "Brakuje mi many",
+    ];
+    el.innerHTML = `<div class="panel"><h2>Zapytaj o swój build</h2>
+      <p class="muted small">Napisz po swojemu, co Cię boli. Asystent policzy w Path of Building, co konkretnie zmienić, ile to da i ile kosztuje.</p>
+      <textarea id="q" style="min-height:70px;font-family:var(--sans);font-size:15px" placeholder="np. nie oneshotuję moba, jak bić mocniej Cometem?"></textarea>
+      <div class="chips" style="margin:8px 0">${examples.map(x => `<button class="ghost small ex" style="font-weight:500">${esc(x)}</button>`).join("")}</div>
+      <div class="row">
+        <label class="small muted">Skill: <select id="qSkill" style="width:auto">${skills.map(s => `<option value="${s.group}:${s.skill}" ${s.main ? "selected" : ""}>${esc(s.label)}${s.main ? " (główny)" : ""}</option>`).join("")}</select></label>
+        <label class="small muted">Cel: <select id="qGoal" style="width:auto"><option value="">z pytania</option><option value="dps">DPS</option><option value="hit">pojedynczy hit (oneshot)</option><option value="survive">przetrwanie</option><option value="mana">mana</option><option value="speed">prędkość ruchu</option></select></label>
+        <button id="btnAsk">Zapytaj</button>
+      </div>
+      <p class="muted small">Liczenie trwa ~20–60 s: sprawdzam supporty, drzewko, gear i unikaty. Budżet bierzemy z pola nad zakładkami albo z pytania („za 5 div”).</p></div>
+      <div id="answer"></div>`;
+    el.querySelectorAll(".ex").forEach(b => b.onclick = () => { $("#q").value = b.textContent; });
+    $("#btnAsk").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/ask", {body: {question: $("#q").value, skill: $("#qSkill").value, goal: $("#qGoal").value || null, budget: g.budget}});
+      renderAnswer(r);
+    });
+  },
+
+  async tree(el) {
+    el.innerHTML = `<div class="panel"><h2>Drzewko pasywne</h2>
+      <p class="muted small">Przeciągaj myszką, kółko = zoom. Pomarańczowe = wzięte, fioletowe = wzięte na drugi zestaw broni, niebieskie = podświetlona ścieżka. Najedź na pasywkę, żeby zobaczyć, co daje.</p>
+      <div id="treeBox" class="treebox"><canvas id="treeCanvas"></canvas><div id="treeTip" class="treetip"></div></div>
+      <div id="treeInfo" class="small" style="margin-top:8px"></div></div>
+      <div class="grid2">
+      <div class="panel"><h2>Co warto wziąć</h2><div class="row"><select id="tMetric" style="width:auto"><option value="dps">DPS</option><option value="ehp">EHP</option><option value="life">Życie</option><option value="es">Energy Shield</option><option value="movement">Prędkość ruchu</option></select><button id="btnRank">Policz</button></div><div id="rankOut"></div></div>
+      <div class="panel"><h2>Co można zwolnić</h2><p class="muted small">Pasywki, których zwolnienie najmniej kosztuje.</p><button id="btnRespec">Policz</button><div id="respecOut"></div></div></div>
+      <div class="panel"><h2>Optymalizator drzewka</h2><p class="muted small">Zwalnia słabe pasywki i bierze mocne, każdy ruch sprawdzony w PoB (~10–30 s).</p><button id="btnTree">Optymalizuj</button><div id="treeOut"></div></div>`;
+    const data = await api("/api/tree");
+    const tv = treeView($("#treeBox"), data);
+    const showNode = async (id) => {
+      const r = await api("/api/node_path?" + q({id}));
+      tv.highlight(r.path.length ? r.path : [id], id);
+      const n = r.node;
+      $("#treeInfo").innerHTML = n ? `<b>${esc(n.name)}</b> <span class="muted">(${esc(n.type)}${n.alloc ? ", wzięta" : `, ${r.path.length} pkt ścieżki`})</span><br>${(n.stats || []).map(esc).join("<br>")}` : "";
+      $("#treeBox").scrollIntoView({behavior: "smooth", block: "center"});
+    };
+    const statsCell = x => `<div class="small muted">${(x.stats || []).map(esc).join("<br>")}</div>`;
+    $("#btnRank").onclick = e => busy(e.target, async () => {
+      const metric = $("#tMetric").value;
+      const r = await api("/api/rank_passives?" + q({metric}));
+      const other = metric === "dps" ? ["d_TotalEHP", "EHP"] : ["d_MainDPS", "DPS"];
+      $("#rankOut").innerHTML = `<div class="tablewrap"><table><tr><th>Pasywka i co daje</th><th class="n">Pkt</th><th class="n">Zysk</th><th class="n">${other[1]} Δ</th><th></th></tr>${
+        r.map(x => `<tr><td><b>${esc(x.node)}</b>${x.not_calculated ? ' <span class="pill check">część efektu PoB nie liczy</span>' : ""}${statsCell(x)}</td><td class="n">${x.points}</td><td class="n">${pct(x.gain_pct)}</td><td class="n">${fmt(x[other[0]])}</td><td><button class="ghost small" data-node="${x.id}">pokaż</button></td></tr>`).join("")}</table></div>`;
+      $("#rankOut").querySelectorAll("[data-node]").forEach(b => b.onclick = () => showNode(+b.dataset.node));
+    });
+    $("#btnRespec").onclick = e => busy(e.target, async () => {
+      const r = await api("/api/rank_respec");
+      $("#respecOut").innerHTML = `<p class="small">Punkty: ${r.points.used} wydane z ${r.points.available}</p><div class="tablewrap"><table><tr><th>Pasywka</th><th class="n">Zwalnia</th><th class="n">Strata DPS</th><th class="n">EHP Δ</th><th></th></tr>${
+        r.cheapest_refunds.map(x => `<tr><td><b>${esc(x.node)}</b>${x.not_calculated ? '<div class="small muted">część efektu PoB nie liczy, oceń sam</div>' : ""}</td><td class="n">${x.points_freed}</td><td class="n">${fmt(x.loss_pct, 2)}%</td><td class="n">${fmt(x.d_TotalEHP)}</td><td><button class="ghost small" data-node="${x.id}">pokaż</button></td></tr>`).join("")}</table></div>
+        ${r.inactive_weapon_set_nodes.length ? `<p class="muted small">${r.inactive_weapon_set_nodes.length} pasywek jest na drugim zestawie broni i liczy się tylko, gdy go trzymasz.</p>` : ""}`;
+      $("#respecOut").querySelectorAll("[data-node]").forEach(b => b.onclick = () => showNode(+b.dataset.node));
+    });
+    $("#btnTree").onclick = e => busy(e.target, async () => {
+      const g = goals();
+      const r = await api("/api/optimize_tree?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
+      $("#treeOut").innerHTML = r.moves.length ? `<div class="tablewrap"><table><tr><th>Weź</th><th>Zwolnij</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
+        r.moves.map(m => `<tr><td><b>${esc(m.add)}</b> (${m.add_points} pkt)</td><td class="small">${esc(m.refund.join(", ") || "—")}</td><td class="n">${pct(m.dps_pct)}</td><td class="n">${pct(m.ehp_pct)}</td></tr>`).join("")}</table></div>
+        <p>Razem: DPS ${pct(r.total.dps_pct)} · EHP ${pct(r.total.ehp_pct)} · punkty ${r.points.before} → ${r.points.after}</p><button id="btnTreeApply">Zastosuj ruchy</button>` : "<p>Nie znalazłem ruchu, który się opłaca.</p>";
+      if (r.moves.length) $("#btnTreeApply").onclick = ev => applySteps(r.apply_steps, ev.target);
+    });
+    state.showNode = showNode;
+  },
+
   async checkup(el) {
     const g = goals();
     const r = await api("/api/checkup?" + q(g));
-    el.innerHTML = `<div class="panel"><h2>Co hamuje build</h2><p class="muted small">Kolejność według Twoich celów (suwaki). Wszystko policzone w Path of Building.</p>${
+    el.innerHTML = `<div class="panel"><h2>Co hamuje build</h2><p class="muted small">Problemy znalezione w buildzie, najważniejsze na górze (kolejność zależy od suwaków). „Pewne” = policzone w PoB, „do sprawdzenia” = PoB tego nie zmierzy, oceń sam.</p>${
       r.findings.map(f => `<div class="finding ${f.severity}"><h4>${esc(f.title)} <span class="pill ${f.certainty}">${{sure: "pewne", likely: "prawdopodobne", check: "do sprawdzenia"}[f.certainty]}</span></h4>
         <p>${esc(f.why)}</p><p><b>Zysk:</b> ${esc(f.effect)}</p><ul>${f.action.map(a => `<li>${esc(a)}</li>`).join("")}</ul>
-        ${Object.keys(f.data || {}).length ? `<details><summary>szczegóły</summary><pre>${esc(JSON.stringify(f.data, null, 1))}</pre></details>` : ""}</div>`).join("") || `<p>Nic nie znaleziono.</p>`
+        ${findingDetails(f.data)}</div>`).join("") || `<p>Nic nie znaleziono.</p>`
     }<p class="muted small">${esc(r.credit)}</p></div>`;
   },
 
@@ -296,32 +376,6 @@ const views = {
     });
   },
 
-  async tree(el) {
-    el.innerHTML = `<div class="grid2">
-      <div class="panel"><h2>Najlepsze nowe pasywki</h2><div class="row"><select id="tMetric"><option value="dps">DPS</option><option value="ehp">EHP</option><option value="life">Życie</option><option value="es">ES</option><option value="movement">Prędkość ruchu</option></select><button id="btnRank">Policz</button></div><div id="rankOut"></div></div>
-      <div class="panel"><h2>Co zwolnić (respec)</h2><button id="btnRespec">Policz</button><div id="respecOut"></div></div></div>
-      <div class="panel"><h2>Optymalizator drzewka</h2><p class="muted small">Zwalnia słabe pasywki i bierze mocne, każdy ruch sprawdzony w PoB (~10–30 s).</p><button id="btnTree">Optymalizuj</button><div id="treeOut"></div></div>`;
-    $("#btnRank").onclick = e => busy(e.target, async () => {
-      const r = await api("/api/rank_passives?" + q({metric: $("#tMetric").value}));
-      $("#rankOut").innerHTML = `<div class="tablewrap"><table><tr><th>Pasywka</th><th class="n">Pkt</th><th class="n">Zysk</th><th class="n">DPS Δ</th><th class="n">EHP Δ</th></tr>${
-        r.map(x => `<tr><td title="${esc((x.stats || []).join("\n"))}">${esc(x.node)}${x.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${x.points}</td><td class="n">${pct(x.gain_pct)}</td><td class="n">${fmt(x.d_MainDPS)}</td><td class="n">${fmt(x.d_TotalEHP)}</td></tr>`).join("")}</table></div>`;
-    });
-    $("#btnRespec").onclick = e => busy(e.target, async () => {
-      const r = await api("/api/rank_respec");
-      $("#respecOut").innerHTML = `<p class="small">Punkty: ${r.points.used}/${r.points.available}</p><div class="tablewrap"><table><tr><th>Pasywka</th><th class="n">Zwalnia</th><th class="n">Strata DPS</th><th class="n">EHP Δ</th></tr>${
-        r.cheapest_refunds.map(x => `<tr><td>${esc(x.node)}${x.not_calculated ? ' <span class="pill check">PoB nie liczy</span>' : ""}</td><td class="n">${x.points_freed}</td><td class="n">${fmt(x.loss_pct, 2)}%</td><td class="n">${fmt(x.d_TotalEHP)}</td></tr>`).join("")}</table></div>
-        ${r.inactive_weapon_set_nodes.length ? `<p class="muted small">${r.inactive_weapon_set_nodes.length} pasywek w drugim zestawie broni (nieaktywne w obliczeniach).</p>` : ""}`;
-    });
-    $("#btnTree").onclick = e => busy(e.target, async () => {
-      const g = goals();
-      const r = await api("/api/optimize_tree?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
-      $("#treeOut").innerHTML = r.moves.length ? `<div class="tablewrap"><table><tr><th>Weź</th><th>Zwolnij</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
-        r.moves.map(m => `<tr><td><b>${esc(m.add)}</b> (${m.add_points} pkt)</td><td class="small">${esc(m.refund.join(", ") || "—")}</td><td class="n">${pct(m.dps_pct)}</td><td class="n">${pct(m.ehp_pct)}</td></tr>`).join("")}</table></div>
-        <p>Razem: DPS ${pct(r.total.dps_pct)} · EHP ${pct(r.total.ehp_pct)} · punkty ${r.points.before} → ${r.points.after}</p><button id="btnTreeApply">Zastosuj ruchy</button><p class="muted small">${esc(r.note)}</p>` : "<p>Nie znalazłem ruchu, który się opłaca.</p>";
-      if (r.moves.length) $("#btnTreeApply").onclick = ev => applySteps(r.apply_steps, ev.target);
-    });
-  },
-
   async combo(el) {
     el.innerHTML = `<div class="panel"><h2>Combo i synergie</h2><p class="muted small">Co build tworzy, z czego korzysta, co do tego pasuje. ~10 s.</p><button id="btnCombo">Analizuj</button><div id="comboOut"></div></div>`;
     $("#btnCombo").onclick = e => busy(e.target, async () => {
@@ -366,6 +420,137 @@ const views = {
   },
 };
 
+
+const wiki = name => `https://www.poe2wiki.net/index.php?search=${encodeURIComponent(name)}`;
+function findingDetails(d) {
+  if (!d || !Object.keys(d).length) return "";
+  let body = "";
+  if (Array.isArray(d.nodes)) body = `<div class="chips">${d.nodes.map(n => `<a class="chip" target="_blank" href="${wiki(n)}">${esc(n)}</a>`).join("")}</div>`;
+  else if (d.nodes) body = Object.entries(d.nodes).map(([n, st]) => `<p class="small"><a target="_blank" href="${wiki(n)}"><b>${esc(n)}</b></a>: ${esc([].concat(st).join("; "))}</p>`).join("");
+  else if (d.mods) body = `<ul class="small">${d.mods.map(m => `<li><b>${esc(m.slot)}</b> (${esc(m.item.split(",")[0])}): ${esc(m.mod)}</li>`).join("")}</ul>`;
+  else if (d.gems) body = `<ul class="small">${d.gems.map(g => `<li>${esc(g.gem)}: poziom ${g.level}</li>`).join("")}</ul>`;
+  else body = `<p class="small">${Object.entries(d).map(([k, v]) => `${esc(k)}: ${esc(typeof v === "object" ? JSON.stringify(v) : v)}`).join(" · ")}</p>`;
+  return `<details><summary>szczegóły</summary>${body}<p class="muted small">Klik w nazwę otwiera opis na poe2wiki.</p></details>`;
+}
+
+function renderAnswer(r) {
+  const out = $("#answer");
+  const kindPl = {gem: "gem", dead_support: "support nie działa", support: "support", tree: "drzewko", gear: "gear", unique: "unikat"};
+  out.innerHTML = `<div class="panel"><h2>${esc(r.skill)}: ${esc(r.goal_label)}</h2>
+    <div class="chips">${r.understood.map(u => `<span class="chip">${esc(u)}</span>`).join("")}</div>
+    <p class="small">Teraz: DPS <b>${fmt(r.now.dps)}</b> · średni hit <b>${fmt(r.now.average_hit)}</b> · crit <b>${fmt(r.now.crit_chance, 1)}%</b> · EHP <b>${fmt(r.now.ehp)}</b></p>
+    ${r.explain ? `<p class="small">${esc(r.explain)}</p>` : ""}
+    ${r.warnings.map(w => `<div class="finding warn"><p>${esc(w)}</p></div>`).join("")}
+    ${r.steps.length ? `<h3>Zrób to, od największego zysku</h3>` : `<p>Nie znalazłem zmiany, która się opłaca.</p>`}
+    ${r.steps.map((s, i) => `<div class="step"><div class="stepn">${i + 1}</div><div style="flex:1">
+      <div><b>${esc(s.title)}</b> <span class="pill">${kindPl[s.kind] || s.kind}</span></div>
+      <div class="small muted">${esc(s.how || "")}</div>
+      <div class="small">Zysk: <b class="pos">${esc(s.gain)}</b> · Koszt: ${esc(s.cost || "-")}</div>
+      <div class="row" style="margin-top:4px">${s.apply ? `<button class="ghost small" data-apply="${i}">Zastosuj w buildzie</button>` : ""}${s.node ? `<button class="ghost small" data-tree="${esc(s.node)}">Pokaż na drzewku</button>` : ""}</div>
+    </div></div>`).join("")}
+    ${r.all_together ? `<div class="finding"><h4>Wszystko, co da się zastosować, naraz (zmierzone razem)</h4><p>${esc(r.all_together.gain)}</p><button id="btnAll">Zastosuj wszystko</button></div>` : ""}
+    ${r.look_for_on_gear.length ? `<h3>Na nowym gearze szukaj</h3><ul class="small">${r.look_for_on_gear.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    <p class="muted small">Policzone w ${r.seconds} s. „Zastosuj” zmienia build w appce. „Kod PoB” na górze daje kod do wklejenia w Path of Building.</p></div>`;
+  out.querySelectorAll("[data-apply]").forEach(b => b.onclick = ev => applySteps(r.steps[+b.dataset.apply].apply, ev.target));
+  out.querySelectorAll("[data-tree]").forEach(b => b.onclick = async () => {
+    state.tab = "tree"; await render();
+    const hit = (await api("/api/kb/search?" + q({q: b.dataset.tree, kind: "node", limit: 5}))).find(x => x.name === b.dataset.tree);
+    if (hit && state.showNode) state.showNode(+hit.ref);
+  });
+  const all = $("#btnAll"); if (all) all.onclick = ev => applySteps(r.all_together.steps, ev.target);
+  out.scrollIntoView({behavior: "smooth"});
+}
+
+function treeView(box, data) {
+  const canvas = box.querySelector("canvas"), tip = box.querySelector(".treetip"), ctx = canvas.getContext("2d");
+  const nodes = data.nodes, byId = new Map(nodes.map(n => [n.id, n]));
+  const alloc = new Map(Object.entries(data.allocated).map(([k, v]) => [+k, v]));
+  let hl = new Set(), target = null;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const n of nodes) { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x); minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y); }
+  let scale = 1, ox = 0, oy = 0;
+  const css = getComputedStyle(document.documentElement);
+  const col = v => css.getPropertyValue(v).trim();
+  function fit() {
+    const w = box.clientWidth, h = box.clientHeight, dpr = devicePixelRatio || 1;
+    canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.width = w + "px"; canvas.style.height = h + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // start zoomed on the allocated part of the tree
+    const a = nodes.filter(n => alloc.has(n.id));
+    const src = a.length ? a : nodes;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const n of src) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
+    scale = Math.min(w / (x1 - x0 + 1500), h / (y1 - y0 + 1500));
+    ox = w / 2 - (x0 + x1) / 2 * scale; oy = h / 2 - (y0 + y1) / 2 * scale;
+  }
+  const R = n => ({Keystone: 10, Notable: 6.5, Mastery: 5, Socket: 6.5, AscendClassStart: 8})[n.type] || 3.2;
+  function draw() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx.fillStyle = col("--panel-2"); ctx.fillRect(0, 0, w, h);
+    const line = col("--line"), acc = col("--accent"), info = col("--info"), muted = col("--muted"), chaos = col("--chaos");
+    ctx.lineWidth = Math.max(0.6, scale * 6);
+    for (const n of nodes) for (const id of n.linked || []) {
+      if (id < n.id) continue; const m = byId.get(id); if (!m) continue;
+      const both = alloc.has(n.id) && alloc.has(id), path = hl.has(n.id) && (hl.has(id) || alloc.has(id)) || hl.has(id) && alloc.has(n.id);
+      ctx.strokeStyle = path ? info : both ? acc : line; ctx.globalAlpha = path || both ? 1 : 0.55;
+      ctx.beginPath(); ctx.moveTo(n.x * scale + ox, n.y * scale + oy); ctx.lineTo(m.x * scale + ox, m.y * scale + oy); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    for (const n of nodes) {
+      const x = n.x * scale + ox, y = n.y * scale + oy;
+      if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
+      const r = Math.max(1.5, R(n) * Math.min(2.2, scale * 18));
+      const ws = alloc.get(n.id);
+      ctx.fillStyle = n.id === target ? "#fff" : hl.has(n.id) ? info : alloc.has(n.id) ? (ws && ws !== data.active_weapon_set ? chaos : acc) : muted;
+      ctx.globalAlpha = alloc.has(n.id) || hl.has(n.id) ? 1 : 0.5;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      if (n.id === target) { ctx.strokeStyle = info; ctx.lineWidth = 2; ctx.stroke(); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function nodeAt(px, py) {
+    let best = null, bd = 1e9;
+    for (const n of nodes) {
+      const d = Math.hypot(n.x * scale + ox - px, n.y * scale + oy - py);
+      const r = Math.max(5, R(n) * Math.min(2.2, scale * 18) + 3);
+      if (d < r && d < bd) { bd = d; best = n; }
+    }
+    return best;
+  }
+  let drag = null;
+  canvas.onmousedown = e => { drag = {x: e.clientX, y: e.clientY, ox, oy, moved: false}; };
+  window.addEventListener("mouseup", () => { drag = null; });
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect(), px = e.clientX - rect.left, py = e.clientY - rect.top;
+    if (drag) { ox = drag.ox + e.clientX - drag.x; oy = drag.oy + e.clientY - drag.y; drag.moved = true; tip.style.display = "none"; draw(); return; }
+    const n = nodeAt(px, py);
+    if (n && n.type !== "Normal" || n && scale > 0.05) {
+      tip.innerHTML = `<b>${esc(n.name)}</b>${alloc.has(n.id) ? ' <span class="pill sure">wzięta</span>' : ""}<br>${(n.stats || []).map(esc).join("<br>")}`;
+      tip.style.display = "block"; tip.style.left = Math.min(px + 14, canvas.clientWidth - 260) + "px"; tip.style.top = (py + 14) + "px";
+    } else tip.style.display = "none";
+  };
+  canvas.onmouseleave = () => { tip.style.display = "none"; };
+  canvas.onwheel = e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect(), px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const f = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+    ox = px - (px - ox) * f; oy = py - (py - oy) * f; scale *= f; draw();
+  };
+  // touch: one finger pans
+  canvas.ontouchstart = e => { const t = e.touches[0]; drag = {x: t.clientX, y: t.clientY, ox, oy}; };
+  canvas.ontouchmove = e => { e.preventDefault(); const t = e.touches[0]; if (drag) { ox = drag.ox + t.clientX - drag.x; oy = drag.oy + t.clientY - drag.y; draw(); } };
+  fit(); draw();
+  window.addEventListener("resize", () => { fit(); draw(); });
+  return {
+    highlight(ids, id) {
+      hl = new Set(ids); target = id;
+      const n = byId.get(id);
+      if (n) { const w = canvas.clientWidth, h = canvas.clientHeight; scale = Math.max(scale, 0.08); ox = w / 2 - n.x * scale; oy = h / 2 - n.y * scale; }
+      draw();
+    },
+  };
+}
+
 async function slotView(slot) {
   const out = $("#slotOut");
   out.innerHTML = `<div class="panel"><span class="busy"></span> ${esc(slot)}…</div>`;
@@ -408,6 +593,11 @@ async function refreshBadge() {
   $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}` : "· brak bazy wiedzy: uruchom soe kb build";
   api("/api/prices").then(p => { $("#kbInfo").textContent += ` · ceny: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
   $("#loadPanel").open = !s.loaded;
+  if (s.loaded) {
+    const sk = await api("/api/skills");
+    $("#mainSkillWrap").style.display = "";
+    $("#mainSkill").innerHTML = sk.map(x => `<option value="${x.group}:${x.skill}" ${x.main ? "selected" : ""}>${esc(x.label)}</option>`).join("");
+  }
   $("#btnSync").style.display = s.source ? "" : "none";
   if (s.source) $("#btnSync").title = `${s.source.account} / ${s.source.name} (${s.source.league}), poe.ninja: ${s.source.updated || "?"}`;
   if (s.loaded) {
@@ -416,6 +606,11 @@ async function refreshBadge() {
   }
 }
 
+$("#mainSkill").onchange = e => busy(null, async () => {
+  const [group, skill] = e.target.value.split(":").map(Number);
+  await api("/api/main_skill", {body: {group, skill}});
+  state.cache = {}; await refreshBadge(); render(); toast("Główny skill zmieniony.");
+});
 $("#tabs").onclick = e => { const t = e.target.closest("button"); if (t) { state.tab = t.dataset.tab; render(); } };
 $("#btnLoad").onclick = e => busy(e.target, async () => {
   const code = $("#code").value.trim();
@@ -423,7 +618,7 @@ $("#btnLoad").onclick = e => busy(e.target, async () => {
   await api("/api/load", {body: {code}});
   await refreshBadge();
   $("#code").value = "";
-  state.tab = "checkup";
+  state.tab = "assistant";
   render();
 });
 $("#btnImport").onclick = e => busy(e.target, async () => {

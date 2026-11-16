@@ -37,6 +37,17 @@ W appce, w panelu „Wczytaj build”, podaj konto tak jak w grze (`Nazwa#1234`)
 - **Działa tylko dla publicznych postaci, które poe.ninja już zna.** PoB loguje się do oficjalnego API GGG (OAuth) na własnym, zarejestrowanym identyfikatorze aplikacji. Żeby zrobić to samo bez poe.ninja, ten projekt musiałby zarejestrować własną aplikację u GGG.
 - **Przy zbyt wielu zapytaniach poe.ninja chwilowo blokuje dostęp** (rate limit / sprawdzanie botów). Wtedy appka mówi to wprost, a ceny lecą z cache. Blokada nie jest obchodzona.
 
+## Asystent (pierwsza zakładka w appce)
+
+Wpisujesz pytanie po swojemu, np. „nie oneshotuję moba, jak bić mocniej Lightning Boltem za 3 div” albo „ciągle umieram na bossach”. Asystent:
+- rozpoznaje cel: oneshot = średni hit, nie DPS; do tego DPS, przetrwanie, mana, prędkość;
+- rozpoznaje skill (albo bierze go z listy) i budżet z tekstu (div, ex);
+- liczy dla tego skilla w PoB: poziom gema, supporty, które na niego nie działają (z powodem), lepsze supporty, ruchy na drzewku, lepsze mody na każdym slocie, unikaty i to, czego szukać na gearze;
+- przy skillach z kilkoma częściami (np. Whirling Slash) bierze tę, która zadaje obrażenia;
+- zwraca ponumerowaną listę „zrób to” z zyskiem i kosztem, przyciski „Zastosuj w buildzie” i „Pokaż na drzewku” oraz wynik „wszystko naraz”.
+
+W nagłówku jest wybór głównego skilla. Zakładka **Drzewko** pokazuje drzewo pasywne jak w PoB (przesuwanie, zoom, najechanie pokazuje, co daje pasywka). Przy rankingach jest opis pasywek i „pokaż”, które podświetla ścieżkę.
+
 ## Appka webowa
 
 `soe web` uruchamia lokalną stronę na tym samym silniku co doradca MCP. Wklejasz kod buildu i masz zakładki:

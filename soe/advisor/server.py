@@ -47,6 +47,17 @@ def load_build(build: str, name: str = "build") -> dict:
 
 
 @tool
+def ask(question: str, skill: str | None = None, goal: str | None = None, budget_divine: float | None = None) -> dict:
+    """Answer a player's free-text question about the loaded build with a measured to-do list (~20-60 s).
+    Understands Polish and English, e.g. "nie oneshotuję moba, jak bić mocniej Cometem za 5 div",
+    "I keep dying to bosses", "out of mana". goal (optional): dps, hit (one-shot = average hit), survive,
+    mana, speed. Each step has gain, cost and, when possible, apply steps for apply_changes."""
+    from soe.advisor.assistant import ask as run
+
+    return run(session, question, skill, goal, budget_divine)
+
+
+@tool
 def import_character(account_or_link: str, character: str | None = None) -> dict:
     """Load a public character from poe.ninja (Path of Exile 2): either a poe.ninja character link, or the
     account name as shown in game (Name#1234) plus the character name. Finds the league automatically.

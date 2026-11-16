@@ -21,6 +21,7 @@ OPS = {
     "set_gem": "set_gem", "remove_gem": "remove_gem", "set_main_skill": "set_main_skill",
     "equip": "equip", "unequip": "unequip", "set_config": "set_config", "set_level": "set_level",
     "alloc_node": "alloc_node", "dealloc_node": "dealloc_node", "paste_gems": "paste_gems",
+    "set_stat_set": "set_stat_set",
 }
 
 _ROUND = 2
@@ -149,7 +150,7 @@ class Session:
             {"group": g["index"], "main": g["main"], "enabled": g["enabled"], "slot": g.get("slot"),
              "skills": g["skills"],
              "gems": [f"{x['name']} {x['level']}/{x['quality']}" + ("" if x["enabled"] else " (disabled)")
-                     + ("" if x.get("applies", True) or not x["enabled"] else " (cannot support this skill)")
+                     + ("" if x.get("applies", True) or not x["enabled"] else " (nie działa na ten skill)")
                      for x in g["gems"]]}
             for g in p.groups()
         ]

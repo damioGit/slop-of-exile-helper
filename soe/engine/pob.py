@@ -58,8 +58,13 @@ def _lua_to_py(v):
 
 
 def _with_main_dps(d: dict) -> dict:
-    """MainDPS = the main skill's own DPS, or its minions' DPS for minion skills."""
+    """MainDPS = the main skill's own DPS, or its minions' DPS for minion skills.
+    AverageHit falls back to DPS / uses per second when PoB keeps the hit elsewhere (weapon attacks)."""
     d["MainDPS"] = d.get("CombinedDPS") or d.get("MinionDPS") or 0
+    if not d.get("AverageHit"):
+        # weapon attacks keep the hit in the hand's own table; else damage per use = DPS / uses per second
+        d["AverageHit"] = d.get("HandAverageHit") or (
+            d["TotalDPS"] / d["Speed"] if d.get("TotalDPS") and d.get("Speed") else 0)
     return d
 
 
@@ -193,6 +198,13 @@ class PoB:
     def set_main_skill(self, group: int, skill: int = 1) -> bool:
         return bool(self._call(self.api.set_main, group, skill))
 
+    def set_stat_set(self, group: int, skill: int = 1, stat_set: int = 1) -> int:
+        """Which part of a multi-part skill PoB calculates; returns how many parts the skill has."""
+        return int(self._call(self.api.set_stat_set, group, skill, stat_set) or 0)
+
+    def get_stat_set(self, group: int, skill: int = 1) -> int:
+        return int(self._call(self.api.get_stat_set, group, skill) or 1)
+
     def all_skill_dps(self) -> list[dict]:
         """DPS of every active skill in every enabled group (main skill is restored)."""
         return _lua_to_py(self._call(self.api.all_skill_dps)) or []
@@ -270,6 +282,8 @@ class PoB:
         res = {k: _num(v) for k, v in out.items() if isinstance(v, (int, float, bool, str))}
         m = out.Minion
         res["MinionDPS"] = _num((m.CombinedDPS or m.TotalDPS or 0) if m else 0)
+        hand = out.MainHand or out.OffHand
+        res["HandAverageHit"] = _num(hand.AverageHit or 0) if hand else 0
         return _with_main_dps(res)
 
     def summary(self) -> dict:

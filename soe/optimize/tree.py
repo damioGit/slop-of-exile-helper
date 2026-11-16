@@ -35,10 +35,16 @@ def _scan_adds(pob, cur: dict, obj: Objective, max_cost: int, types) -> list[dic
     return rows
 
 
-def _scan_refunds(pob, cur: dict, obj: Objective, protected: set[int]) -> list[dict]:
+def _scan_refunds(pob, cur: dict, obj: Objective, protected: set[int], keep_conditional: bool = True) -> list[dict]:
+    from soe.advisor.checkup import _CONDITIONAL
+
     rows = []
     for n in pob.allocated_nodes():
         if n.get("ascendancy") or n["weapon_set"] or n["type"] in _SKIP_TYPES or n["id"] in protected:
+            continue
+        # ailment/condition passives (freeze, chill, shock, "while...", "against...") do things the goal
+        # number does not show; refunding them would quietly break the build's mechanics
+        if keep_conditional and _CONDITIONAL.search(" ".join(n["stats"])):
             continue
         w = pob.whatif(remove_nodes=[n["id"]])
         freed = -w["points"]
@@ -122,7 +128,7 @@ def optimize_tree(session, objective: Objective | None = None, max_moves: int = 
         "apply_steps": [s for m in moves for s in m["steps"]],
         "final_build_code": final_code,
         "seconds": round(time.perf_counter() - t0, 1),
-        "note": "Greedy local search on PoB numbers under the current config; conditional passives count only "
-                "if their condition is on. Passives with effects PoB cannot calculate are "
-                + ("kept." if keep_unmodelled else "treated as worthless."),
+        "note": "Greedy local search on PoB numbers under the current config. Passives with conditions or ailment "
+                "effects (freeze, chill, shock, 'while', 'against') are never refunded, and passives with effects PoB "
+                "cannot calculate are " + ("kept." if keep_unmodelled else "treated as worthless."),
     }
