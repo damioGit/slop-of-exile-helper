@@ -109,7 +109,8 @@ class Session:
             {"group": g["index"], "main": g["main"], "enabled": g["enabled"], "slot": g.get("slot"),
              "skills": g["skills"],
              "gems": [f"{x['name']} {x['level']}/{x['quality']}" + ("" if x["enabled"] else " (disabled)")
-                      for x in g["gems"]]}
+                     + ("" if x.get("applies", True) or not x["enabled"] else " (cannot support this skill)")
+                     for x in g["gems"]]}
             for g in p.groups()
         ]
         if with_all_skills:
@@ -122,7 +123,13 @@ class Session:
         res["weapon_set"] = "second (swap)" if p.resolve_slot("Weapon 1").endswith("Swap") else "first"
         opts = {o["var"]: o.get("value") for o in p.config_options()}
         res["config"] = {k: opts.get(k) for k in ("enemyIsBoss", "enemyLevel", "usePowerCharges", "useFrenzyCharges",
-                                                  "useEnduranceCharges", "conditionEnemyShocked", "conditionEnemyIgnited")}
+                                                  "useEnduranceCharges", "conditionEnemyShocked", "conditionEnemyIgnited",
+                                                  "enemyDistance")}
+        res["enemy"] = p.enemy_resists()
+        res["passive_points"] = p.points()
+        if res["passive_points"]["unspent"] < 0:
+            res["passive_points"]["note"] = ("more points allocated than PoB's maximum for this level; the character may "
+                                             "have a point source PoB does not know, or the tree is over budget")
         return res
 
     def item(self, slot: str) -> dict | None:
@@ -161,21 +168,47 @@ class Session:
             raise ValueError(f"no passive node named {ref!r}" + (" that is allocated" if want_allocated else ""))
         return min(cands)[1]
 
+    # ---- explanations ----------------------------------------------------------------
+    NO_CHANGE = ("PoB shows no stat change. Either the effect is conditional and the condition is off in the config "
+                 "(check build_config), or PoB does not model this mechanic, or it really does nothing for this build.")
+
+    def _node_notes(self, ids: list[int]) -> list[str]:
+        notes = []
+        active_set = self.pob.points()["active_weapon_set"]
+        for i in ids:
+            n = self.pob.node_info(i)
+            if not n:
+                continue
+            if n["alloc"] and n["weapon_set"] and n["weapon_set"] != active_set:
+                notes.append(f"{n['name']}: allocated to weapon set {n['weapon_set']}, but the build calculates "
+                             f"weapon set {active_set}, so it counts for nothing here")
+            if n["unsupported"]:
+                notes.append(f"{n['name']}: PoB does not calculate: " + "; ".join(n["unsupported"]))
+        return notes
+
     # ---- what-if (no change to the build) ------------------------------------------
     def whatif_passives(self, add=None, remove=None) -> dict:
         self._need_build()
         add_ids = [self.resolve_node(x, want_allocated=False) for x in (add or [])]
         rem_ids = [self.resolve_node(x, want_allocated=True) for x in (remove or [])]
         w = self.pob.whatif(add_nodes=add_ids or None, with_path=True, remove_nodes=rem_ids or None)
+        changes = diff(self.base, w)
+        notes = self._node_notes(add_ids + rem_ids)
+        if not changes:
+            notes.append(self.NO_CHANGE)
         return {"points": w.pop("points"),
                 "nodes": [self.pob.node_info(i)["name"] for i in add_ids + rem_ids],
-                "changes": diff(self.base, w)}
+                "changes": changes, "notes": notes}
 
     def whatif_item(self, slot: str, item_text: str | None = None) -> dict:
         self._need_build()
         w = self.pob.whatif(slot=slot, item_raw=item_text)
         w.pop("points", None)
-        return {"slot": self.pob.resolve_slot(slot), "changes": diff(self.base, w)}
+        changes = diff(self.base, w)
+        return {"slot": self.pob.resolve_slot(slot), "changes": changes,
+                "notes": [] if changes else [self.NO_CHANGE]}
+
+    MAX_GEMS_PER_GROUP = 6  # 1 skill gem + up to 5 support sockets in PoE2
 
     def _apply_steps(self, steps: list[dict]) -> list[str]:
         notes = []
@@ -187,26 +220,53 @@ class Session:
             if op in ("alloc_node", "dealloc_node"):
                 ref = st.pop("node", None) or st.pop("node_id", None)
                 st = {"node_id": self.resolve_node(ref, want_allocated=(op == "dealloc_node"))}
+            if op == "set_gem":
+                groups = self.pob.groups()
+                gi = st.get("group")
+                if not gi or gi > len(groups):
+                    raise ValueError(f"no skill group {gi}; build_overview lists them")
+                g = groups[gi - 1]
+                if st.get("gem", 0) > len(g["gems"]) and len(g["gems"]) >= self.MAX_GEMS_PER_GROUP and not g.get("slot"):
+                    notes.append(f"group {gi} already has {len(g['gems'])} gems; a PoE2 skill gem has at most 5 support "
+                                 f"sockets, so this extra gem is not possible in game")
             res = getattr(self.pob, OPS[op])(**st)
             if res is False or (op == "alloc_node" and res is None):
-                notes.append(f"{op} {st} did not apply")
+                notes.append(f"{op} {st} did not apply (wrong name, unreachable node or invalid gem)")
         return notes
+
+    def _points_note(self, before_pts: dict, after_pts: dict) -> dict:
+        return {"used": [before_pts["used"], after_pts["used"]], "available": after_pts["available"],
+                "weapon_set_1": [before_pts["weapon_set_1"], after_pts["weapon_set_1"]],
+                "weapon_set_2": [before_pts["weapon_set_2"], after_pts["weapon_set_2"]]}
 
     def try_changes(self, steps: list[dict]) -> dict:
         """Apply steps on a copy, report the changes, roll back."""
         self._need_build()
+        before_pts = self.pob.points()
         with self.pob.trial():
             notes = self._apply_steps(steps)
             after = self.pob.summary()
-        return {"changes": diff(self.base, after), "main_skill": after.get("main_skill"), "notes": notes}
+            after_pts = self.pob.points()
+        changes = diff(self.base, after)
+        if not changes:
+            notes.append(self.NO_CHANGE)
+        res = {"changes": changes, "main_skill": after.get("main_skill"), "notes": notes}
+        if before_pts != after_pts:
+            res["passive_points"] = self._points_note(before_pts, after_pts)
+        return res
 
     def apply_changes(self, steps: list[dict]) -> dict:
         """Apply steps for real; later comparisons are against the new state."""
         self._need_build()
         before = self.base
+        before_pts = self.pob.points()
         notes = self._apply_steps(steps)
         self.base = self.pob.summary()
-        return {"changes": diff(before, self.base), "notes": notes, "build_code": self.pob.export_code()}
+        res = {"changes": diff(before, self.base), "notes": notes, "build_code": self.pob.export_code()}
+        after_pts = self.pob.points()
+        if before_pts != after_pts:
+            res["passive_points"] = self._points_note(before_pts, after_pts)
+        return res
 
     # ---- ranking -------------------------------------------------------------------
     def rank_passives(self, metric: str = "dps", node_types=("Notable", "Keystone"), max_cost: int = 6,
@@ -230,8 +290,44 @@ class Session:
                 })
         rows.sort(key=lambda r: r["per_point"], reverse=True)
         for r in rows[:limit]:
-            r["stats"] = self.pob.node_info(r["id"])["stats"]
+            info = self.pob.node_info(r["id"])
+            r["stats"] = info["stats"]
+            if info["unsupported"]:
+                r["not_calculated"] = info["unsupported"]
         return rows[:limit]
+
+    def rank_respec(self, metric: str = "dps", limit: int = 15, also=("dps", "ehp"),
+                    include_inactive_set: bool = True) -> dict:
+        """Allocated passives ordered by how little you lose per point if you refund them
+        (a node plus everything that only connects through it). Cheapest refunds first."""
+        self._need_build()
+        key = metric_key(metric)
+        extra = [metric_key(a) for a in also if metric_key(a) != key]
+        rows, inactive = [], []
+        for n in self.pob.allocated_nodes():
+            if n.get("ascendancy"):
+                continue
+            if not n["active"]:
+                inactive.append({"node": n["name"], "id": n["id"], "weapon_set": n["weapon_set"]})
+                continue
+            w = self.pob.whatif(remove_nodes=[n["id"]])
+            freed = -w["points"]
+            if freed <= 0:
+                continue
+            loss = self.base.get(key, 0) - w[key]
+            row = {"node": n["name"], "id": n["id"], "type": n["type"], "points_freed": freed,
+                   "loss": _r(loss), "loss_pct": round(loss / self.base[key] * 100, 2) if self.base.get(key) else None,
+                   "loss_per_point": _r(loss / freed),
+                   **{f"d_{e}": _r(w[e] - self.base.get(e, 0)) for e in extra}}
+            if n["unsupported"]:
+                row["not_calculated"] = n["unsupported"]
+            rows.append(row)
+        # cheapest refunds first; among equal loss, the ones that also cost less on the other metrics
+        rows.sort(key=lambda r: (r["loss_per_point"], *[-r[f"d_{e}"] for e in extra]))
+        res = {"metric": key, "points": self.pob.points(), "cheapest_refunds": rows[:limit]}
+        if include_inactive_set:
+            res["inactive_weapon_set_nodes"] = inactive
+        return res
 
     def export_code(self) -> str:
         self._need_build()

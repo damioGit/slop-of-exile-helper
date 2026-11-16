@@ -94,13 +94,71 @@ function soe.node_path(nodeId)
 	return res
 end
 
+local function activeWeaponSet()
+	return build.itemsTab.activeItemSet.useSecondWeaponSet and 2 or 1
+end
+
+-- stat lines PoB cannot parse into modifiers (so they do nothing in calculations)
+local function unsupportedLines(node)
+	local res = {}
+	for i, m in ipairs(node.mods or {}) do
+		if (m.extra or not m.list or #m.list == 0) and node.sd and node.sd[i] then res[#res + 1] = node.sd[i] end
+	end
+	return res
+end
+
+local function nodeRecord(node)
+	local stats = {}
+	for i, s in ipairs(node.sd or {}) do stats[i] = s end
+	local mode = node.allocMode or 0
+	return { id = node.id, name = node.dn, type = node.type, alloc = node.alloc and true or false,
+		cost = node.path and #node.path or nil, ascendancy = node.ascendancyName, stats = stats,
+		weapon_set = mode, active = (not node.alloc) or mode == 0 or mode == activeWeaponSet(),
+		unsupported = unsupportedLines(node) }
+end
+
 function soe.node_info(nodeId)
 	local node = build.spec.nodes[nodeId]
 	if not node then return nil end
-	local stats = {}
-	for i, s in ipairs(node.sd or {}) do stats[i] = s end
-	return { id = node.id, name = node.dn, type = node.type, alloc = node.alloc and true or false,
-		cost = node.path and #node.path or nil, ascendancy = node.ascendancyName, stats = stats }
+	return nodeRecord(node)
+end
+
+function soe.allocated_nodes()
+	local res = {}
+	for _, node in pairs(build.spec.allocNodes) do
+		if node.type ~= "ClassStart" and node.type ~= "AscendClassStart" then res[#res + 1] = nodeRecord(node) end
+	end
+	table.sort(res, function(a, b) return a.id < b.id end)
+	return res
+end
+
+-- Passive point budget the way PoB's own warning computes it
+function soe.points()
+	local used, ascUsed, _, sockets, ws1, ws2 = build.spec:CountAllocNodes()
+	local out = build.calcsTab.mainOutput or {}
+	local extra = out.ExtraPoints or 0
+	local maxWS = (build.maxWeaponSets or 0) + (out.PassivePointsToWeaponSetPoints or 0) + (out.WeaponSetPassivePoints or 0)
+	local quest = build.acts and build.maxActs and build.acts[build.maxActs] and build.acts[build.maxActs].questPoints or 0
+	local level = build.characterLevel or 1
+	local normalUsed = used - math.min(ws1, ws2)
+	local available = math.min(99 + (build.maxWeaponSets or 0) + extra, level - 1 + quest + extra + (build.maxWeaponSets or 0))
+	return { used = normalUsed, available = available, unspent = available - normalUsed,
+		weapon_set_1 = ws1, weapon_set_2 = ws2, weapon_set_max = maxWS,
+		ascendancy_used = ascUsed, ascendancy_max = 8, jewel_sockets = sockets, active_weapon_set = activeWeaponSet() }
+end
+
+-- Enemy resistances as PoB's config (boss preset etc.) sets them
+function soe.enemy_resists()
+	local env = build.calcsTab.mainEnv
+	local db = env and env.enemyDB
+	if not db then return {} end
+	local res = {}
+	for _, e in ipairs({ "Fire", "Cold", "Lightning", "Chaos" }) do
+		res[e] = db:Sum("BASE", nil, e .. "Resist")
+	end
+	res.Armour = db:Sum("BASE", nil, "Armour")
+	res.Evasion = db:Sum("BASE", nil, "Evasion")
+	return res
 end
 
 -- ---- what-if (never changes the build) -------------------------------------
@@ -159,14 +217,23 @@ end
 
 -- ---- skills / gems ----------------------------------------------------------
 local function groupInfo(i, g)
+	-- supports actually applied to at least one active skill of this group
+	local applied = {}
+	for _, s in ipairs(g.displaySkillList or {}) do
+		for _, eff in ipairs(s.effectList or {}) do
+			if eff.grantedEffect then applied[eff.grantedEffect] = true end
+		end
+	end
 	local gems = {}
 	for j, gem in ipairs(g.gemList) do
 		local ge = gem.gemData and gem.gemData.grantedEffect
+		local isSupport = (ge and ge.support) and true or false
 		gems[j] = {
 			name = gem.nameSpec, level = gem.level, quality = gem.quality,
 			enabled = gem.enabled and true or false,
-			support = (ge and ge.support) and true or false,
+			support = isSupport,
 			valid = gem.gemData ~= nil,
+			applies = (not isSupport) or (ge ~= nil and applied[ge] == true),
 		}
 	end
 	local skills = {}

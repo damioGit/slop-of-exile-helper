@@ -24,9 +24,14 @@ py -m venv .venv
 ## Doradca w Claude Code (MCP)
 
 Serwer `soe` jest zarejestrowany w `.mcp.json`. Claude Code w tym folderze pyta przy starcie, czy go włączyć.
-Wymaga zbudowanej bazy (`soe kb build`). Narzędzia: `load_build`, `build_overview`, `get_item`, `build_config`,
-`whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `export_build`, `reset_build`,
+Wymaga zbudowanej bazy (`soe kb build`). Narzędzia: `load_build`, `build_overview`, `checkup`, `get_item`, `build_config`,
+`whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `rank_respec`, `export_build`, `reset_build`,
 `kb_search`, `kb_gem`, `kb_supports_for`, `kb_unique`, `kb_mods`, `kb_node`. Zasady odpowiadania są w [CLAUDE.md](CLAUDE.md).
+
+`checkup` to lista tego, co hamuje build: resy, najsłabszy max hit, atrybuty, spirit, mana, supporty, które nie działają,
+poziomy gemów, punkty, pasywki z drugiego zestawu broni oraz pasywki i mody, które nic nie dają (zmierzone w PoB).
+Wynik ułożony jest wg wag celów gracza. Format jest wzorowany na [Exile Build Advisor](https://github.com/reytla/exile-build-adviser)
+(reytla, MIT), szczegóły w [NOTICE](NOTICE).
 
 Ręczne uruchomienie: `.venv/Scripts/python -m soe.advisor.server` (stdio).
 

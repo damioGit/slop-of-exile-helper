@@ -101,9 +101,18 @@ Konsekwencja: dochodzi warstwa **`api/`** (lokalny serwer HTTP, FastAPI), z któ
 | **1. Engine API** ✅ | 16.11 | `mutate()` dla node'ów drzewka, gemów, itemów, configu; snapshot/rollback; pula instancji; test wydajności (cel: >20 evali/s). |
 | **2. Knowledge Base** ✅ | 16.11 | SQLite ze wszystkimi gemami/supportami/modami/unikatami/drzewkiem, wyszukiwarka, CLI `soe kb search "fire spell"`. |
 | **3. MCP + Advisor v1** ✅ | 16.11 | Claude w Claude Code widzi narzędzia, odpowiada na „jak zwiększyć DPS tego buildu” na prawdziwych liczbach. |
-| **4. Optymalizatory** | 26.11–4.12 | Stat weights, optymalizacja drzewka i supportów, raport „top 10 zmian za najmniej”. |
+| **4. Optymalizatory** 🔶 | 16.11–4.12 | Gotowe: check-up z wagami celów, ranking respecu, budżet punktów, pasywki z zestawów broni, wyjaśnienia przy pustych wynikach. Zostało: stat weights dla gearu, optymalizacja drzewka (respec + nowe ścieżki naraz) i supportów na puli procesów, raport „top 10 zmian za najmniej”. |
 | **5. Combo + Crafting** | 1–9.12 | Graf interakcji i sugestie combosów; planer craftu (o ile dane wag modów będą dostępne). |
 | **6. Web appka + launch pipeline** | 3–10.12 | Lokalna appka (build, staty, drzewko, plan zmian). Skrypt „nowy release PoB → dane gotowe” w < 30 min, próba na 0.22 → 0.23. |
+
+### Web appka: zakres (pomysły m.in. z Exile Build Advisor, reytla, MIT)
+
+- Zakładki: **Check-up** (findings z „dlaczego / co zyskasz / co zrobić”, kolor wg wagi, etykieta pewności), **Przegląd** (mierniki resów do capu, max hit per typ, spirit, punkty), **Skille** (grupy, supporty, które nie działają, DPS każdego skilla), **Gear** (sloty, martwe mody, what-if z wklejonym itemem), **Drzewko**.
+- Suwaki celów gracza (damage / survive / mana / ease / speed) od razu przestawiają kolejność check-upu.
+- Linki do trade2 z pseudo-statami (resy, atrybuty, life) dla każdej sugestii gearowej.
+- „Twoje dane”: budżet, liga, własna tabela cen (bez zgadywania cen), później poe.ninja.
+- Porównanie z guidem (kod PoB guide'a ↔ Twój build).
+- Jasny i ciemny motyw, działa na telefonie (~390 px). Backend: ten sam `Session` co MCP (FastAPI).
 | **D-day** | 11.12+ | PoB wypuszcza dane 1.0 → odpalamy pipeline → ranking starterów i aktualizujemy wszystko. |
 
 ## 4. Ryzyka (szczerze)

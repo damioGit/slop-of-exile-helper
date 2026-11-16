@@ -121,6 +121,26 @@ def rank_passives(metric: str = "dps", max_cost: int = 6, limit: int = 15, inclu
     return session.rank_passives(metric, types, max_cost, limit)
 
 
+@tool
+def checkup(damage: int = 2, survive: int = 2, mana: int = 1, ease: int = 1, speed: int = 1, deep: bool = True) -> dict:
+    """Ranked list of what holds the build back: uncapped resistances, weakest max hit, attributes,
+    Spirit, mana sustain, supports that do not apply, low gem levels, unspent points, passives in the
+    inactive weapon set, passives and gear mods that change nothing (measured in PoB). Goal weights
+    0-3 reorder the list for what the player cares about. Start here for "what should I improve?"."""
+    from soe.advisor.checkup import run_checkup
+
+    return run_checkup(session, {"damage": damage, "survive": survive, "mana": mana, "ease": ease, "speed": speed}, deep)
+
+
+@tool
+def rank_respec(metric: str = "dps", limit: int = 15) -> dict:
+    """Allocated passives ordered by the smallest loss per refunded point (node + nodes that only connect
+    through it), for finding points to move when none are free. Also lists nodes allocated to the
+    inactive weapon set (they count for nothing in the current calculation) and the point budget.
+    `not_calculated` lists stat lines PoB cannot model; a 0 loss there does not mean useless in game."""
+    return session.rank_respec(metric, limit)
+
+
 # ---- knowledge base ---------------------------------------------------------------------
 @tool
 def kb_search(query: str, kind: str | None = None, limit: int = 15) -> list[dict]:
@@ -135,13 +155,15 @@ def kb_gem(name: str) -> dict | None:
 
 
 @tool
-def kb_supports_for(gem: str, search: str | None = None) -> list[dict]:
-    """Support gems that can support this active gem (same rule as PoB). search filters by name/text."""
+def kb_supports_for(gem: str, search: str | None = None, limit: int = 40) -> dict:
+    """Support gems that can support this active gem (same rule as PoB). search filters by name/text
+    (e.g. 'crit', 'cold', 'more damage'). Returns the total count and at most `limit` supports."""
     rows = session.kb.supports_for(gem)
     if search:
         s = search.lower()
         rows = [r for r in rows if s in r["name"].lower() or s in " ".join(r["stats_text"]).lower()]
-    return [{"name": r["name"], "tier": r["tier"], "text": r["stats_text"]} for r in rows]
+    return {"total": len(rows), "shown": min(len(rows), limit),
+            "supports": [{"name": r["name"], "tier": r["tier"], "text": r["stats_text"]} for r in rows[:limit]]}
 
 
 @tool

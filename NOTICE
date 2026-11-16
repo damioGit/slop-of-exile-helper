@@ -1,0 +1,10 @@
+Slop of Exile Helper: third-party material
+
+- vendor/PathOfBuilding-PoE2 (fetched, not committed) and all game data derived from it:
+  Path of Building Community, https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2, MIT licence.
+- soe/advisor/checkup.py: the check-up idea and finding format (severity, certainty, why / effect /
+  action, goal weights) are adapted from Exile Build Advisor by reytla,
+  https://github.com/reytla/exile-build-adviser, MIT licence, (c) 2026 reytla.
+  The rules are rewritten in Python and measured with the Path of Building engine.
+- Path of Exile and its game data are (c) Grinding Gear Games. This project is not affiliated with
+  or endorsed by Grinding Gear Games, Path of Building Community or poe.ninja.

@@ -23,7 +23,8 @@ SUMMARY_KEYS = [
     "TotalEHP", "PhysicalMaximumHitTaken", "FireMaximumHitTaken", "ColdMaximumHitTaken",
     "LightningMaximumHitTaken", "ChaosMaximumHitTaken",
     "LifeRegenRecovery", "ManaRegenRecovery", "EnergyShieldRecharge",
-    "MovementSpeedMod", "Str", "Dex", "Int",
+    "SpiritReserved", "SpiritUnreserved", "ManaCost", "ManaPerSecondCost",
+    "MovementSpeedMod", "Str", "Dex", "Int", "ReqStr", "ReqDex", "ReqInt",
 ]
 
 
@@ -135,7 +136,28 @@ class PoB:
         return _lua_to_py(self._call(self.api.node_path, node_id)) or []
 
     def node_info(self, node_id: int) -> dict | None:
-        return _lua_to_py(self._call(self.api.node_info, node_id))
+        """Node record: name, type, stats, alloc, cost, weapon_set (0 shared / 1 / 2), active,
+        unsupported (stat lines PoB cannot calculate)."""
+        r = _lua_to_py(self._call(self.api.node_info, node_id))
+        if r is not None:
+            r.setdefault("unsupported", [])
+            r.setdefault("stats", [])
+        return r
+
+    def allocated_nodes(self) -> list[dict]:
+        rows = _lua_to_py(self._call(self.api.allocated_nodes)) or []
+        for r in rows:
+            r.setdefault("unsupported", [])
+            r.setdefault("stats", [])
+        return rows
+
+    def points(self) -> dict:
+        """Passive point budget: used, available, unspent, weapon set points, ascendancy points."""
+        return _lua_to_py(self._call(self.api.points))
+
+    def enemy_resists(self) -> dict:
+        """Enemy resistances/armour/evasion as the current config (e.g. boss preset) sets them."""
+        return _lua_to_py(self._call(self.api.enemy_resists)) or {}
 
     # gems / skills
     def groups(self) -> list[dict]:
