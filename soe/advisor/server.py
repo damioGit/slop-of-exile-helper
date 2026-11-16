@@ -239,6 +239,17 @@ def suggest_combos(damage: float = 1, survive: float = 1, max_cost: int = 6) -> 
 
 
 @tool
+def price_check(names: list[str]) -> dict:
+    """Current poe.ninja prices (Path of Exile 2, current league) for currency, essences, uniques, lineage
+    supports, uncut gems, runes, fragments... by exact item name. Unknown or unlisted = null (never guessed).
+    Also returns the league and the Divine/Exalted/Chaos rates."""
+    from soe.prices import default_prices
+
+    p = default_prices()
+    return {"status": p.status(), "prices": {n: p.price(n) for n in names}}
+
+
+@tool
 def rank_respec(metric: str = "dps", limit: int = 15) -> dict:
     """Allocated passives ordered by the smallest loss per refunded point (node + nodes that only connect
     through it), for finding points to move when none are free. Also lists nodes allocated to the

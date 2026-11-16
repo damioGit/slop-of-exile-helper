@@ -54,7 +54,7 @@ Serwer `soe` jest zarejestrowany w `.mcp.json`. Claude Code w tym folderze pyta 
 Wymaga zbudowanej bazy (`soe kb build`). Narzędzia: `load_build`, `build_overview`, `checkup`, `get_item`, `build_config`,
 `whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `rank_respec`,
 `stat_weights`, `optimize_supports`, `optimize_tree`, `improvement_plan`, `try_unique`, `rank_uniques`,
-`mod_upgrades`, `ideal_item`, `craft_odds`, `suggest_combos`, `export_build`, `reset_build`,
+`mod_upgrades`, `ideal_item`, `craft_odds`, `suggest_combos`, `price_check`, `export_build`, `reset_build`,
 `kb_search`, `kb_gem`, `kb_supports_for`, `kb_unique`, `kb_mods`, `kb_node`. Zasady odpowiadania są w [CLAUDE.md](CLAUDE.md).
 
 `checkup` to lista tego, co hamuje build: resy, najsłabszy max hit, atrybuty, spirit, mana, supporty, które nie działają,
@@ -112,3 +112,11 @@ Wagi modów w danych PoB to tylko 0/1 (patrz PLAN.md, ryzyko 4).
 - Pola tabel Lua o nazwach `items`, `keys`, `values` czytaj przez `tbl["items"]`, bo w lupa `.items` to metoda Pythona.
 - LuaJIT na Windows rzuca wyjątek SEH `0xe24c4a02` przy każdym złapanym błędzie Lua. To nie crash; faulthandler w pytest jest wyłączony z tego powodu.
 - Jedna instancja `PoB` na proces/wątek. Do równoległych obliczeń używaj wielu procesów.
+
+## Ceny (poe.ninja)
+
+`soe/prices/ninja.py` pobiera ceny z poe.ninja (PoE2): walutę, esencje, runy, fragmenty, soul core'y, uncut gemy, lineage supporty i unikaty wszystkich typów. Ceny są w divine, z przeliczeniem na exalted i chaos.
+- **Liga:** najnowsza indeksowana liga softcore albo zmienna `SOE_LEAGUE`.
+- **Cache:** `data/prices/<liga>/` na 1 h. Bez internetu używany jest ostatni cache, oznaczony jako nieaktualny.
+- **Brak ceny = nieznana.** Nic nie jest zgadywane.
+- **Gdzie widać ceny:** `price_check`, ranking i test unikatów, optymalizator supportów (lineage), esencje w `mod_upgrades`, `craft_odds` (oczekiwana liczba exaltów i koszt), `improvement_plan` (koszt, zysk na divine, znany koszt całości) oraz appka.

@@ -253,8 +253,8 @@ const views = {
       const c = r.best_combination;
       $("#supOut").innerHTML = `<h3>Wartość obecnych supportów (bez niego)</h3><div class="tablewrap"><table><tr><th>Support</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
         Object.entries(r.current_supports).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${pct(v.dps_pct)}</td><td class="n">${pct(v.ehp_pct)}</td></tr>`).join("")}</table></div>
-        ${c ? `<h3>Najlepszy zestaw zmian (sprawdzony razem)</h3><p>${c.swaps.map(s => `${esc(s.replace)} → <b>${esc(s.with)}</b>`).join("<br>")}</p><p>DPS ${pct(c.dps_pct)} · EHP ${pct(c.ehp_pct)}</p><button id="btnSupApply">Zastosuj</button>` : "<p>Brak lepszego zestawu.</p>"}
-        <h3>Najlepsze pojedyncze (etap 1)</h3><div class="chips">${r.stage1_top.map(x => `<span class="chip">${esc(x.support)} ${pct(x.dps_pct)}</span>`).join("")}</div>
+        ${c ? `<h3>Najlepszy zestaw zmian (sprawdzony razem)</h3><p>${c.swaps.map(s => `${esc(s.replace)} → <b>${esc(s.with)}</b>${s.price ? ` <span class="muted small">(${esc(s.price.text)})</span>` : ""}`).join("<br>")}</p><p>DPS ${pct(c.dps_pct)} · EHP ${pct(c.ehp_pct)}</p><button id="btnSupApply">Zastosuj</button>` : "<p>Brak lepszego zestawu.</p>"}
+        <h3>Najlepsze pojedyncze (etap 1)</h3><div class="chips">${r.stage1_top.map(x => `<span class="chip">${esc(x.support)} ${pct(x.dps_pct)}${x.price ? " · " + esc(x.price.text) : ""}</span>`).join("")}</div>
         <p class="muted small">${esc(r.note)} · ${r.evaluated} przeliczeń w ${r.seconds} s</p>`;
       if (c) $("#btnSupApply").onclick = ev => applySteps(c.apply_steps, ev.target);
     });
@@ -278,7 +278,7 @@ const views = {
       const g = goals();
       const r = await api("/api/try_unique?" + q({name: $("#uName").value, damage: g.damage, survive: g.survive}));
       $("#tryUOut").innerHTML = `<h3>${esc(r.unique)} (${esc(r.base)}) w ${esc(r.slot)} zamiast ${esc(r.replaces || "pustego slotu")}</h3>
-        <p>DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}${r.penalty ? ` · <span class="neg">kara ${fmt(r.penalty, 1)}</span>` : ""}</p>${diffTable(r.changes)}${notes(r.notes)}
+        <p>DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}${r.penalty ? ` · <span class="neg">kara ${fmt(r.penalty, 1)}</span>` : ""} · cena: <b>${r.price ? esc(r.price.text) : "brak na poe.ninja"}</b></p>${diffTable(r.changes)}${notes(r.notes)}
         <details><summary>mody unikatu</summary><pre>${esc(r.unique_mods.join("\n"))}</pre></details>`;
     });
   },
@@ -334,7 +334,7 @@ const views = {
       const t = r.all_together;
       $("#planOut").innerHTML = `<div class="tablewrap"><table><tr><th>Zmiana</th><th class="n">DPS</th><th class="n">EHP</th><th>Koszt</th></tr>${
         r.top_changes.map(x => `<tr><td>${esc(x.what)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td><td class="small muted">${esc(x.cost)}</td></tr>`).join("")}</table></div>
-        ${t ? `<h3>Gemy + drzewko razem (zmierzone)</h3><p>DPS ${pct(t.dps_pct)} · EHP ${pct(t.ehp_pct)}</p><button id="btnPlanApply">Zastosuj gemy i drzewko</button>` : ""}
+        ${t ? `<h3>Gemy + drzewko razem (zmierzone)</h3><p>DPS ${pct(t.dps_pct)} · EHP ${pct(t.ehp_pct)}${t.known_cost_divine ? ` · znany koszt: <b>${fmt(t.known_cost_divine, 2)} div</b>` : ""}</p><button id="btnPlanApply">Zastosuj gemy i drzewko</button>` : ""}
         <h3>Czego szukać na gearze</h3><div class="chips">${r.gear_stat_priorities.map(x => `<span class="chip">${esc(x.stat)}</span>`).join("")}</div>
         <p class="muted small">${esc(r.note)} · ${r.seconds} s</p>`;
       if (t) $("#btnPlanApply").onclick = ev => applySteps(t.steps, ev.target);
@@ -367,7 +367,7 @@ async function slotView(slot) {
         up.upgrades.length ? `<div class="tablewrap"><table><tr><th>Zamień</th><th>Na</th><th class="n">DPS</th><th class="n">EHP</th></tr>${up.upgrades.map(u => `<tr><td class="small">${esc(u.replace)}<div class="muted">${esc(u.replace_as)}</div></td><td class="small"><b>${esc(u.with)}</b>${u.essence.length ? `<div class="muted">esencja: ${esc(u.essence.join(", "))}</div>` : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td></tr>`).join("")}</table></div>` : "<p class='muted'>Nic lepszego w puli modów.</p>"}
         ${up.not_changeable_or_unknown.length ? `<p class="muted small">Spoza zwykłej puli: ${esc(up.not_changeable_or_unknown.join("; "))}</p>` : ""}
         <button class="ghost" id="btnIdeal">Pokaż idealny item na ten slot</button><div id="idealOut"></div>
-        ${uq ? `<h3>Unikaty na ten slot</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
+        ${uq ? `<h3>Unikaty na ten slot</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td><td class="n small">${u.price ? esc(u.price.text) : "–"}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
       </div></div></div>`;
     $("#btnWI").onclick = e => busy(e.target, async () => {
       const r = await api("/api/whatif_item", {body: {slot, item_text: $("#wiText").value}});
@@ -393,6 +393,7 @@ async function refreshBadge() {
   state.loaded = s.loaded;
   state.overview = null;
   $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}` : "· brak bazy wiedzy: uruchom soe kb build";
+  api("/api/prices").then(p => { $("#kbInfo").textContent += ` · ceny: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
   $("#loadPanel").open = !s.loaded;
   if (s.loaded) {
     const m = s.summary;

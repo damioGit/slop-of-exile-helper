@@ -38,9 +38,13 @@ def improvement_plan(session, goals: dict | None = None, use_supports: bool = Tr
         for swap, step in zip((best_combo or {}).get("swaps", []), (best_combo or {}).get("apply_steps", [])):
             row = singles[(swap["replace"], swap["with"])]
             alts = [r["with"] for r in sup["best_per_slot"].get(swap["replace"], []) if r["with"] != swap["with"]][:3]
+            pr = swap.get("price")
             items.append({"kind": "gem_swap", "what": f"{sup['skill']}: {swap['replace']} -> {swap['with']}",
                           "score": row["score"], "dps_pct": row["dps_pct"], "ehp_pct": row["ehp_pct"],
-                          "cost": COST["gem_swap"], "alternatives": alts, "steps": [step]})
+                          "cost": f"{swap['with']}: {pr['text']} (poe.ninja)" if pr else
+                                  "regular support gem (cheap; not listed on poe.ninja)",
+                          "price_divine": pr["divine"] if pr else None,
+                          "alternatives": alts, "steps": [step]})
     else:
         best_combo = None
 
@@ -53,8 +57,13 @@ def improvement_plan(session, goals: dict | None = None, use_supports: bool = Tr
                     pob.set_gem(main["index"], i, level=20)
                     ex = obj.explain(pob.summary(), base)
                 if ex["score"] > 0.3:
+                    from soe.prices import safe_price
+
+                    pr = safe_price("Uncut Skill Gem (Level 20)")
                     items.append({"kind": "gem_level", "what": f"{gem['name']} level {gem['level']} -> 20",
-                                  **{k: ex[k] for k in ("score", "dps_pct", "ehp_pct")}, "cost": COST["gem_level"],
+                                  **{k: ex[k] for k in ("score", "dps_pct", "ehp_pct")},
+                                  "cost": f"Uncut Skill Gem (Level 20): {pr['text']}" if pr else COST["gem_level"],
+                                  "price_divine": pr["divine"] if pr else None,
                                   "steps": [{"op": "set_gem", "group": main["index"], "gem": i, "level": 20}]})
 
     tree = None
@@ -89,6 +98,9 @@ def improvement_plan(session, goals: dict | None = None, use_supports: bool = Tr
 
     items.sort(key=lambda x: x["score"], reverse=True)
     items = items[:top]
+    for it in items:  # gain per divine where the price is known (free changes have no ratio)
+        if it.get("price_divine"):
+            it["score_per_divine"] = round(it["score"] / it["price_divine"], 2)
 
     # everything gem + tree together: gains interact, so measure the bundle
     together = None
@@ -101,10 +113,22 @@ def improvement_plan(session, goals: dict | None = None, use_supports: bool = Tr
         with pob.trial():
             notes = session._apply_steps(bundle)
             after = pob.summary()
+        known = [s["price"]["divine"] for s in (best_combo or {}).get("swaps", []) if s.get("price")]
         together = {**obj.explain(after, base), "steps": bundle, "notes": notes,
-                    "includes": (["support set"] if best_combo else []) + (["tree moves"] if tree and tree["moves"] else [])}
+                    "includes": (["support set"] if best_combo else []) + (["tree moves"] if tree and tree["moves"] else []),
+                    "known_cost_divine": round(sum(known), 3) if known else 0,
+                    "cost_note": "lineage supports priced on poe.ninja; regular supports and respec gold not counted"}
+
+    try:
+        from soe.prices import default_prices
+
+        st = default_prices().status()
+        prices = {"league": st["league"], "divine_in_exalted": st["divine_in_exalted"], "stale": st["stale_types"]}
+    except Exception as e:
+        prices = {"error": str(e)}
 
     return {
+        "prices": prices,
         "goals": {"damage": obj.damage, "survive": obj.survive},
         "top_changes": items,
         "all_together": together,

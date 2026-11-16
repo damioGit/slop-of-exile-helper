@@ -126,17 +126,23 @@ def optimize_supports(session, group: int | None = None, objective: Objective | 
                 for idx, _ in chosen]
         r = run([{"do": do, "undo": undo}])[0]
         if r["ok"]:
-            combo = {"swaps": [{"replace": row["replace"], "with": row["with"]} for _, row in chosen],
+            from soe.prices import safe_price
+
+            combo = {"swaps": [{"replace": row["replace"], "with": row["with"], "price": safe_price(row["with"])}
+                               for _, row in chosen],
                      **obj.explain(r["result"], session.base),
                      "apply_steps": [{"op": "set_gem", **kw} for _, kw in do]}
+
+    from soe.prices import safe_price
 
     return {
         "group": gi, "skill": active["name"], "evaluated": n_eval, "seconds": round(time.perf_counter() - t, 1),
         "current_supports": current,
-        "stage1_top": [{"support": c, **ex} for c, ex in stage1[:top * 2]],
+        "stage1_top": [{"support": c, **ex, "price": safe_price(c)} for c, ex in stage1[:top * 2]],
         "best_per_slot": {per_slot[idx][0]["replace"] if per_slot[idx] else gem["name"]: per_slot[idx][:top]
                           for idx, gem in slots},
         "best_combination": combo,
         "note": "score ≈ % gain on the weighted DPS/EHP objective minus penalties. A current support worth 0 "
-                "is either not modelled by PoB or useless here; lineage supports (unique names) are rare drops.",
+                "is either not modelled by PoB or useless here. price comes from poe.ninja (lineage supports); "
+                "None = regular support (cut from an uncut support gem, cheap) or not listed.",
     }

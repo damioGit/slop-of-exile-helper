@@ -185,6 +185,14 @@ def combos(damage: float = 1, survive: float = 1):
     return locked(suggest_combos, session, _goals(damage, survive))
 
 
+@app.get("/api/prices")
+def prices(names: str = ""):
+    from soe.prices import default_prices
+
+    p = default_prices()
+    return {"status": p.status(), "prices": {n: p.price(n) for n in names.split("|") if n}}
+
+
 @app.get("/api/kb/search")
 def kb_search(q: str, kind: str | None = None, limit: int = 20):
     return session.kb.search(q, kind, limit)

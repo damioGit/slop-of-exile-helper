@@ -1,8 +1,15 @@
+import os
+import tempfile
 from pathlib import Path
 
 import pytest
 
 BUILDS = Path(__file__).parent / "builds"
+
+# tests never call poe.ninja: prices come from an empty offline cache unless a test builds its own
+os.environ["SOE_PRICES_OFFLINE"] = "1"
+os.environ["SOE_PRICES_DIR"] = tempfile.mkdtemp(prefix="soe-prices-")
+os.environ["SOE_LEAGUE"] = "Test League"
 
 
 @pytest.fixture(scope="session")

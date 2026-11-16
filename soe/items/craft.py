@@ -73,6 +73,18 @@ def _item_level(raw: str) -> int:
     return int(m.group(1)) if m else 82
 
 
+def _essences(kb, mod_id: str, slot: str) -> list[str]:
+    """Essences that guarantee this mod on this slot's item type, with poe.ninja price when listed."""
+    from soe.prices import safe_price
+
+    out = []
+    for e in kb.essences_for(mod_id):
+        if e["item_type"] == SLOT_ITEM_TYPE.get(slot, e["item_type"]) and e["name"] not in [x.split(" (")[0] for x in out]:
+            pr = safe_price(e["name"])
+            out.append(f"{e['name']} ({pr['text']})" if pr else e["name"])
+    return out[:2]
+
+
 def pool_by_group(kb, base: str, ilvl: int) -> dict[tuple[str, str], list[dict]]:
     """(affix type, group) -> tiers, best (highest level) first."""
     groups: dict[tuple[str, str], list[dict]] = {}
@@ -149,8 +161,7 @@ def ideal_item(session, slot: str, objective: Objective | None = None, ilvl: int
     return {"slot": real_slot, "base": base, "item_level": ilvl or item_lvl, "current": cur["name"],
             **obj.explain(w, session.base),
             "mods": [{"type": k[0], "group": k[1], "text": " / ".join(_mod_lines(m)), "level": m["level"],
-                      "essence": [e["name"] for e in kb.essences_for(m["id"])
-                                  if e["item_type"] == SLOT_ITEM_TYPE.get(real_slot, e["item_type"])][:2]}
+                      "essence": _essences(kb, m["id"], real_slot)}
                      for k, m in chosen],
             "item_text": raw,
             "note": "Top rolls of the highest tier available at this item level; score vs the current item. "
@@ -197,8 +208,7 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
                     rows.append({"replace": _clean(exp[i]),
                                  "replace_as": f"{atype} T{tier}" if tier else f"{atype}, value above normal tiers",
                                  "with": " / ".join(_mod_lines(top)), "group": key[1], **ex,
-                                 "essence": [e["name"] for e in kb.essences_for(top["id"])
-                                             if e["item_type"] == SLOT_ITEM_TYPE.get(real_slot, e["item_type"])][:2]})
+                                 "essence": _essences(kb, top["id"], real_slot)})
     rows.sort(key=lambda r: r["score"], reverse=True)
     unknown = [_clean(exp[i]) for i, x in enumerate(lines_info) if not x and exp[i].strip()
                and _clean(exp[i]) not in ("Corrupted", "Mirrored")]
@@ -212,13 +222,22 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
 
 def craft_odds(session, base: str, ilvl: int, want_groups: list[str]) -> dict:
     """Chance that one random added prefix or suffix is in the wanted mod families (equal weights)."""
+    from soe.prices import safe_price
+
     groups = pool_by_group(session.kb, base, ilvl)
+    exalt = safe_price("Exalted Orb")
     res = {}
     for atype in ("Prefix", "Suffix"):
         total = sum(len(t) for (a, _), t in groups.items() if a == atype)
         hit = sum(len(t) for (a, g), t in groups.items() if a == atype and g in want_groups)
-        res[atype] = {"possible_mods": total, "wanted_mods": hit,
-                      "chance_pct": round(hit / total * 100, 1) if total else 0}
+        r = {"possible_mods": total, "wanted_mods": hit, "chance_pct": round(hit / total * 100, 1) if total else 0}
+        if hit:
+            r["expected_exalts"] = round(total / hit, 1)  # an Exalted Orb adds one random mod of an open type
+            if exalt:
+                r["expected_cost_divine"] = round(total / hit * exalt["divine"], 3)
+        res[atype] = r
     return {"base": base, "item_level": ilvl, "wanted": want_groups, **res,
+            "exalted_orb_price": exalt,
             "families": sorted({g for (_, g) in groups}),
-            "note": "Equal weights per possible mod tier (PoB has no real spawn weights): an estimate."}
+            "note": "Equal weights per possible mod tier (PoB has no real spawn weights): an estimate. Expected exalts "
+                    "assume the slot type is open and only count hitting a wanted family, not its top tier."}

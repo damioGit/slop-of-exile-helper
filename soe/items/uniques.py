@@ -67,7 +67,9 @@ def try_unique(session, name: str, slot: str | None = None, objective: Objective
                      "see changes and fix it elsewhere before judging the unique.")
     if row.get("req_level") and session.base.get("level", 100) < row["req_level"]:
         notes.append(f"Requires level {row['req_level']}.")
-    return {"unique": row["name"], "base": row["base"], "base_type": btype,
+    from soe.prices import safe_price
+
+    return {"unique": row["name"], "base": row["base"], "base_type": btype, "price": safe_price(row["name"]),
             "replaces": current["name"] if current else None, **best,
             "other_slots": [{k: r[k] for k in ("slot", "score", "dps_pct", "ehp_pct")} for r in results if r is not best],
             "unique_mods": row["implicits"] + row["mods"], "notes": notes}
@@ -75,6 +77,8 @@ def try_unique(session, name: str, slot: str | None = None, objective: Objective
 
 def rank_uniques(session, slot: str, objective: Objective | None = None, limit: int = 15) -> dict:
     """Every unique that fits the item type currently in `slot`, ranked against the current item."""
+    from soe.prices import safe_price
+
     session._need_build()
     obj = objective or Objective()
     cur = session.item(slot)
@@ -92,10 +96,12 @@ def rank_uniques(session, slot: str, objective: Objective | None = None, limit: 
         unsupported = _unsupported(session.pob, row)
         rows.append({"unique": row["name"], "base": row["base"], "score": r["score"], "dps_pct": r["dps_pct"],
                      "ehp_pct": r["ehp_pct"], "penalty": r["penalty"], "req_level": row["req_level"],
+                     "price": safe_price(row["name"]),
                      **({"not_calculated": unsupported} if unsupported else {})})
     rows.sort(key=lambda x: x["score"], reverse=True)
     return {"slot": session.pob.resolve_slot(slot), "current": cur["name"], "base_type": btype,
             "checked": len(rows), "ranking": rows[:limit],
-            "note": "score vs the current item (0 = equal). Uniques are calculated with PoB's default rolls, so "
+            "note": "score vs the current item (0 = equal); price = cheapest poe.ninja listing (None = not listed). "
+                    "Uniques are calculated with PoB's default rolls, so "
                     "the same unique you already wear can score below your own copy. Penalties mean the unique drops "
                     "resistances, attributes or Spirit you had; 'not_calculated' lines are invisible to PoB."}
