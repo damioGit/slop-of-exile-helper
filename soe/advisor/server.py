@@ -47,6 +47,21 @@ def load_build(build: str, name: str = "build") -> dict:
 
 
 @tool
+def import_character(account_or_link: str, character: str | None = None) -> dict:
+    """Load a public character from poe.ninja (Path of Exile 2): either a poe.ninja character link, or the
+    account name as shown in game (Name#1234) plus the character name. Finds the league automatically.
+    Only characters poe.ninja has indexed (public profile, high enough level) can be imported."""
+    return session.import_character(account_or_link, character)
+
+
+@tool
+def resync_character() -> dict:
+    """Re-import the character loaded with import_character (picks up gear, gems and passives changed in game
+    since, once poe.ninja has re-fetched it). Drops changes made with apply_changes."""
+    return session.resync()
+
+
+@tool
 def build_overview(with_all_skill_dps: bool = True) -> dict:
     """Everything about the loaded build: summary, skill groups with gems (group numbers are used by
     try_changes), DPS of every skill, equipped items in use, active weapon set and key config values."""

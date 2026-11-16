@@ -31,6 +31,12 @@ Kliknij dwa razy **`Slop of Exile Helper`** (skrót z pomarańczowym kryształem
 - Skrót wskazuje na `scripts/start.bat`, a ikona leży w `assets/soe.ico` (rysuje ją `scripts/make_icon.py`).
 - Jeśli przeniesiesz folder, skrót przestanie działać. Wtedy uruchom `scripts/start.bat` albo zrób nowy skrót do niego.
 
+## Import postaci z profilu (poe.ninja)
+
+W appce, w panelu „Wczytaj build”, podaj konto tak jak w grze (`Nazwa#1234`) i nazwę postaci albo wklej link do postaci z poe.ninja, potem „Importuj”. Liga dobiera się sama. „⟳ Synchronizuj” pobiera postać jeszcze raz, np. po zmianach w grze, gdy poe.ninja ją odświeży. W Claude Code działają narzędzia `import_character` i `resync_character`.
+- **Działa tylko dla publicznych postaci, które poe.ninja już zna.** PoB loguje się do oficjalnego API GGG (OAuth) na własnym, zarejestrowanym identyfikatorze aplikacji. Żeby zrobić to samo bez poe.ninja, ten projekt musiałby zarejestrować własną aplikację u GGG.
+- **Przy zbyt wielu zapytaniach poe.ninja chwilowo blokuje dostęp** (rate limit / sprawdzanie botów). Wtedy appka mówi to wprost, a ceny lecą z cache. Blokada nie jest obchodzona.
+
 ## Appka webowa
 
 `soe web` uruchamia lokalną stronę na tym samym silniku co doradca MCP. Wklejasz kod buildu i masz zakładki:

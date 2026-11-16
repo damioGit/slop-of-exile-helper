@@ -103,7 +103,25 @@ class Session:
             raise RuntimeError("no build loaded; call load_build first")
 
     # ---- build -------------------------------------------------------------------
+    source: dict | None = None  # where the loaded build came from (poe.ninja import), for re-sync
+
+    def import_character(self, ref: str, name: str | None = None) -> dict:
+        """Load a public character from poe.ninja: a character link, or account (Name#1234) + character name."""
+        from soe.prices.characters import fetch_character
+
+        c = fetch_character(ref, name)
+        summary = self.load(c["code"], c["name"])
+        self.source = {k: c[k] for k in ("account", "name", "league", "class", "level", "updated", "source")}
+        return {"character": self.source, "summary": summary}
+
+    def resync(self) -> dict:
+        """Fetch the imported character again (after playing / changing gear) and reload it."""
+        if not self.source:
+            raise RuntimeError("the build was not imported from poe.ninja; use import_character first")
+        return self.import_character(self.source["account"], self.source["name"])
+
     def load(self, build: str, name: str = "build") -> dict:
+        self.source = None  # set again by import_character
         text = build.strip()
         if len(text) < 300 and Path(text).exists():
             text = Path(text).read_text(encoding="utf-8").strip()

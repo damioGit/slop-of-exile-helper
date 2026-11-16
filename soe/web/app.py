@@ -49,13 +49,23 @@ def status():
         meta = session.kb.meta()
     except Exception as e:  # KB not built yet
         meta = {"error": str(e)}
-    return {"loaded": session.loaded, "name": session.name, "kb": meta,
+    return {"loaded": session.loaded, "name": session.name, "kb": meta, "source": session.source,
             "summary": session.base if session.loaded else None}
 
 
 @app.post("/api/load")
 def load(payload: dict = Body(...)):
     return locked(session.load, payload["code"], payload.get("name") or "build")
+
+
+@app.post("/api/import")
+def import_character(payload: dict = Body(...)):
+    return locked(session.import_character, payload["ref"], payload.get("name") or None)
+
+
+@app.post("/api/resync")
+def resync():
+    return locked(session.resync)
 
 
 @app.post("/api/reset")
