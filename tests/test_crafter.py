@@ -50,6 +50,10 @@ def test_routes_rank_and_essence(kb):
     assert len(best) == 1 and best[0]["key"] != "chaos"
     for x in r["routes"]:
         assert 0 <= x["chance_pct"] <= 100 and x["steps"]
+    # finishing on one base and farming cheap bases are compared too, with the cost of stopping at fewer mods
+    assert any(x["key"].startswith("loop") for x in r["routes"]) and any(x["key"].startswith("farm") for x in r["routes"])
+    real = {x["hits"]: x["expected_divine"] for x in r["realistic"]}
+    assert set(real) == {1, 2, 3} and real[1] <= real[2] <= real[3]
 
 
 def test_perfect_essence_route_for_essence_only_mod(kb):

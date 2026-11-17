@@ -499,7 +499,7 @@ const views = {
     state.overview = o;
     const attr = g => { const r = g.req || {}; const top = Object.entries(r).sort((a, b) => b[1] - a[1])[0]; return top ? top[0] : ""; };
     const gemRow = (g, gi, i) => `<div class="gem ${attr(g)} ${g.support ? "sup" : ""} ${g.applies === false || g.enabled === false ? "off" : ""}" data-gem="${gi}:${i}">
-        <img loading="lazy" alt="" src="/api/icon?${q({name: g.name, kind: g.support ? "item" : "skill"})}" onerror="this.style.visibility='hidden'">
+        <img loading="lazy" alt="" src="/api/icon?${q({name: g.name, kind: g.support ? "item" : "skill"})}" onerror="iconRetry(this)">
         <span><span class="gn">${esc(g.name)}</span>${g.tags ? `<div class="small muted">${esc(g.tags)}</div>` : ""}</span>
         <span class="lv">${g.level ?? ""}${g.quality ? ` / ${g.quality}%` : ""}</span>
         <div class="gemtext" hidden>${g.why_not ? `<div class="why">Nie działa: ${esc(g.why_not)}</div>` : ""}${g.description ? `<p>${esc(g.description)}</p>` : ""}
@@ -630,7 +630,7 @@ const views = {
       const f = $("#cFind").value.trim().toLowerCase();
       const list = bases.filter(b => !f || b.name.toLowerCase().includes(f));
       $("#cBases").innerHTML = list.map(b => `<button class="basebtn ${b.name === c.base ? "on" : ""}" data-b="${esc(b.name)}">
-        <img loading="lazy" alt="" src="/api/icon?${q({name: b.name})}" onerror="this.style.visibility='hidden'">
+        <img loading="lazy" alt="" src="/api/icon?${q({name: b.name})}" onerror="iconRetry(this)">
         <span>${esc(b.name)}<small>${esc(b.sub_type || b.type)} · wym. lvl ${b.level}</small></span></button>`).join("") || `<p class="muted small">Brak baz.</p>`;
       $("#cBases").querySelectorAll("[data-b]").forEach(btn => btn.onclick = () => { c.base = btn.dataset.b; c.wanted = {}; showBases(); loadPool(); });
     };
@@ -655,7 +655,10 @@ const views = {
           <div class="panel" id="cRoutesPanel"><h2>Drogi craftu</h2><div id="cRoutes"><p class="muted">Zaznacz mody i kliknij „Znajdź drogę craftu”.</p></div></div></div>`;
       $("#cModFind").oninput = e => { c.filter = e.target.value; drawMods(); };
       $("#btnClear").onclick = () => { c.wanted = {}; drawMods(); };
-      $("#btnRoutes").onclick = e => busy(e.target, findRoutes);
+      $("#btnRoutes").onclick = e => busy(e.target, async () => {
+        $("#cRoutes").innerHTML = `<p class="muted"><span class="busy"></span> Symuluję drogi craftu (do ~10 s)…</p>`;
+        try { await findRoutes(); } catch (err) { $("#cRoutes").innerHTML = `<p class="neg">Błąd: ${esc(err.message)}</p>`; throw err; }
+      });
       drawMods();
     }
 
@@ -710,22 +713,29 @@ const views = {
       const r = await api("/api/craft/routes", {body: {base: c.base, ilvl: c.ilvl, wanted}});
       const out = $("#cRoutes");
       if (!r.possible) { out.innerHTML = `<div class="finding bad">${r.problems.map(esc).join("<br>")}</div>`; return; }
-      const div = v => v == null ? "?" : v < 0.1 && state.exPerDiv ? `${fmt(v * state.exPerDiv, v * state.exPerDiv < 10 ? 1 : 0)} ex` : `${fmt(v, v < 1 ? 2 : 1)} div`;
+      const div = v => v == null ? "?" : v < 0.1 && state.exPerDiv ? `${fmt(v * state.exPerDiv, v * state.exPerDiv < 10 ? 1 : 0)} ex` : `${fmt(v, v < 1 ? 2 : v < 100 ? 1 : 0)} div`;
+      const chance = v => !v ? "0%" : v >= 1 ? `${fmt(v, 1)}%` : v >= 0.1 ? `${fmt(v, 2)}%` : `1 na ${fmt(Math.round(100 / v))}`;
+      const k = r.wanted.length;
+      const real = (r.realistic || []).map(x => `<tr><td><b>${x.hits} z ${x.of}</b></td><td class="n"><b>${div(x.expected_divine)}</b></td><td class="small muted">${esc(x.route)}</td></tr>`).join("");
       out.innerHTML = (r.need_item_level > c.ilvl ? `<div class="finding warn">Wybrane tiery wymagają item level ${r.need_item_level}.</div>` : "") +
-        r.routes.map((x, i) => {
-          const dead = !x.chance_pct;
+        (real ? `<div class="finding"><h4>Co realnie wyjdzie i za ile</h4><p class="small muted">Najtańsza droga do danej liczby wybranych modów (średnio, do skutku).</p>
+          <div class="tablewrap"><table><tr><th>Mody</th><th class="n">Koszt</th><th>Droga</th></tr>${real}</table></div></div>` : "") +
+        r.routes.map(x => {
+          const dead = !x.chance_pct && !Object.values(x.ladder).some(l => l.expected_divine != null);
+          const ladder = Object.entries(x.ladder).filter(([j]) => +j >= Math.max(1, k - 2) || x.loop)
+            .map(([j, l]) => `<span class="chip">${j}/${k}: <b>${l.expected_divine == null ? "–" : div(l.expected_divine)}</b></span>`).join("");
           return `<div class="route ${x.badges ? "top" : ""} ${dead ? "dead" : ""}">
             <h4>${esc(x.name)}${(x.badges || []).map(b => `<span class="pill sure">${esc(b)}</span>`).join("")}${dead ? '<span class="pill">ta droga nie da celu</span>' : ""}</h4>
             <div class="small muted">${esc(x.about)}</div>
             <div class="odds">
-              <div class="o"><b>${fmt(x.chance_pct, x.chance_pct < 1 ? 2 : 1)}%</b><span class="small muted">szansa na próbę</span></div>
-              <div class="o"><b>${div(x.cost_try_divine)}</b><span class="small muted">koszt próby${x.cost_complete ? "" : " (bez części cen)"}</span></div>
-              <div class="o"><b>${dead ? "–" : div(x.expected_divine)}</b><span class="small muted">do skutku${x.tries ? ` (~${fmt(x.tries, x.tries < 10 ? 1 : 0)} ${x.key === "chaos" ? "baz" : "prób i baz"})` : ""}</span></div>
+              <div class="o"><b>${chance(x.chance_pct)}</b><span class="small muted">${x.loop ? "że się uda (limit orbów)" : "szansa na próbę"}</span></div>
+              <div class="o"><b>${div(x.cost_try_divine)}</b><span class="small muted">${x.loop ? "średnio wydasz" : "koszt próby"}${x.cost_complete ? "" : " (bez części cen)"}</span></div>
+              <div class="o"><b>${x.expected_divine == null ? "–" : div(x.expected_divine)}</b><span class="small muted">do skutku${x.tries && !x.loop ? ` (~${fmt(x.tries, x.tries < 10 ? 1 : 0)} baz)` : ""}</span></div>
             </div>
+            <div class="chips" style="margin-top:8px"><span class="small muted">Gdy wystarczy mniej modów:</span>${ladder}</div>
             <div class="orbs">${x.steps.map((s, j) => `${j ? '<span class="arr">→</span>' : ""}<span class="orb" title="${esc(s.orb)}${s.price_divine != null ? ` · ${s.price_divine} div/szt.` : " · brak ceny"}">
-              <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="this.style.visibility='hidden'">${esc(s.orb)} <b>×${fmt(s.avg_count, s.avg_count % 1 ? 2 : 0)}</b></span>`).join("")}</div>
-            <div class="small muted" style="margin-top:6px">Trafione mody: ${Object.entries(x.at_least_pct).map(([k, v]) => `co najmniej ${k}: ${fmt(v, 1)}%`).join(" · ")}</div></div>`;
-        }).join("") + `<p class="muted small">${esc(r.note)} Liczby przy orbach to średnie zużycie na jedną próbę.</p>`;
+              <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="iconRetry(this)">${esc(s.orb)} <b>×${fmt(s.avg_count, s.avg_count % 1 ? 2 : 0)}</b></span>`).join("")}</div></div>`;
+        }).join("") + `<p class="muted small">${esc(r.note)} Liczby przy orbach to średnie zużycie na próbę (przy drogach „do skutku”: na cały craft).</p>`;
     }
 
     // the player's own gear: one click picks that base
@@ -959,6 +969,10 @@ function treeView(box, data) {
 }
 
 // ---------------------------------------------------------------- items drawn like in-game tooltips
+function iconRetry(img) {  // icons come from poe2db one by one: a slow first fetch gets one more chance
+  if (img.dataset.retry) { img.style.visibility = "hidden"; return; }
+  img.dataset.retry = 1; setTimeout(() => { img.src = img.src + "&retry=1"; }, 3000);
+}
 const tiers = n => `${n} ${n === 1 ? "tier" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "tiery" : "tierów"}`;
 async function openForge(base) {  // the Kuźnia tab with this base picked
   const hit = (await api("/api/craft/bases?" + q({q: base}))).bases.find(b => b.name === base);
@@ -986,7 +1000,7 @@ function recipeView(r) {
   const tipItem = {name: "Twój nowy item", base: t.base, rarity: "RARE", implicits: (t.implicit || []).map(text => ({text, flags: []})),
     mods: t.mods.map(m => ({text: m.text, flags: m.text === r.essence_mod ? ["crafted"] : []}))};
   const step = s => `<div class="st ${s.kind === "tip" ? "tip-step" : ""}">
-      <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="this.style.visibility='hidden'">
+      <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="iconRetry(this)">
       <div><div class="t">${esc(s.title)}</div><div class="small muted">${esc(s.detail)}</div></div>
       <div class="price">${s.price ? esc(s.price.text) + (s.count > 1 ? ` × ${s.count}` : "") : s.kind === "base" ? "cena nieznana" : "nie ma na poe.ninja"}</div></div>`;
   return `<div class="grid2" style="align-items:start">

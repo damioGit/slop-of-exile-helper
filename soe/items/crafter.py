@@ -23,6 +23,7 @@ so chances for high minimum tiers are optimistic. The ranking of routes is what 
 from __future__ import annotations
 
 import random
+import time
 from collections import Counter
 
 from soe.items.craft import family, pool_by_group, resolve_ranges
@@ -30,8 +31,12 @@ from soe.items.craft import family, pool_by_group, resolve_ranges
 SIDES = ("Prefix", "Suffix")
 MIN_LEVEL = {"Exalted Orb": 0, "Greater Exalted Orb": 35, "Perfect Exalted Orb": 50}
 OMEN_EXALT = {"Prefix": "Omen of Sinistral Exaltation", "Suffix": "Omen of Dextral Exaltation"}
+OMEN_ANNUL = {"Prefix": "Omen of Sinistral Annulment", "Suffix": "Omen of Dextral Annulment"}
 OMEN_CRYST = {"Prefix": "Omen of Sinistral Crystallisation", "Suffix": "Omen of Dextral Crystallisation"}
-CHAOS_CAP = 250
+LOOP_CAP = 600  # currency uses on one base before we call it a failure
+ONE_SHOT_MAX = 200_000
+EXTEND = {"random", "alchemy", "essence"}  # cheap routes whose full-goal chance is worth measuring well
+FARM_TRIES = 3000  # cheap bases tried before finishing the best one
 
 
 def _price(name: str) -> float | None:
@@ -194,13 +199,21 @@ def _ess_mod(e: dict) -> dict:
 
 
 class _Run:
-    def __init__(self, pool: _Pool, want: _Want, rng):
+    def __init__(self, pool: _Pool, want: _Want, rng, prices: dict | None = None):
         self.pool, self.want, self.rng = pool, want, rng
         self.mods: list = []
         self.used: Counter = Counter()
+        self.prices = prices or {}
+        self.spent = 0.0
+        self.reached: dict[int, float] = {}  # hits -> divine spent when first reached (the player could stop there)
 
     def use(self, name: str, n: int = 1):
         self.used[name] += n
+        self.spent += (self.prices.get(name) or 0) * n
+
+    def mark(self):
+        for j in range(1, self.want.hits(self.mods) + 1):
+            self.reached.setdefault(j, self.spent)
 
     def exalt(self, orb: str = "Exalted Orb", omens: bool = False):
         side = None
@@ -250,6 +263,53 @@ class _Run:
             self.mods.remove(self.rng.choice(self.mods))
         self.pool.add(self.rng, self.mods)
 
+    def annul(self):
+        self.use("Orb of Annulment")
+        if self.mods:
+            self.mods.remove(self.rng.choice(self.mods))
+
+    def blocked_side(self) -> str | None:
+        """A side that is full, still misses a wanted mod and holds junk: something has to go."""
+        have = {m["fam"] for m in self.mods if self.want.hit(m)}
+        for s in SIDES:
+            mine = [m for m in self.mods if m["type"] == s]
+            missing = any(side == s and f not in have for f, side in self.want.side.items())
+            if len(mine) >= 3 and missing and any(not self.want.hit(m) for m in mine):
+                return s
+        return None
+
+    def until_done(self, fixer: str, perfect: list, cap: int):
+        """The way players finish a rare: add mods one by one (omens steer the Exalt to the side that still needs
+        mods). When a full side holds junk instead of a wanted mod, remove one: Chaos Orb (random mod out, random
+        mod in), Orb of Annulment (random mod out), or Annulment with Omen of Sinistral/Dextral Annulment (random
+        mod of that side out). A Perfect Essence gives a missing mod it can guarantee."""
+        k = len(self.want.min)
+        for _ in range(cap):
+            self.mark()
+            if self.want.hits(self.mods) >= k:
+                return
+            have = {m["fam"] for m in self.mods if self.want.hit(m)}
+            before = self.spent, sum(self.used.values())
+            for e in perfect:
+                if family(e["grp"]) not in have:
+                    self.perfect_essence(e)
+                    if sum(self.used.values()) != before[1]:
+                        break
+            if sum(self.used.values()) != before[1]:
+                continue
+            side = self.blocked_side()
+            if side or len(self.mods) >= 6:
+                if fixer == "chaos":
+                    self.chaos()
+                elif fixer == "annul_omen" and side:
+                    self.use(OMEN_ANNUL[side])
+                    self.use("Orb of Annulment")
+                    self.mods.remove(self.rng.choice([m for m in self.mods if m["type"] == side]))
+                else:
+                    self.annul()
+            else:
+                self.exalt(omens=True)
+
 
 def _usable_essences(want: _Want, ess_by_fam: dict) -> tuple[list, list]:
     """Essences that give a wanted mod at the wanted tier: (normal ones, one per family, cheapest first; perfect ones)."""
@@ -291,6 +351,7 @@ def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: li
         r.mods.append(_ess_mod(first))
 
     routes = []
+    tail_p = [e["name"] for e in perf_one] + (list(OMEN_CRYST.values()) if perf_one else [])
 
     def cheap(r):
         r.use("Orb of Transmutation"); r.pool.add(r.rng, r.mods)
@@ -358,17 +419,59 @@ def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: li
                            ["Orb of Transmutation", first["name"] if first else "Regal Orb", orb,
                             "Omen of Sinistral Exaltation", "Omen of Dextral Exaltation"]))
 
-    if basic and len(wanted_fams) <= 3:
-        def chaos(r):
-            alch(r)
-            n = 0
-            while want.hits(r.mods) < len(wanted_fams) and n < CHAOS_CAP:
-                r.chaos()
-                n += 1
-        routes.append(("chaos", "Chaos spam do skutku",
-                       f"Alchemy + Exalty, potem Chaos Orb (usuwa losowy mod, dodaje losowy) aż wejdzie wszystko "
-                       f"(najwyżej {CHAOS_CAP}). Mało pewne na jedną próbę, ale bez nowych baz.", chaos,
-                       ["Orb of Alchemy", "Exalted Orb", "Chaos Orb"]))
+    k = len(wanted_fams)
+    if basic and k >= 3:
+        def farm_then_finish(r, fixer):
+            need = k - 1
+            for _ in range(FARM_TRIES):  # cheap one-shot bases until one has all but one wanted mod
+                t = _Run(pool, want, r.rng, r.prices)
+                cheap(t)
+                r.used.update(t.used)
+                r.spent += t.spent
+                if want.hits(t.mods) >= need:
+                    r.mods = t.mods
+                    break
+            else:
+                return
+            r.until_done(fixer, perf_one, LOOP_CAP)
+        for fixer, label, orb in (("annul_omen", "Annul z omenem strony", "Orb of Annulment"), ("chaos", "Chaos", "Chaos Orb")):
+            extra = list(OMEN_ANNUL.values()) if fixer == "annul_omen" else []
+            routes.append((f"farm_{fixer}", f"Tanie bazy do {k - 1}/{k}, potem {label}",
+                           f"Robisz tanie itemy (Transmutation, Augmentation, Regal, Exalty), aż jeden ma {k - 1} z {k} "
+                           f"modów. Ten jeden dokańczasz: {'Orb of Annulment z omenem Sinistral/Dextral Annulment usuwa mod tylko z pełnej strony, ' if fixer == 'annul_omen' else ''}"
+                           f"{'Chaos Orb wymienia losowy mod' if fixer == 'chaos' else 'Annul usuwa śmieć (albo pech: dobry mod)'}, "
+                           "a Exalt z omenem dokłada brakujący typ.",
+                           lambda r, fx=fixer: farm_then_finish(r, fx),
+                           ["Orb of Transmutation", "Orb of Augmentation", "Regal Orb", "Exalted Orb",
+                            "Omen of Sinistral Exaltation", "Omen of Dextral Exaltation", orb] + extra + tail_p))
+
+    # finishing on one base: add mods one by one and remove what blocks a wanted slot
+    def begin(r):
+        if first:
+            start_essence(r)
+        else:
+            r.use("Orb of Transmutation"); r.pool.add(r.rng, r.mods)
+            r.use("Regal Orb"); r.pool.add(r.rng, r.mods)
+    head = first["name"] if first else "Regal Orb"
+    perf_names = ", ".join(e["name"] for e in perf_one)
+    perf_txt = (f" Brakujący mod z Perfect Essence ({perf_names}) wchodzi na pewno, a omen Crystallisation wybiera, "
+                "z której strony wypada mod.") if perf_one else ""
+    tail = [e["name"] for e in perf_one] + (list(OMEN_CRYST.values()) if perf_one else [])
+    if first or basic:
+        routes.append(("loop_chaos", f"{head} + Exalt/Chaos do skutku",
+                       f"{'Esencja na start, potem ' if first else 'Transmutation + Regal, potem '}Exalt po Exalcie "
+                       "(omen kieruje go na prefix albo suffix, którego brakuje). Gdy śmieć zajmuje miejsce potrzebnego "
+                       "moda: Chaos Orb (usuwa losowy mod, dodaje losowy) i dalej. Jedna baza, aż wejdzie wszystko." + perf_txt,
+                       lambda r: (begin(r), r.until_done("chaos", perf_one, LOOP_CAP)),
+                       ["Orb of Transmutation", head, "Exalted Orb", "Omen of Sinistral Exaltation",
+                        "Omen of Dextral Exaltation", "Chaos Orb"] + tail))
+        routes.append(("loop_annul", f"{head} + Exalt/Annul do skutku",
+                       f"{'Esencja na start, potem ' if first else 'Transmutation + Regal, potem '}Exalt po Exalcie z "
+                       "omenami. Gdy śmieć zajmuje miejsce: Orb of Annulment (usuwa losowy mod) i znowu Exalt. "
+                       "Drożej za ruch niż Chaos, ale wolne miejsce wypełnia sterowany Exalt." + perf_txt,
+                       lambda r: (begin(r), r.until_done("annul", perf_one, LOOP_CAP)),
+                       ["Orb of Transmutation", head, "Exalted Orb", "Omen of Sinistral Exaltation",
+                        "Omen of Dextral Exaltation", "Orb of Annulment"] + tail))
     return routes
 
 
@@ -402,25 +505,39 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
     normal, perfect = _usable_essences(want, ess_by_fam)
     defs = []
     for j, first in enumerate([None] + normal[:3]):  # every wanted mod an essence can start with
-        defs += _routes(pool, want, ilvl, first, perfect, basic=j == 0)
+        defs += [d for d in _routes(pool, want, ilvl, first, perfect, basic=j == 0)
+                 if j <= 1 or not d[0].startswith("loop")]  # long loops: only the cheapest essence
     out = []
     for i, (key, name, about, fn, orbs) in enumerate(defs):
         rng = random.Random(seed + i)
-        n_ok, hist, used = 0, Counter(), Counter()
-        for _ in range(sims):
-            r = _Run(pool, want, rng)
+        n_ok, hist, used, spends = 0, Counter(), Counter(), []
+        ladder_cost, ladder_hit = Counter(), Counter()
+        prices = {o: _price(o) for o in dict.fromkeys(orbs)}
+        k = len(want.min)
+        multi = key.startswith(("loop", "farm"))
+        target = max(80, sims // 20) if multi else sims  # loops take many steps per try
+        n_sims, t0 = 0, time.perf_counter()
+        # one-shot routes are cheap to simulate: go on while the full goal is too rare to measure (up to ~2.5 s)
+        while n_sims < target or (key in EXTEND and n_ok < 25 and n_sims < ONE_SHOT_MAX and time.perf_counter() - t0 < 1.2):
+            n_sims += 1
+            r = _Run(pool, want, rng, prices)
             fn(r)
+            r.mark()
             h = want.hits(r.mods)
             hist[h] += 1
             n_ok += h == len(want.min)
             used.update(r.used)
-        p = n_ok / sims
+            spends.append(r.spent)
+            for j in range(1, k + 1):  # spend until j hits (or the whole run when never reached)
+                ladder_cost[j] += r.reached.get(j, r.spent)
+                ladder_hit[j] += j in r.reached
+        p = n_ok / n_sims
         steps, cost, known = [], 0.0, True
         for orb in dict.fromkeys(orbs):
-            avg = used[orb] / sims
+            avg = used[orb] / n_sims
             if avg <= 0:
                 continue
-            price = _price(orb)
+            price = prices[orb]
             if price is None:
                 known = False
             else:
@@ -428,12 +545,19 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
             steps.append({"orb": orb, "avg_count": round(avg, 2), "price_divine": price})
         k = len(want.min)
         out.append({"key": key, "name": name, "about": about, "steps": steps,
-                    "chance_pct": round(p * 100, 2),
-                    "at_least_pct": {j: round(sum(v for h, v in hist.items() if h >= j) / sims * 100, 1)
+                    "chance_pct": round(p * 100, 4),
+                    "at_least_pct": {j: round(sum(v for h, v in hist.items() if h >= j) / n_sims * 100, 1)
                                      for j in range(1, k + 1)},
                     "cost_try_divine": round(cost, 3), "cost_complete": known,
                     "tries": round(1 / p, 1) if p else None,
-                    "expected_divine": round(cost / p, 3) if p else None})
+                    "expected_divine": round(cost / p, 3) if p else None,
+                    "loop": key.startswith(("loop", "farm")),
+                    # what it costs to stop at j wanted mods: one-shot routes repeat on new bases, loops go on
+                    "ladder": {j: {"pct": round(ladder_hit[j] / n_sims * 100, 1),
+                                   "expected_divine": (round(ladder_cost[j] / ladder_hit[j], 3) if key.startswith(("loop", "farm"))
+                                                       else round(cost / (ladder_hit[j] / n_sims), 3)) if ladder_hit[j] else None}
+                               for j in range(1, k + 1) if not key.startswith("farm") or j >= k - 1},
+                    "p90_divine": round(sorted(spends)[int(len(spends) * 0.9) - 1], 3) if key.startswith(("loop", "farm")) and spends else None})
     # per kind of route keep the essence that works best
     best_of: dict[str, dict] = {}
     for r in out:
@@ -442,17 +566,26 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
         if cur is None or rank(r) < rank(cur):
             best_of[r["key"]] = r
     out = list(best_of.values())
-    one_shot = [r for r in out if r["key"] != "chaos"]  # chaos spam is many tries on one item, not one try
-    if one_shot:
-        best = max(one_shot, key=lambda r: r["chance_pct"])
+    alive = [r for r in out if r["chance_pct"] > 0 and not r["loop"]]  # chance per try: one-shot routes only
+    if alive:  # a route that never reaches the goal gets no badge
+        best = max(alive, key=lambda r: (r["chance_pct"], -(r["expected_divine"] or 0)))
         best["badges"] = ["najpewniejsza"]
         priced = [r for r in out if r["expected_divine"] is not None]
         if priced:
             cheap = min(priced, key=lambda r: r["expected_divine"])
             cheap.setdefault("badges", []).append("najtańsza do skutku")
     out.sort(key=lambda r: (-(r["chance_pct"] > 0), r["expected_divine"] if r["expected_divine"] is not None else 1e9))
+    k = len(want.min)
+    realistic = []
+    for j in range(max(1, k - 3), k + 1):  # the cheapest way to j of the k wanted mods
+        opts = [(r["ladder"][j]["expected_divine"], r["name"]) for r in out
+                if j in r["ladder"] and r["ladder"][j]["expected_divine"] is not None]
+        if opts:
+            c, n = min(opts)
+            realistic.append({"hits": j, "of": k, "expected_divine": c, "route": n})
     return {"base": base["name"], "item_level": ilvl, "need_item_level": need_ilvl, "possible": True,
-            "wanted": [{**w, "family": family(w["group"])} for w in wanted], "routes": out,
+            "wanted": [{**w, "family": family(w["group"])} for w in wanted], "routes": out, "realistic": realistic,
             "note": ("Szanse: symulacja (równe wagi dla każdego tieru, bo PoB nie ma prawdziwych wag z gry), więc "
                      "wysokie tiery wychodzą tu łatwiej niż w grze. Koszt: średnie zużycie orbów na jedną próbę, "
-                     "ceny z poe.ninja, bez ceny bazy. 'Do skutku' = koszt próby / szansa.")}
+                     "ceny z poe.ninja, bez ceny bazy. 'Do skutku' = koszt próby / szansa. Drogi 'do skutku' liczą cały craft "
+                     f"na jednej bazie (najwyżej {LOOP_CAP} użyć orbów).")}
