@@ -95,7 +95,8 @@ def status():
     except Exception as e:  # KB not built yet
         meta = {"error": str(e)}
     return {"loaded": session.loaded, "name": session.name, "kb": meta, "source": session.source,
-            "build_id": session.build_id, "summary": session.base if session.loaded else None}
+            "build_id": session.build_id, "summary": session.base if session.loaded else None,
+            "poe2db": __import__("soe.kb.poe2db", fromlist=["status"]).status()}
 
 
 @app.post("/api/load")

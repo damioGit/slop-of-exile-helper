@@ -39,6 +39,13 @@ def _out(obj):
     print(json.dumps(obj, indent=2, ensure_ascii=False, default=str))
 
 
+def cmd_poe2db(args):
+    from soe.kb import poe2db
+    from soe.kb.query import KB
+
+    _out(poe2db.sync(KB()) if args.db_cmd == "sync" else poe2db.status())
+
+
 def cmd_kb(args):
     if args.kb_cmd == "build":
         from soe.kb.build import build
@@ -98,6 +105,12 @@ def main(argv=None):
     c.add_argument("old")
     c.add_argument("new")
     c.set_defaults(func=lambda a: _out(__import__("soe.pipeline.update", fromlist=["compare"]).compare(a.old, a.new)))
+
+    d = sub.add_parser("poe2db", help="mod weights, essences and desecrated mods from poe2db.tw")
+    ds = d.add_subparsers(dest="db_cmd", required=True)
+    ds.add_parser("sync", help="fetch every item class page again (data/poe2db)")
+    ds.add_parser("status", help="how many pages are saved and when")
+    d.set_defaults(func=cmd_poe2db)
 
     w = sub.add_parser("web", help="local web app (http://127.0.0.1:8765)")
     w.add_argument("--port", type=int, default=8765)

@@ -11,7 +11,7 @@ When the user pastes a build code or asks about their build, use the `soe` tools
    For "what should I improve?" start with `checkup` (set goal weights from what the player says). On a full tree, use `rank_respec` to find points to move.
    For "what should I change?" use `improvement_plan` (~1 min), or the parts on their own: `optimize_supports` (~25 s), `optimize_tree` (~10–30 s), `stat_weights` (what to look for on gear). Tell the player it takes a moment.
    Gear: "which item do I replace first?" → `gear_audit` (each slot vs a realistic rare for the character's level). "What is this item worth / should I exalt, chaos, annul or fracture it?" → `item_analysis` (value of every mod, currency odds and prices). "How do I craft a better X?" → `craft_plan` (base, essence, exalts, odds, cost of one try). "How do I craft a base with mods X, Y, Z (cheapest / surest)?" → `craft_pool` then `craft_routes` (routes compared by chance per try and expected cost).
-   Items: "I like unique X" → `try_unique`; "best unique for this slot" → `rank_uniques`; "what to craft / how to improve this item" → `mod_upgrades` (per mod, with essences) and `ideal_item` (the ceiling); odds of hitting mods → `craft_odds`. Crafting odds use equal weights and are estimates; say so.
+   Items: "I like unique X" → `try_unique`; "best unique for this slot" → `rank_uniques`; "what to craft / how to improve this item" → `mod_upgrades` (per mod, with essences) and `ideal_item` (the ceiling); odds of hitting mods → `craft_odds`. Crafting odds use the real spawn weights, mod families, essences and desecrated mods from poe2db (`soe poe2db sync`, saved in data/poe2db); a base without a poe2db page falls back to equal weights, say so then.
    Synergies: `suggest_combos` shows what the build creates and feeds on, payoffs, enablers, and **config conditions that nothing in the build creates**. Mention those first, because they mean the DPS shown is optimistic.
    Real items: `find_upgrade(slot, wanted_mod, budget_divine)` searches the official trade site, keeps the current item's key mods, and prices and measures every listing in PoB. Use it before suggesting gear the player has to buy, and say plainly when nothing in budget beats the current item.
    Gear mod suggestions are ranked by a typical (middle tier) roll. The best roll is shown apart with its odds. Never present a top-tier mod as a budget option.
@@ -33,7 +33,7 @@ When the user pastes a build code or asks about their build, use the `soe` tools
    - flag the trade-offs: DPS vs EHP, resistances dropping below cap, attribute requirements, spirit
    - order suggestions by impact per cost (passive points, currency, gem swaps)
 5. Known limits:
-   - PoB has no real mod spawn weights (only can/can't roll), so crafting odds are estimates
+   - mod spawn weights come from poe2db, not PoB; desecration odds assume revealed options draw normal and desecrated mods alike (poe2db does not say how often)
    - skills with conditional uptime are calculated as PoB's config says; check `build_config` before calling something "free DPS"
 
 ## Development

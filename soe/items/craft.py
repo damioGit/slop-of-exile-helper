@@ -5,8 +5,7 @@
 - mod_upgrades: which mod of the current item to replace, with what, and the gain
 - odds: chance that one random added mod hits the wanted families
 
-Odds use equal weights for every mod that can roll, because PoE2 spawn weights are not in PoB's data.
-They show which crafts are realistic, not exact percentages.
+Odds use the real spawn weights from poe2db (soe.kb.poe2db); without a saved page, equal weights from PoB's data.
 """
 from __future__ import annotations
 
@@ -88,13 +87,50 @@ def _essences(kb, mod_id: str, slot: str) -> list[str]:
 
 
 def pool_by_group(kb, base: str, ilvl: int) -> dict[tuple[str, str], list[dict]]:
-    """(affix type, group) -> tiers, best (highest level) first."""
+    """(affix type, group) -> tiers, best (highest level) first. Every tier carries "w" (its spawn weight) and
+    "fams" (the game's mod families: two mods sharing one cannot be on the same item). Both come from poe2db
+    when its page for the base is available (then poe2db also decides what can roll); else from PoB with weight 1."""
+    from soe.kb import poe2db
+
+    brow = kb.base(base)
+    data = poe2db.for_base(brow) if brow else None
+    pool = kb.mod_pool(base, ilvl)
+    if data:
+        by_id = {m["id"]: m for m in data["normal"] if m["id"]}
+        by_lvl = {(m["type"], f, m["level"]): m for m in data["normal"] for f in m["fams"]}
+        kept, seen = [], set()
+        for m in pool:
+            src = by_id.get(m["id"]) or by_lvl.get((m["type"], family(m["grp"]), m["level"] or 1)) \
+                or by_lvl.get((m["type"], m["grp"], m["level"] or 1))
+            if not src or src["weight"] <= 0:
+                continue  # poe2db: does not roll on this base
+            seen.add(id(src))
+            kept.append({**m, "w": src["weight"], "fams": src["fams"] or [family(m["grp"])]})
+        tags = list(brow.get("tags") or ["default"])[:1]
+        for src in data["normal"]:  # tiers poe2db knows and PoB's data does not have yet
+            if id(src) in seen or src["weight"] <= 0 or src["level"] > ilvl or not src["fams"]:
+                continue
+            kept.append({"id": src["id"] or f"poe2db:{src['fams'][0]}:{src['level']}", "domain": "Item",
+                         "type": src["type"], "affix": "", "text": src["text"], "level": src["level"],
+                         "grp": src["fams"][0], "tags": [], "weight_keys": tags, "weight_vals": [1],
+                         "spawns_on": [], "adds_tags": [], "w": src["weight"], "fams": src["fams"],
+                         "source": "poe2db"})
+        pool = kept
+    else:
+        pool = [{**m, "w": 1, "fams": [family(m["grp"])]} for m in pool]
     groups: dict[tuple[str, str], list[dict]] = {}
-    for m in kb.mod_pool(base, ilvl):
+    for m in pool:
         groups.setdefault((m["type"], m["grp"]), []).append(m)
     for v in groups.values():
         v.sort(key=lambda m: m["level"] or 0, reverse=True)
     return groups
+
+
+def weights_source(kb, base: str) -> str:
+    from soe.kb import poe2db
+
+    b = kb.base(base)
+    return "poe2db" if b and poe2db.for_base(b) else "equal"
 
 
 def identify(line: str, groups) -> list[tuple[str, str, int]]:
@@ -276,15 +312,15 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
                 top_lines, top_ex = evals["top"]
                 if t_ex["score"] <= 0.05:
                     continue  # a typical roll that is not better than what you have is no suggestion
-                total = sum(len(t) for (a, _), t in groups.items() if a == atype)
+                total = sum(sum(m.get("w", 1) for m in t) for (a, _), t in groups.items() if a == atype)
                 rows.append({"replace": _clean(exp[i]),
                              "replace_as": f"{atype} T{tier}" if tier else f"{atype}, value above normal tiers",
                              "with": " / ".join(t_lines), "with_tier": f"T{len(tiers) // 2 + 1} z {len(tiers)}",
                              "group": key[1], **t_ex,
                              "top": {"with": " / ".join(top_lines), "level": top["level"], **top_ex},
-                             "odds": {"family_pct": round(len(tiers) / total * 100, 1),
-                                      "top_tier_pct": round(100 / total, 2),
-                                      "exalts_for_top_tier": total},
+                             "odds": {"family_pct": round(sum(m.get("w", 1) for m in tiers) / total * 100, 1),
+                                      "top_tier_pct": round(top.get("w", 1) / total * 100, 2),
+                                      "exalts_for_top_tier": round(total / max(top.get("w", 1), 1e-9))},
                              "essence": _essences(kb, typical["id"], real_slot) or _essences(kb, top["id"], real_slot)})
     rows.sort(key=lambda r: r["score"], reverse=True)  # ranked by the realistic (typical) roll
     unknown = [_clean(exp[i]) for i, x in enumerate(lines_info) if not x and exp[i].strip()
@@ -294,21 +330,21 @@ def mod_upgrades(session, slot: str, objective: Objective | None = None, limit: 
             "not_changeable_or_unknown": unknown,
             "note": ("Corrupted item: it cannot be modified." if corrupted else
                      "Ranked by a typical (middle tier, middle roll) replacement; 'top' is the best possible roll and "
-                     "'odds' the chance per Exalted Orb with equal weights (estimate). A top tier at well under 1% is "
+                     "'odds' the chance per Exalted Orb (spawn weights from poe2db). A top tier at well under 1% is "
                      "a lottery or an expensive trade item; poe.ninja does not price rare items. Replacing a mod means "
                      "removing the old one first (annul is random) or an essence that guarantees the new one.")}
 
 
 def craft_odds(session, base: str, ilvl: int, want_groups: list[str]) -> dict:
-    """Chance that one random added prefix or suffix is in the wanted mod families (equal weights)."""
+    """Chance that one random added prefix or suffix is in the wanted mod families (poe2db spawn weights)."""
     from soe.prices import safe_price
 
     groups = pool_by_group(session.kb, base, ilvl)
     exalt = safe_price("Exalted Orb")
     res = {}
     for atype in ("Prefix", "Suffix"):
-        total = sum(len(t) for (a, _), t in groups.items() if a == atype)
-        hit = sum(len(t) for (a, g), t in groups.items() if a == atype and g in want_groups)
+        total = sum(sum(m.get("w", 1) for m in t) for (a, _), t in groups.items() if a == atype)
+        hit = sum(sum(m.get("w", 1) for m in t) for (a, g), t in groups.items() if a == atype and g in want_groups)
         r = {"possible_mods": total, "wanted_mods": hit, "chance_pct": round(hit / total * 100, 1) if total else 0}
         if hit:
             r["expected_exalts"] = round(total / hit, 1)  # an Exalted Orb adds one random mod of an open type
@@ -318,5 +354,5 @@ def craft_odds(session, base: str, ilvl: int, want_groups: list[str]) -> dict:
     return {"base": base, "item_level": ilvl, "wanted": want_groups, **res,
             "exalted_orb_price": exalt,
             "families": sorted({g for (_, g) in groups}),
-            "note": "Equal weights per possible mod tier (PoB has no real spawn weights): an estimate. Expected exalts "
+            "note": "Spawn weights from poe2db (equal weights when poe2db has no page for the base). Expected exalts "
                     "assume the slot type is open and only count hitting a wanted family, not its top tier."}

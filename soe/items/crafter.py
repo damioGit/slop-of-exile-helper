@@ -1,42 +1,52 @@
-"""Craft planner for a base and mods the player picks (the Crafting tab).
+"""Craft planner for a base and mods the player picks (the Kuźnia tab).
 
 The player picks a base, an item level and up to 3 prefixes + 3 suffixes (each with a minimum tier).
-We compare several real PoE2 crafting routes by Monte Carlo over the mod pool:
+We compare real PoE2 crafting routes by Monte Carlo over the base's mod pool from poe2db (real spawn weights,
+the game's mod families, essences and desecrated mods):
 
-- chance per try that the finished item has every wanted mod (how deterministic the route is),
-- the currency one try uses on average (poe.ninja prices), and the expected cost until it works.
+- chance per try that the finished item has every wanted mod,
+- the currency a try (or a whole craft on one base) uses on average, priced from poe.ninja,
+- what it costs to stop at fewer wanted mods (4 of 6, 5 of 6).
 
 PoE2 rules used (poe2db, checked 2026-11):
 - Orb of Transmutation: normal -> magic with 1 mod. Orb of Augmentation: adds a mod to a magic item (max 2).
 - Regal Orb: magic -> rare, adds 1 mod. Orb of Alchemy: normal -> rare with 4 random mods.
 - Exalted Orb: adds 1 random mod to a rare (max 3 prefixes + 3 suffixes). Greater Exalted Orb only adds mods of
-  level 35+, Perfect Exalted Orb 50+.
-- Chaos Orb: removes a random mod and adds a random one.
+  level 35+, Perfect Exalted Orb 50+. Omen of Sinistral / Dextral Exaltation: only a prefix / suffix.
+- Chaos Orb: removes a random mod and adds a random one. Orb of Annulment: removes a random mod; Omen of Sinistral /
+  Dextral Annulment: only a prefix / suffix; Omen of Light: only the desecrated mod.
 - Lesser / normal / Greater Essence: magic -> rare with its guaranteed mod. Perfect Essence: on a rare, removes a
-  random mod and adds its guaranteed mod; Omen of Sinistral / Dextral Crystallisation makes it remove only a prefix /
-  suffix.
-- Omen of Sinistral / Dextral Exaltation: the next Exalted Orb adds only a prefix / suffix.
-
-PoE2 spawn weights are not in PoB's data: every mod tier that can roll has the same weight. Real top tiers are rarer,
-so chances for high minimum tiers are optimistic. The ranking of routes is what matters.
+  random mod and adds its mod; Omen of Sinistral / Dextral Crystallisation: removes only a prefix / suffix.
+- Desecration: a bone (Jawbone: weapons and quivers, Rib: armour, Collarbone: rings, amulets, belts; Ancient bones
+  only mods of level 40+) adds an unrevealed desecrated mod to a rare with room. At the Well of Souls you pick one of
+  three options, which may include the base's normal mods. Omen of Abyssal Echoes rerolls the options once, Omen of
+  Sinistral / Dextral Necromancy makes it a prefix / suffix. One desecrated mod per item.
 """
 from __future__ import annotations
 
+import bisect
 import random
+import statistics
 import time
 from collections import Counter
 
-from soe.items.craft import family, pool_by_group, resolve_ranges
+from soe.items.craft import added_tags, can_roll, family, pool_by_group, resolve_ranges
+from soe.kb import poe2db
 
 SIDES = ("Prefix", "Suffix")
 MIN_LEVEL = {"Exalted Orb": 0, "Greater Exalted Orb": 35, "Perfect Exalted Orb": 50}
 OMEN_EXALT = {"Prefix": "Omen of Sinistral Exaltation", "Suffix": "Omen of Dextral Exaltation"}
 OMEN_ANNUL = {"Prefix": "Omen of Sinistral Annulment", "Suffix": "Omen of Dextral Annulment"}
 OMEN_CRYST = {"Prefix": "Omen of Sinistral Crystallisation", "Suffix": "Omen of Dextral Crystallisation"}
-LOOP_CAP = 600  # currency uses on one base before we call it a failure
+OMEN_NECRO = {"Prefix": "Omen of Sinistral Necromancy", "Suffix": "Omen of Dextral Necromancy"}
+ECHOES, LIGHT = "Omen of Abyssal Echoes", "Omen of Light"
+LOOP_CAP = 300  # currency uses on one base before we call it a failure
 ONE_SHOT_MAX = 200_000
 EXTEND = {"random", "alchemy", "essence"}  # cheap routes whose full-goal chance is worth measuring well
 FARM_TRIES = 3000  # cheap bases tried before finishing the best one
+REVEAL_OPTIONS = 3
+# poe2db says revealed options "may include base modifiers" but not how often: a desecrated-only mod counts like a
+# typical (median weight) normal mod of that side. Stated in the result note.
 
 
 def _price(name: str) -> float | None:
@@ -48,6 +58,10 @@ def _price(name: str) -> float | None:
 
 def _essence_type(base: dict) -> str:
     return "Warstaff" if base.get("sub_type") == "Warstaff" else base.get("type")
+
+
+def fkey(fams) -> str:
+    return "|".join(sorted(fams))
 
 
 # ---------------------------------------------------------------- what the UI lists
@@ -76,135 +90,202 @@ def craft_bases(kb, item_type: str | None = None, text: str | None = None) -> li
     return out
 
 
+def _essence_index(kb, base: dict, ilvl: int) -> dict[str, list[dict]]:
+    """family -> essences that guarantee a mod of it on this base (poe2db; PoB's essence table as fallback)."""
+    data = poe2db.for_base(base)
+    rows = []
+    if data and data.get("essence"):
+        for e in data["essence"]:
+            if e["fams"]:
+                rows.append({"name": e["name"], "mod_text": e["text"], "mod_level": e["level"], "affix": e["type"],
+                             "grp": e["fams"][0], "fams": e["fams"], "adds_tags": [], "perfect": e["perfect"]})
+    else:
+        for r in kb._rows("SELECT e.name, m.text AS mod_text, m.level AS mod_level, m.type AS affix, m.grp, "
+                          "m.adds_tags FROM essences e JOIN mods m ON m.id = e.mod_id AND m.domain = 'Item' "
+                          "WHERE e.item_type = ?", (_essence_type(base),)):
+            r.update(perfect=r["name"].startswith("Perfect "), mod_level=r["mod_level"] or 1, fams=[family(r["grp"])])
+            rows.append(r)
+    out: dict[str, list[dict]] = {}
+    for r in rows:
+        if r["mod_level"] > ilvl or r["affix"] not in SIDES:
+            continue
+        for f in r["fams"]:
+            out.setdefault(f, []).append(r)
+    for v in out.values():
+        v.sort(key=lambda r: r["mod_level"])
+    return out
+
+
 def craft_pool(kb, base_name: str, ilvl: int) -> dict:
-    """Every mod family that can roll on the base at this item level, with its tiers (T1 = best)
-    and the essences that guarantee one of its tiers."""
+    """Every mod group that can roll on the base at this item level: tiers (T1 = best) with spawn weights, the chance
+    that a random mod of that side is from the group, and the essences that guarantee one of its tiers."""
     base = kb.base(base_name)
     if not base:
         raise ValueError(f"unknown base {base_name!r}")
     groups = pool_by_group(kb, base["name"], ilvl)
-    ess = _essence_index(kb, _essence_type(base), ilvl)
-    fams = []
+    ess = _essence_index(kb, base, ilvl)
+    side_w = Counter()
+    for (atype, _), tiers in groups.items():
+        side_w[atype] += sum(t["w"] for t in tiers)
+    out = []
     for (atype, grp), tiers in groups.items():
-        fams.append({
-            "type": atype, "group": grp, "family": family(grp),
-            "text": tiers[0]["text"], "tags": tiers[0].get("tags") or [],
-            "tiers": [{"tier": i, "level": t["level"] or 1, "text": t["text"]} for i, t in enumerate(tiers, 1)],
+        fams = tiers[0]["fams"]
+        es = {e["name"]: e for f in fams for e in ess.get(f, []) if e["affix"] == atype}
+        out.append({
+            "type": atype, "group": grp, "family": fkey(fams), "text": tiers[0]["text"],
+            "tags": tiers[0].get("tags") or [],
+            "chance_pct": round(sum(t["w"] for t in tiers) / side_w[atype] * 100, 2) if side_w[atype] else 0,
+            "tiers": [{"tier": i, "level": t["level"] or 1, "text": t["text"], "weight": t["w"]}
+                      for i, t in enumerate(tiers, 1)],
             "essences": [{"name": e["name"], "level": e["mod_level"], "text": e["mod_text"], "perfect": e["perfect"]}
-                         for e in ess.get(family(grp), []) if e["affix"] == atype],
+                         for e in es.values()],
         })
-    in_pool = {f["family"] for f in fams}
-    for fam, rows in ess.items():  # mods only an essence gives (e.g. % life from a Perfect Essence)
-        for atype in SIDES:
-            mine = [e for e in rows if e["affix"] == atype]
-            if fam in in_pool or not mine:
-                continue
-            mine.sort(key=lambda e: e["mod_level"], reverse=True)
-            fams.append({"type": atype, "group": mine[0]["grp"], "family": fam, "text": mine[0]["mod_text"],
-                         "tags": [], "essence_only": True,
-                         "tiers": [{"tier": i, "level": e["mod_level"], "text": e["mod_text"]} for i, e in enumerate(mine, 1)],
-                         "essences": [{"name": e["name"], "level": e["mod_level"], "text": e["mod_text"],
-                                       "perfect": e["perfect"]} for e in mine]})
-    fams.sort(key=lambda f: (f["type"], f["text"].lower()))
+    in_pool = {f for g in out for f in g["family"].split("|")}
+    only: dict[tuple, list] = {}
+    for rows in ess.values():  # mods only an essence gives (e.g. % life from a Perfect Essence)
+        for e in rows:
+            if not set(e["fams"]) & in_pool:
+                only.setdefault((e["affix"], fkey(e["fams"])), {})[e["name"]] = e
+    for (atype, fk), es in only.items():
+        mine = sorted(es.values(), key=lambda e: e["mod_level"], reverse=True)
+        out.append({"type": atype, "group": mine[0]["grp"], "family": fk, "text": mine[0]["mod_text"], "tags": [],
+                    "essence_only": True, "chance_pct": 0,
+                    "tiers": [{"tier": i, "level": e["mod_level"], "text": e["mod_text"], "weight": 0}
+                              for i, e in enumerate(mine, 1)],
+                    "essences": [{"name": e["name"], "level": e["mod_level"], "text": e["mod_text"],
+                                  "perfect": e["perfect"]} for e in mine]})
+    out.sort(key=lambda f: (f["type"], f["text"].lower()))
     req = base.get("req") or {}
+    data = poe2db.for_base(base)
     return {"base": base["name"], "type": base["type"], "item_level": ilvl,
-            "base_level": (req.get("level") if isinstance(req, dict) else None) or 1, "families": fams}
-
-
-def _essence_index(kb, item_type: str, ilvl: int) -> dict[str, list[dict]]:
-    rows = kb._rows("SELECT e.name, m.text AS mod_text, m.level AS mod_level, m.type AS affix, m.grp, "
-                    "m.adds_tags FROM essences e JOIN mods m ON m.id = e.mod_id AND m.domain = 'Item' "
-                    "WHERE e.item_type = ?", (item_type,))
-    out: dict[str, list[dict]] = {}
-    for r in rows:
-        if (r["mod_level"] or 0) > ilvl or r["affix"] not in SIDES:
-            continue
-        r["perfect"] = r["name"].startswith("Perfect ")
-        r["mod_level"] = r["mod_level"] or 1
-        out.setdefault(family(r["grp"]), []).append(r)
-    for v in out.values():
-        v.sort(key=lambda r: r["mod_level"])
-    return out
+            "base_level": (req.get("level") if isinstance(req, dict) else None) or 1, "families": out,
+            "weights": "poe2db" if data else "equal", "poe2db_page": poe2db.page_for_base(base),
+            "desecrated_mods": len(data["desecrated"]) if data else 0}
 
 
 # ---------------------------------------------------------------- simulation
 
 
 class _Pool:
-    """Fast random picks from the base's mod pool: rejection sampling instead of filtering the whole list."""
+    """Weighted random picks from the base's mod pool (rejection for family / tag conflicts)."""
 
-    def __init__(self, groups, base_tags: set):
+    def __init__(self, groups, base_tags: set, data: dict | None, ilvl: int):
         self.base_tags = base_tags
         self.entries = {s: [] for s in SIDES}
         for (atype, grp), tiers in groups.items():
             for m in tiers:
-                self.entries[atype].append({"type": atype, "grp": grp, "fam": family(grp), "level": m["level"] or 1,
+                fams = frozenset(m.get("fams") or [family(grp)])
+                self.entries[atype].append({"type": atype, "grp": grp, "fam": fkey(fams), "fams": fams,
+                                            "level": m["level"] or 1, "w": m.get("w", 1),
                                             "adds_tags": m.get("adds_tags") or [], "weight_keys": m.get("weight_keys"),
                                             "weight_vals": m.get("weight_vals")})
-        self._by_min: dict[tuple, list] = {}
+        self.des = {s: [] for s in SIDES}  # desecrated-only mods, weighted like a typical normal mod of the side
+        for s in SIDES:
+            med = statistics.median([e["w"] for e in self.entries[s]]) if self.entries[s] else 1
+            for d in (data or {}).get("desecrated", []):
+                if d["type"] == s and d["level"] <= ilvl and d["fams"]:
+                    fams = frozenset(d["fams"])
+                    self.des[s].append({"type": s, "grp": d["fams"][0], "fam": fkey(fams), "fams": fams,
+                                        "level": d["level"], "w": med, "adds_tags": [], "desecrated_only": True})
+        self._cache: dict[tuple, tuple] = {}
 
-    def side_list(self, side: str, min_level: int) -> list:
-        key = (side, min_level)
-        if key not in self._by_min:
-            self._by_min[key] = [e for e in self.entries[side] if e["level"] >= min_level]
-        return self._by_min[key]
+    def side_list(self, side: str, min_level: int, reveal: bool = False) -> tuple[list, list, float]:
+        key = (side, min_level, reveal)
+        if key not in self._cache:
+            lst = [e for e in self.entries[side] if e["level"] >= min_level and e["w"] > 0]
+            if reveal:
+                lst += [e for e in self.des[side] if e["level"] >= min_level]
+            cum, t = [], 0.0
+            for e in lst:
+                t += e["w"]
+                cum.append(t)
+            self._cache[key] = (lst, cum, t)
+        return self._cache[key]
 
-    def add(self, rng, mods: list, side: str | None = None, min_level: int = 0) -> dict | None:
-        from soe.items.craft import can_roll
-
-        counts = Counter(m["type"] for m in mods)
-        sides = [s for s in SIDES if counts[s] < 3 and (side is None or s == side)]
-        lists = [self.side_list(s, min_level) for s in sides]
-        total = sum(len(x) for x in lists)
+    def pick(self, rng, mods: list, sides: list, min_level: int = 0, reveal: bool = False, avoid=()) -> dict | None:
+        lists = [self.side_list(s, min_level, reveal) for s in sides]
+        total = sum(t for _, _, t in lists)
         if not total:
             return None
-        fams = {m["fam"] for m in mods}
-        extra = set()
+        present = set()
         for m in mods:
-            extra.update(m["adds_tags"])
+            present |= m["fams"]
+        for a in avoid:
+            present |= a["fams"]
+        extra = added_tags(mods)
         tags = self.base_tags | extra if extra else None
-        for _ in range(200):
-            i = rng.randrange(total)
-            for lst in lists:
-                if i < len(lst):
-                    e = lst[i]
+        for _ in range(300):
+            x = rng.random() * total
+            for lst, cum, t in lists:
+                if x < t:
+                    e = lst[min(bisect.bisect_right(cum, x), len(lst) - 1)]
                     break
-                i -= len(lst)
-            if e["fam"] in fams or (tags is not None and not can_roll(e, tags)):
+                x -= t
+            if e["fams"] & present or (tags is not None and e.get("weight_keys") is not None and not can_roll(e, tags)):
                 continue
-            mods.append(e)
             return e
         return None  # everything left is blocked
+
+    def add(self, rng, mods: list, side: str | None = None, min_level: int = 0) -> dict | None:
+        counts = Counter(m["type"] for m in mods)
+        sides = [s for s in SIDES if counts[s] < 3 and (side is None or s == side)]
+        if not sides:
+            return None
+        e = self.pick(rng, mods, sides, min_level)
+        if e:
+            mods.append(e)
+        return e
 
 
 class _Want:
     def __init__(self, wanted: list[dict]):
-        self.min = {family(w["group"]): int(w.get("min_level") or 0) for w in wanted}
-        self.side = {family(w["group"]): w["type"] for w in wanted}
+        """wanted: [{"key", "fams" (frozenset), "type", "min_level"}]"""
+        self.w = wanted
+        self.min = {w["key"]: int(w.get("min_level") or 0) for w in wanted}
+        self.side = {w["key"]: w["type"] for w in wanted}
+        self._memo: dict[int, str | None] = {}
+
+    def key_of(self, m: dict) -> str | None:
+        k = self._memo.get(id(m), 0)
+        if k != 0:
+            return k
+        # the same mod group (a hybrid sharing one family, e.g. Strength and Intelligence, is not "+Intelligence")
+        k = next((w["key"] for w in self.w if w["type"] == m["type"] and w["key"] == m["fam"]
+                  and m["level"] >= self.min[w["key"]]), None)
+        if not m.get("_tmp"):
+            self._memo[id(m)] = k
+        return k
 
     def hit(self, m: dict) -> bool:
-        return m["fam"] in self.min and m["level"] >= self.min[m["fam"]]
+        return self.key_of(m) is not None
+
+    def have(self, mods: list) -> set:
+        return {k for k in (self.key_of(m) for m in mods) if k}
 
     def hits(self, mods: list) -> int:
-        return len({m["fam"] for m in mods if self.hit(m)})
+        return len(self.have(mods))
+
+    def missing(self, mods: list) -> list[str]:
+        have = self.have(mods)
+        return [k for k in self.min if k not in have]
 
     def missing_sides(self, mods: list) -> set:
-        have = {m["fam"] for m in mods if self.hit(m)}
-        return {self.side[f] for f in self.min if f not in have}
+        return {self.side[k] for k in self.missing(mods)}
 
 
 def _ess_mod(e: dict) -> dict:
-    return {"type": e["affix"], "grp": e["grp"], "fam": family(e["grp"]), "level": e["mod_level"],
-            "adds_tags": e.get("adds_tags") or []}
+    return {"type": e["affix"], "grp": e["grp"], "fam": fkey(e["fams"]), "fams": frozenset(e["fams"]),
+            "level": e["mod_level"], "adds_tags": e.get("adds_tags") or []}
 
 
 class _Run:
-    def __init__(self, pool: _Pool, want: _Want, rng, prices: dict | None = None):
+    def __init__(self, pool: _Pool, want: _Want, rng, prices: dict | None = None, bone: str | None = None):
         self.pool, self.want, self.rng = pool, want, rng
         self.mods: list = []
         self.used: Counter = Counter()
         self.prices = prices or {}
         self.spent = 0.0
+        self.bone = bone
         self.reached: dict[int, float] = {}  # hits -> divine spent when first reached (the player could stop there)
 
     def use(self, name: str, n: int = 1):
@@ -215,13 +296,15 @@ class _Run:
         for j in range(1, self.want.hits(self.mods) + 1):
             self.reached.setdefault(j, self.spent)
 
+    def counts(self) -> Counter:
+        return Counter(m["type"] for m in self.mods)
+
     def exalt(self, orb: str = "Exalted Orb", omens: bool = False):
         side = None
         if omens:
-            miss = self.want.missing_sides(self.mods)
-            counts = Counter(m["type"] for m in self.mods)
-            open_miss = [s for s in miss if counts[s] < 3]
-            if len(open_miss) == 1 and counts[SIDES[1 - SIDES.index(open_miss[0])]] < 3:
+            c = self.counts()
+            open_miss = [s for s in self.want.missing_sides(self.mods) if c[s] < 3]
+            if len(open_miss) == 1 and c[SIDES[1 - SIDES.index(open_miss[0])]] < 3:
                 side = open_miss[0]  # only one side still needs mods and the other is open too: steer it
                 self.use(OMEN_EXALT[side])
         self.use(orb)
@@ -234,28 +317,29 @@ class _Run:
             if len(self.mods) == before:
                 break
 
-    def perfect_essence(self, e: dict):
-        """Perfect Essence on a rare: removes a random mod (only from its own side with the omen) and adds its mod."""
-        if any(m["fam"] == family(e["grp"]) for m in self.mods):
-            return
+    def perfect_essence(self, e: dict) -> bool:
+        """Perfect Essence on a rare: removes a random mod (one side with the omen) and adds its mod."""
+        if any(m["fams"] & set(e["fams"]) for m in self.mods):
+            return False
         side = e["affix"]
         other = SIDES[1 - SIDES.index(side)]
         by = {s: [m for m in self.mods if m["type"] == s] for s in SIDES}
         junk = {s: [m for m in by[s] if not self.want.hit(m)] for s in SIDES}
         if len(by[side]) >= 3:  # its side is full: the removed mod must come from there
             if not junk[side]:
-                return
+                return False
             remove_from = side
         elif junk[other] and not junk[side]:
             remove_from = other
         elif junk[side]:
             remove_from = side
         else:
-            return  # nothing worth sacrificing
+            return False  # nothing worth sacrificing
         self.use(OMEN_CRYST[remove_from])
         self.use(e["name"])
         self.mods.remove(self.rng.choice(by[remove_from]))  # still random within that side
         self.mods.append(_ess_mod(e))
+        return True
 
     def chaos(self):
         self.use("Chaos Orb")
@@ -263,95 +347,136 @@ class _Run:
             self.mods.remove(self.rng.choice(self.mods))
         self.pool.add(self.rng, self.mods)
 
-    def annul(self):
+    def annul(self, side: str | None = None):
+        if side:
+            self.use(OMEN_ANNUL[side])
         self.use("Orb of Annulment")
-        if self.mods:
-            self.mods.remove(self.rng.choice(self.mods))
+        cands = [m for m in self.mods if side is None or m["type"] == side]
+        if cands:
+            self.mods.remove(self.rng.choice(cands))
+
+    def desecrated(self) -> dict | None:
+        return next((m for m in self.mods if m.get("des")), None)
+
+    def desecrate(self, side: str) -> bool:
+        """Bone + reveal: take a wanted option when one shows up (reroll once with Omen of Abyssal Echoes)."""
+        c = self.counts()
+        if self.desecrated() or c[side] >= 3:
+            return False
+        if c[SIDES[1 - SIDES.index(side)]] < 3:
+            self.use(OMEN_NECRO[side])  # both sides open: make it this side
+        self.use(self.bone)
+        min_lvl = 40 if self.bone.startswith("Ancient") else 0
+        need = set(self.want.missing(self.mods))
+        chosen = None
+        for attempt in range(2):
+            opts = []
+            for _ in range(REVEAL_OPTIONS):
+                o = self.pool.pick(self.rng, self.mods, [side], min_lvl, reveal=True, avoid=opts)
+                if o:
+                    opts.append(o)
+            good = [o for o in opts if self.want.key_of(o) in need]
+            if good:
+                chosen = good[0]
+                break
+            if attempt == 0:
+                self.use(ECHOES)
+            elif opts:
+                chosen = opts[0]  # nothing wanted: one of them has to be taken
+        if chosen:
+            self.mods.append({**chosen, "des": True, "_tmp": True})
+        return True
 
     def blocked_side(self) -> str | None:
         """A side that is full, still misses a wanted mod and holds junk: something has to go."""
-        have = {m["fam"] for m in self.mods if self.want.hit(m)}
+        miss = self.want.missing_sides(self.mods)
         for s in SIDES:
             mine = [m for m in self.mods if m["type"] == s]
-            missing = any(side == s and f not in have for f, side in self.want.side.items())
-            if len(mine) >= 3 and missing and any(not self.want.hit(m) for m in mine):
+            if len(mine) >= 3 and s in miss and any(not self.want.hit(m) for m in mine):
                 return s
         return None
 
     def until_done(self, fixer: str, perfect: list, cap: int):
         """The way players finish a rare: add mods one by one (omens steer the Exalt to the side that still needs
-        mods). When a full side holds junk instead of a wanted mod, remove one: Chaos Orb (random mod out, random
-        mod in), Orb of Annulment (random mod out), or Annulment with Omen of Sinistral/Dextral Annulment (random
-        mod of that side out). A Perfect Essence gives a missing mod it can guarantee."""
+        mods). When a full side holds junk instead of a wanted mod, remove one (Chaos, Annulment, Annulment with a
+        side omen; a junk desecrated mod: Omen of Light + Annulment). A Perfect Essence gives a missing mod it
+        guarantees. With a bone, the last missing mod comes from a Desecration (pick 1 of 3)."""
         k = len(self.want.min)
         for _ in range(cap):
             self.mark()
-            if self.want.hits(self.mods) >= k:
+            miss = self.want.missing(self.mods)
+            if not miss:
                 return
-            have = {m["fam"] for m in self.mods if self.want.hit(m)}
-            before = self.spent, sum(self.used.values())
-            for e in perfect:
-                if family(e["grp"]) not in have:
-                    self.perfect_essence(e)
-                    if sum(self.used.values()) != before[1]:
-                        break
-            if sum(self.used.values()) != before[1]:
+            if any(e["for"] in miss and self.perfect_essence(e) for e in perfect):
                 continue
+            c = self.counts()
+            if self.bone and not self.desecrated():
+                last = len(miss) == 1 or len(self.mods) == 5
+                side = self.want.side[miss[0]]
+                if last and c[side] < 3 and self.desecrate(side):
+                    continue
+            d = self.desecrated()
             side = self.blocked_side()
+            if d and not self.want.hit(d) and (side == d["type"] or len(self.mods) >= 6):
+                self.use(LIGHT)
+                self.use("Orb of Annulment")
+                self.mods.remove(d)
+                continue
             if side or len(self.mods) >= 6:
                 if fixer == "chaos":
                     self.chaos()
                 elif fixer == "annul_omen" and side:
-                    self.use(OMEN_ANNUL[side])
-                    self.use("Orb of Annulment")
-                    self.mods.remove(self.rng.choice([m for m in self.mods if m["type"] == side]))
+                    self.annul(side)
                 else:
                     self.annul()
             else:
                 self.exalt(omens=True)
+        self.mark()
 
 
 def _usable_essences(want: _Want, ess_by_fam: dict) -> tuple[list, list]:
-    """Essences that give a wanted mod at the wanted tier: (normal ones, one per family, cheapest first; perfect ones)."""
-    usable = []
-    for f in want.min:
-        for e in ess_by_fam.get(f, []):
-            if e["mod_level"] >= want.min[f] and e["affix"] == want.side[f]:
-                usable.append({**e, "price": _price(e["name"])})
+    """Essences that give a wanted mod at the wanted tier: (normal ones, one per wanted mod, cheapest first;
+    perfect ones)."""
+    usable = {}
+    for w in want.w:
+        for f in w["fams"]:
+            for e in ess_by_fam.get(f, []):
+                if e["mod_level"] >= want.min[w["key"]] and e["affix"] == w["type"]:
+                    usable[e["name"]] = {**e, "price": _price(e["name"]), "for": w["key"]}
     key = lambda e: (e["price"] is None, e["price"] or 0, e["mod_level"])  # noqa: E731
     normal, seen = [], set()
-    for e in sorted((e for e in usable if not e["perfect"]), key=key):
-        if family(e["grp"]) not in seen:
-            seen.add(family(e["grp"]))
+    for e in sorted((e for e in usable.values() if not e["perfect"]), key=key):
+        if e["for"] not in seen:
+            seen.add(e["for"])
             normal.append(e)
-    return normal, sorted((e for e in usable if e["perfect"]), key=key)
+    return normal, sorted((e for e in usable.values() if e["perfect"]), key=key)
 
 
-def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: list, basic: bool) -> list:
+def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: list, basic: bool,
+            bone: str | None) -> list:
     """Route definitions (key, name, about, function(run), orbs). `first`: the essence that makes the item rare;
-    `basic`: also the routes without essences."""
-    wanted_fams = list(want.min)
-    perf = [e for e in perfect if not first or family(e["grp"]) != family(first["grp"])]
-    perf_one = []
-    seen = set()
-    for e in perf:
-        if family(e["grp"]) not in seen:
-            seen.add(family(e["grp"]))
+    `basic`: also the routes without essences; `bone`: the Desecration bone for this base (None: no desecration)."""
+    k = len(want.min)
+    perf_one, seen = [], set()
+    for e in perfect:
+        if (not first or e["for"] != first["for"]) and e["for"] not in seen:
+            seen.add(e["for"])
             perf_one.append(e)
 
     def start_essence(r):
-        fam = family(first["grp"])
+        fams = set(first["fams"])
         for _ in range(50):  # the transmute mod must not be the essence's own family: else take a new base
             r.mods.clear()
             r.use("Orb of Transmutation")
             m = r.pool.add(r.rng, r.mods)
-            if not m or m["fam"] != fam:
+            if not m or not (m["fams"] & fams):
                 break
         r.use(first["name"])
         r.mods.append(_ess_mod(first))
 
     routes = []
     tail_p = [e["name"] for e in perf_one] + (list(OMEN_CRYST.values()) if perf_one else [])
+    bone_orbs = [bone, ECHOES, LIGHT, "Orb of Annulment"] + list(OMEN_NECRO.values()) if bone else []
 
     def cheap(r):
         r.use("Orb of Transmutation"); r.pool.add(r.rng, r.mods)
@@ -392,7 +517,7 @@ def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: li
                 r.use("Regal Orb"); r.pool.add(r.rng, r.mods)
             r.fill(omens=True)
             for e in perf_one:
-                if not any(m["fam"] == family(e["grp"]) and want.hit(m) for m in r.mods):
+                if e["for"] in want.missing(r.mods):
                     r.perfect_essence(e)
             r.fill(omens=True)
         names = ", ".join(e["name"] for e in perf_one)
@@ -401,8 +526,7 @@ def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: li
                         "Perfect Essence usuwa losowy mod (z omenem Crystallisation tylko z tej samej strony) "
                         "i daje swój mod na pewno."), ess_perf,
                        (["Orb of Transmutation"] + ([first["name"]] if first else ["Regal Orb"]) +
-                        ["Exalted Orb", "Omen of Sinistral Exaltation", "Omen of Dextral Exaltation"] +
-                        [e["name"] for e in perf_one] + list(OMEN_CRYST.values()))))
+                        ["Exalted Orb", "Omen of Sinistral Exaltation", "Omen of Dextral Exaltation"] + tail_p)))
     hi = max(want.min.values() or [0])
     for orb in ("Greater Exalted Orb", "Perfect Exalted Orb"):
         if hi >= MIN_LEVEL[orb] and ilvl >= MIN_LEVEL[orb] and (first or basic):
@@ -419,13 +543,24 @@ def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: li
                            ["Orb of Transmutation", first["name"] if first else "Regal Orb", orb,
                             "Omen of Sinistral Exaltation", "Omen of Dextral Exaltation"]))
 
-    k = len(wanted_fams)
+    bone_txt = (f" Ostatni brakujący mod: {bone} (desecration), w Well of Souls wybierasz 1 z 3 opcji; gdy żadna nie "
+                "pasuje, Omen of Abyssal Echoes losuje opcje jeszcze raz, a zły desecrated mod zdejmuje Omen of Light "
+                "z Annulmentem.") if bone else ""
     if basic and k >= 3:
         def farm_then_finish(r, fixer):
             need = k - 1
-            for _ in range(FARM_TRIES):  # cheap one-shot bases until one has all but one wanted mod
+            for _ in range(FARM_TRIES):  # cheap bases until one has all but one wanted mod
                 t = _Run(pool, want, r.rng, r.prices)
-                cheap(t)
+                t.use("Orb of Transmutation"); pool.add(t.rng, t.mods)
+                t.use("Orb of Augmentation"); pool.add(t.rng, t.mods)
+                t.use("Regal Orb"); pool.add(t.rng, t.mods)
+                while len(t.mods) < 6:  # stop while the slot is still open: 5 good mods and room for the last
+                    if want.hits(t.mods) >= need and want.hits(t.mods) == len(t.mods):
+                        break
+                    before = len(t.mods)
+                    t.exalt()
+                    if len(t.mods) == before:
+                        break
                 r.used.update(t.used)
                 r.spent += t.spent
                 if want.hits(t.mods) >= need:
@@ -434,16 +569,23 @@ def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: li
             else:
                 return
             r.until_done(fixer, perf_one, LOOP_CAP)
-        for fixer, label, orb in (("annul_omen", "Annul z omenem strony", "Orb of Annulment"), ("chaos", "Chaos", "Chaos Orb")):
-            extra = list(OMEN_ANNUL.values()) if fixer == "annul_omen" else []
+        fixers = [("annul_omen", "Annul z omenem strony", ["Orb of Annulment"] + list(OMEN_ANNUL.values()), None),
+                  ("chaos", "Chaos", ["Chaos Orb"], None)]
+        if bone:
+            fixers.append(("bone", "desecration", bone_orbs, bone))
+        for fixer, label, orbs, b in fixers:
+            def fn(r, fx=fixer, b=b):
+                r.bone = b
+                farm_then_finish(r, "annul" if fx == "bone" else fx)  # Annul opens the slot the bone needs
             routes.append((f"farm_{fixer}", f"Tanie bazy do {k - 1}/{k}, potem {label}",
                            f"Robisz tanie itemy (Transmutation, Augmentation, Regal, Exalty), aż jeden ma {k - 1} z {k} "
-                           f"modów. Ten jeden dokańczasz: {'Orb of Annulment z omenem Sinistral/Dextral Annulment usuwa mod tylko z pełnej strony, ' if fixer == 'annul_omen' else ''}"
-                           f"{'Chaos Orb wymienia losowy mod' if fixer == 'chaos' else 'Annul usuwa śmieć (albo pech: dobry mod)'}, "
-                           "a Exalt z omenem dokłada brakujący typ.",
-                           lambda r, fx=fixer: farm_then_finish(r, fx),
-                           ["Orb of Transmutation", "Orb of Augmentation", "Regal Orb", "Exalted Orb",
-                            "Omen of Sinistral Exaltation", "Omen of Dextral Exaltation", orb] + extra + tail_p))
+                           "modów. Ten jeden dokańczasz: " +
+                           ({"annul_omen": "Orb of Annulment z omenem Sinistral/Dextral Annulment usuwa mod tylko z "
+                                           "pełnej strony, a Exalt z omenem dokłada brakujący typ.",
+                             "chaos": "Chaos Orb wymienia losowy mod, aż wejdzie brakujący.",
+                             "bone": "kość (desecration) daje wybór 1 z 3 modów." + bone_txt}[fixer]),
+                           fn, ["Orb of Transmutation", "Orb of Augmentation", "Regal Orb", "Exalted Orb",
+                                "Omen of Sinistral Exaltation", "Omen of Dextral Exaltation"] + orbs + tail_p))
 
     # finishing on one base: add mods one by one and remove what blocks a wanted slot
     def begin(r):
@@ -453,26 +595,35 @@ def _routes(pool: _Pool, want: _Want, ilvl: int, first: dict | None, perfect: li
             r.use("Orb of Transmutation"); r.pool.add(r.rng, r.mods)
             r.use("Regal Orb"); r.pool.add(r.rng, r.mods)
     head = first["name"] if first else "Regal Orb"
-    perf_names = ", ".join(e["name"] for e in perf_one)
-    perf_txt = (f" Brakujący mod z Perfect Essence ({perf_names}) wchodzi na pewno, a omen Crystallisation wybiera, "
-                "z której strony wypada mod.") if perf_one else ""
-    tail = [e["name"] for e in perf_one] + (list(OMEN_CRYST.values()) if perf_one else [])
+    perf_txt = (f" Brakujący mod z Perfect Essence ({', '.join(e['name'] for e in perf_one)}) wchodzi na pewno, a omen "
+                "Crystallisation wybiera, z której strony wypada mod.") if perf_one else ""
     if first or basic:
+        start_txt = "Esencja na start, potem " if first else "Transmutation + Regal, potem "
         routes.append(("loop_chaos", f"{head} + Exalt/Chaos do skutku",
-                       f"{'Esencja na start, potem ' if first else 'Transmutation + Regal, potem '}Exalt po Exalcie "
-                       "(omen kieruje go na prefix albo suffix, którego brakuje). Gdy śmieć zajmuje miejsce potrzebnego "
-                       "moda: Chaos Orb (usuwa losowy mod, dodaje losowy) i dalej. Jedna baza, aż wejdzie wszystko." + perf_txt,
+                       f"{start_txt}Exalt po Exalcie (omen kieruje go na prefix albo suffix, którego brakuje). Gdy śmieć "
+                       "zajmuje miejsce potrzebnego moda: Chaos Orb (usuwa losowy mod, dodaje losowy) i dalej. Jedna baza, "
+                       "aż wejdzie wszystko." + perf_txt,
                        lambda r: (begin(r), r.until_done("chaos", perf_one, LOOP_CAP)),
                        ["Orb of Transmutation", head, "Exalted Orb", "Omen of Sinistral Exaltation",
-                        "Omen of Dextral Exaltation", "Chaos Orb"] + tail))
-        routes.append(("loop_annul", f"{head} + Exalt/Annul do skutku",
-                       f"{'Esencja na start, potem ' if first else 'Transmutation + Regal, potem '}Exalt po Exalcie z "
-                       "omenami. Gdy śmieć zajmuje miejsce: Orb of Annulment (usuwa losowy mod) i znowu Exalt. "
-                       "Drożej za ruch niż Chaos, ale wolne miejsce wypełnia sterowany Exalt." + perf_txt,
-                       lambda r: (begin(r), r.until_done("annul", perf_one, LOOP_CAP)),
-                       ["Orb of Transmutation", head, "Exalted Orb", "Omen of Sinistral Exaltation",
-                        "Omen of Dextral Exaltation", "Orb of Annulment"] + tail))
+                        "Omen of Dextral Exaltation", "Chaos Orb"] + tail_p))
+        if bone:
+            def loop_bone(r):
+                r.bone = bone
+                begin(r)
+                r.until_done("annul", perf_one, LOOP_CAP)
+            routes.append(("loop_bone", f"{head} + Exalty + desecration",
+                           f"{start_txt}Exalty z omenami, śmieci zdejmuje Annul." + bone_txt + perf_txt, loop_bone,
+                           ["Orb of Transmutation", head, "Exalted Orb", "Omen of Sinistral Exaltation",
+                            "Omen of Dextral Exaltation"] + bone_orbs + tail_p))
     return routes
+
+
+def _bone_for(base: dict, wanted: list[dict], ilvl: int) -> str | None:
+    kind = poe2db.bone_kind(base)
+    if not kind or ilvl < 1:
+        return None
+    hi = max(int(w.get("min_level") or 0) for w in wanted)
+    return f"{'Ancient' if hi >= 40 else 'Preserved'} {poe2db.BONE[kind]}"
 
 
 def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 2000, seed: int = 11) -> dict:
@@ -483,41 +634,66 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
     if not wanted:
         raise ValueError("pick at least one mod")
     groups = pool_by_group(kb, base["name"], ilvl)
-    ess_by_fam = _essence_index(kb, _essence_type(base), ilvl)
-    problems = []
-    fams = Counter(family(w["group"]) for w in wanted)
-    if any(n > 1 for n in fams.values()):
-        problems.append("Dwa wybrane mody są z tej samej rodziny: na itemie może być tylko jeden z nich.")
-    for side in SIDES:
-        if sum(w["type"] == side for w in wanted) > 3:
-            problems.append(f"Za dużo modów typu {side}: najwyżej 3.")
+    ess_by_fam = _essence_index(kb, base, ilvl)
+    data = poe2db.for_base(base)
+    problems, resolved = [], []
     for w in wanted:
         tiers = groups.get((w["type"], w["group"])) or []
-        ok = [t for t in tiers if (t["level"] or 1) >= int(w.get("min_level") or 0)]
-        if not ok and not any(e["mod_level"] >= int(w.get("min_level") or 0) for e in ess_by_fam.get(family(w["group"]), [])):
+        mn = int(w.get("min_level") or 0)
+        if tiers:
+            fams = frozenset(tiers[0]["fams"])
+        else:  # essence-only mod
+            hit = [e for rows in ess_by_fam.values() for e in rows if e["grp"] == w["group"] and e["affix"] == w["type"]]
+            fams = frozenset(hit[0]["fams"]) if hit else frozenset([family(w["group"])])
+        ok = [t for t in tiers if (t["level"] or 1) >= mn]
+        if not ok and not any(e["mod_level"] >= mn for f in fams for e in ess_by_fam.get(f, [])):
             problems.append(f"{w['group']}: ten tier nie wypada na tej bazie przy item level {ilvl}.")
-    need_ilvl = max(int(w.get("min_level") or 0) for w in wanted)
+        resolved.append({"key": fkey(fams), "fams": fams, "type": w["type"], "min_level": mn, "group": w["group"]})
+    for i, a in enumerate(resolved):
+        if any(a["fams"] & b["fams"] for b in resolved[i + 1:]):
+            problems.append("Dwa wybrane mody są z tej samej rodziny: na itemie może być tylko jeden z nich.")
+            break
+    for side in SIDES:
+        if sum(w["type"] == side for w in resolved) > 3:
+            problems.append(f"Za dużo modów typu {side}: najwyżej 3.")
+    need_ilvl = max(w["min_level"] for w in resolved)
+    # mods that almost never roll (poe2db weight like 1 against 1000): say so before the numbers
+    side_w = Counter()
+    for (atype, _), tiers in groups.items():
+        side_w[atype] += sum(t["w"] for t in tiers)
+    warnings = []
+    for w in resolved:
+        tiers = [t for t in groups.get((w["type"], w["group"])) or [] if (t["level"] or 1) >= w["min_level"]]
+        share = sum(t["w"] for t in tiers) / side_w[w["type"]] * 100 if side_w[w["type"]] else 0
+        w["chance_pct"] = round(share, 3)
+        has_ess = any(e["mod_level"] >= w["min_level"] for f in w["fams"] for e in ess_by_fam.get(f, []))
+        if share < 0.5 and not has_ess:
+            text = (tiers or (groups.get((w["type"], w["group"])) or [{"text": w["group"]}]))[0]["text"]
+            warnings.append(f"{text}: na tej bazie prawie nie wypada (szansa na losowy {w['type'].lower()} "
+                            f"{share:.2f}%, waga z poe2db), a żadna esencja go nie daje. Cel z tym modem jest bardzo drogi; "
+                            "rozważ inny mod albo kup gotowy item.")
     if problems:
         return {"base": base["name"], "item_level": ilvl, "possible": False, "problems": problems, "routes": []}
 
-    pool = _Pool(groups, set(base.get("tags") or []))
-    want = _Want(wanted)
+    pool = _Pool(groups, set(base.get("tags") or []), data, ilvl)
+    want = _Want(resolved)
     normal, perfect = _usable_essences(want, ess_by_fam)
+    bone = _bone_for(base, wanted, ilvl) if data else None
     defs = []
     for j, first in enumerate([None] + normal[:3]):  # every wanted mod an essence can start with
-        defs += [d for d in _routes(pool, want, ilvl, first, perfect, basic=j == 0)
+        defs += [d for d in _routes(pool, want, ilvl, first, perfect, basic=j == 0, bone=bone)
                  if j <= 1 or not d[0].startswith("loop")]  # long loops: only the cheapest essence
+    k = len(want.min)
     out = []
     for i, (key, name, about, fn, orbs) in enumerate(defs):
         rng = random.Random(seed + i)
         n_ok, hist, used, spends = 0, Counter(), Counter(), []
         ladder_cost, ladder_hit = Counter(), Counter()
         prices = {o: _price(o) for o in dict.fromkeys(orbs)}
-        k = len(want.min)
         multi = key.startswith(("loop", "farm"))
-        target = max(80, sims // 20) if multi else sims  # loops take many steps per try
+        target = max(60, sims // 30) if multi else sims  # loops take many steps per try
         n_sims, t0 = 0, time.perf_counter()
-        # one-shot routes are cheap to simulate: go on while the full goal is too rare to measure (up to ~2.5 s)
+        # one-shot routes are cheap to simulate: go on while the full goal is too rare to measure
         while n_sims < target or (key in EXTEND and n_ok < 25 and n_sims < ONE_SHOT_MAX and time.perf_counter() - t0 < 1.2):
             n_sims += 1
             r = _Run(pool, want, rng, prices)
@@ -525,7 +701,7 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
             r.mark()
             h = want.hits(r.mods)
             hist[h] += 1
-            n_ok += h == len(want.min)
+            n_ok += h == k
             used.update(r.used)
             spends.append(r.spent)
             for j in range(1, k + 1):  # spend until j hits (or the whole run when never reached)
@@ -543,7 +719,6 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
             else:
                 cost += price * avg
             steps.append({"orb": orb, "avg_count": round(avg, 2), "price_divine": price})
-        k = len(want.min)
         out.append({"key": key, "name": name, "about": about, "steps": steps,
                     "chance_pct": round(p * 100, 4),
                     "at_least_pct": {j: round(sum(v for h, v in hist.items() if h >= j) / n_sims * 100, 1)
@@ -551,18 +726,18 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
                     "cost_try_divine": round(cost, 3), "cost_complete": known,
                     "tries": round(1 / p, 1) if p else None,
                     "expected_divine": round(cost / p, 3) if p else None,
-                    "loop": key.startswith(("loop", "farm")),
+                    "loop": multi,
                     # what it costs to stop at j wanted mods: one-shot routes repeat on new bases, loops go on
                     "ladder": {j: {"pct": round(ladder_hit[j] / n_sims * 100, 1),
-                                   "expected_divine": (round(ladder_cost[j] / ladder_hit[j], 3) if key.startswith(("loop", "farm"))
+                                   "expected_divine": (round(ladder_cost[j] / ladder_hit[j], 3) if multi
                                                        else round(cost / (ladder_hit[j] / n_sims), 3)) if ladder_hit[j] else None}
                                for j in range(1, k + 1) if not key.startswith("farm") or j >= k - 1},
-                    "p90_divine": round(sorted(spends)[int(len(spends) * 0.9) - 1], 3) if key.startswith(("loop", "farm")) and spends else None})
+                    "p90_divine": round(sorted(spends)[int(len(spends) * 0.9) - 1], 3) if multi and spends else None})
     # per kind of route keep the essence that works best
     best_of: dict[str, dict] = {}
+    rank = lambda x: (x["expected_divine"] is None, x["expected_divine"] or 0, -x["chance_pct"])  # noqa: E731
     for r in out:
         cur = best_of.get(r["key"])
-        rank = lambda x: (x["expected_divine"] is None, x["expected_divine"] or 0, -x["chance_pct"])  # noqa: E731
         if cur is None or rank(r) < rank(cur):
             best_of[r["key"]] = r
     out = list(best_of.values())
@@ -570,12 +745,11 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
     if alive:  # a route that never reaches the goal gets no badge
         best = max(alive, key=lambda r: (r["chance_pct"], -(r["expected_divine"] or 0)))
         best["badges"] = ["najpewniejsza"]
-        priced = [r for r in out if r["expected_divine"] is not None]
-        if priced:
-            cheap = min(priced, key=lambda r: r["expected_divine"])
-            cheap.setdefault("badges", []).append("najtańsza do skutku")
-    out.sort(key=lambda r: (-(r["chance_pct"] > 0), r["expected_divine"] if r["expected_divine"] is not None else 1e9))
-    k = len(want.min)
+    priced = [r for r in out if r["expected_divine"] is not None]
+    if priced:
+        cheap = min(priced, key=lambda r: r["expected_divine"])
+        cheap.setdefault("badges", []).append("najtańsza do skutku")
+    out.sort(key=lambda r: (r["expected_divine"] is None, r["expected_divine"] or 0))
     realistic = []
     for j in range(max(1, k - 3), k + 1):  # the cheapest way to j of the k wanted mods
         opts = [(r["ladder"][j]["expected_divine"], r["name"]) for r in out
@@ -583,9 +757,14 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
         if opts:
             c, n = min(opts)
             realistic.append({"hits": j, "of": k, "expected_divine": c, "route": n})
+    src = (f"Wagi modów, rodziny, esencje i mody desecrated: poe2db ({poe2db.page_for_base(base)})."
+           if data else "Brak danych z poe2db dla tej bazy: równe wagi z danych PoB (mniej dokładne).")
     return {"base": base["name"], "item_level": ilvl, "need_item_level": need_ilvl, "possible": True,
-            "wanted": [{**w, "family": family(w["group"])} for w in wanted], "routes": out, "realistic": realistic,
-            "note": ("Szanse: symulacja (równe wagi dla każdego tieru, bo PoB nie ma prawdziwych wag z gry), więc "
-                     "wysokie tiery wychodzą tu łatwiej niż w grze. Koszt: średnie zużycie orbów na jedną próbę, "
-                     "ceny z poe.ninja, bez ceny bazy. 'Do skutku' = koszt próby / szansa. Drogi 'do skutku' liczą cały craft "
-                     f"na jednej bazie (najwyżej {LOOP_CAP} użyć orbów).")}
+            "weights": "poe2db" if data else "equal", "bone": bone, "warnings": warnings,
+            "wanted": [{"group": w["group"], "type": w["type"], "min_level": w["min_level"], "family": w["key"],
+                        "chance_pct": w["chance_pct"]}
+                       for w in resolved], "routes": out, "realistic": realistic,
+            "note": (f"{src} Szanse: symulacja na tych wagach. Desecration: poe2db nie podaje, jak często opcje to "
+                     "zwykłe mody bazy, więc mod tylko z desecration liczę jak typowy mod tej strony. Koszt: ceny z "
+                     "poe.ninja, bez ceny bazy. 'Do skutku' przy jednej próbie = koszt próby / szansa; drogi na jednej "
+                     f"bazie liczą cały craft (najwyżej {LOOP_CAP} użyć orbów).")}

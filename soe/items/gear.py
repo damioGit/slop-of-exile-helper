@@ -1,7 +1,7 @@
 """Gear advice beyond what PoB shows, every number measured in PoB.
 
 - item_analysis: what each mod of an item is worth to this build, free affixes, and whether an Exalted Orb,
-  Chaos Orb, Orb of Annulment or Fracturing Orb is worth using on it (odds with equal mod weights)
+  Chaos Orb, Orb of Annulment or Fracturing Orb is worth using on it (odds with the spawn weights from poe2db)
 - realistic_item: a rare a player of this level can realistically get for the slot (best base for the level,
   middle tier rolls), with its gain over the current item
 - gear_audit: every slot ranked by how much a realistic replacement gains: "which item to replace first"
@@ -92,7 +92,8 @@ def item_analysis(session, slot: str, objective: Objective | None = None) -> dic
                 if m and i != skip and not exp[i].startswith("{crafted}")}
 
     def outcomes(types: set[str], skip: int | None):
-        """Every mod family a random new mod can be (equal weight per tier), measured with the line `skip` replaced."""
+        """Every mod family a random new mod can be (weighted by its tiers' spawn weights from poe2db), measured with
+        the line `skip` replaced."""
         tags = base_tags | added_tags([m for i, m in line_mods.items() if m and i != skip])
         fams = present_families(skip)
         out = []
@@ -105,7 +106,7 @@ def item_analysis(session, slot: str, objective: Objective | None = None) -> dic
             new = [resolve_ranges(p, "mid") for p in typical["text"].split(" / ")]
             lines = exp[:skip] + new + exp[skip + 1:] if skip is not None else exp + new
             ex = obj.explain(_w(session, real, join_item(head, imp, lines)), session.base)
-            out.append({"text": " / ".join(new), "type": atype, "weight": len(tiers), **_short(ex)})
+            out.append({"text": " / ".join(new), "type": atype, "weight": sum(t.get("w", 1) for t in tiers), **_short(ex)})
         return out
 
     def summarize(outs: list[dict], cost_name: str, extra: dict | None = None) -> dict:
@@ -157,7 +158,7 @@ def item_analysis(session, slot: str, objective: Objective | None = None) -> dic
                              "verdict": ("warto" if best["value"]["score"] >= 5 and len(junk) <= 1 else
                                          "loteria" if best["value"]["score"] >= 5 else "nie")}
     res["crafting"] = craft
-    res["note"] = ("Odds use equal weights for every mod that can roll (PoE2 weights are not in PoB's data): an estimate. "
+    res["note"] = ("Odds use the spawn weights from poe2db (equal weights when poe2db has no page for the base). "
                    "Outcomes use a middle tier with a middle roll. 'value' = what you lose without the mod.")
     return res
 

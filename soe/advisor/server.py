@@ -283,7 +283,7 @@ def item_analysis(slot: str, damage: float = 1, survive: float = 1) -> dict:
 def craft_plan(slot: str, damage: float = 1, survive: float = 1) -> dict:
     """Step-by-step craft of a realistic better item for the slot: base and item level, Orb of Transmutation,
     the Essence that guarantees the most valuable target mod, Exalted Orbs, optional Omens; odds of hitting the
-    other target mods (Monte Carlo, equal weights: estimate) and the cost of one try in poe.ninja prices."""
+    other target mods (Monte Carlo on poe2db spawn weights) and the cost of one try in poe.ninja prices."""
     from soe.items.craftplan import craft_plan as cp
 
     return cp(session, slot, _goals(damage, survive))
@@ -295,7 +295,7 @@ def craft_routes(base: str, item_level: int, wanted: list[dict]) -> dict:
     "type": "Prefix"|"Suffix", "min_level": minimum mod level, 0 = any tier}] (groups from craft_pool).
     Routes: Transmute/Augment/Regal + Exalts, Alchemy + Exalts, Essence + Exalts with Sinistral/Dextral Exaltation
     omens, + Perfect Essence with Crystallisation omens, Greater/Perfect Exalted Orbs, Chaos spam. Each: chance per
-    try, average currency per try, expected cost until it works (poe.ninja). Equal weights per tier: estimate."""
+    try, average currency per try, expected cost until it works (poe.ninja). Spawn weights, mod families, essences and desecrated mods from poe2db; also Desecration (bone, pick 1 of 3) and the cost of stopping at fewer mods ('ladder', 'realistic'). Read 'warnings' first: mods that almost never roll."""
     from soe.items.crafter import craft_routes as run
 
     return run(session.kb, base, item_level, wanted)
@@ -313,7 +313,7 @@ def craft_pool(base: str, item_level: int = 82) -> dict:
 @tool
 def craft_odds(base: str, item_level: int, want_groups: list[str]) -> dict:
     """Chance that one random added prefix/suffix lands in the wanted mod families (names as in
-    ideal_item / mod_upgrades 'group'). Equal weights: PoB has no real spawn weights, so it is an estimate."""
+    ideal_item / mod_upgrades 'group'), with poe2db spawn weights."""
     from soe.items.craft import craft_odds as co
 
     return co(session, base, item_level, want_groups)

@@ -648,7 +648,8 @@ const views = {
           <input type="text" id="cModFind" placeholder="filtruj, np. life, resistance, spell" value="${esc(c.filter)}">
           <div class="modcols" style="margin-top:10px">${["Prefix", "Suffix"].map(t => `<div><h3>${t === "Prefix" ? "Prefiksy" : "Suffiksy"} <span class="small muted" id="cnt${t}"></span></h3>
             <div class="modlist" id="list${t}"></div></div>`).join("")}</div>
-          <p class="muted small">Tier = minimalny poziom moda, który Ci wystarczy. Ikona esencji: ten mod da się dostać na pewno. „Tylko esencja”: nie wypada losowo.</p></div>
+          <p class="muted small">Tier = minimalny poziom moda, który Ci wystarczy. Ikona esencji: ten mod da się dostać na pewno. „Tylko esencja”: nie wypada losowo. % = szansa, że losowy prefix/suffix wypadnie z tej grupy.
+            ${p.weights === "poe2db" ? `Wagi, rodziny modów, esencje i mody desecrated: <a target="_blank" href="https://poe2db.tw/us/${esc(p.poe2db_page)}#ModifiersCalc">poe2db (${esc(p.poe2db_page)})</a>.` : `<span class="neg">Brak strony poe2db dla tej bazy: równe wagi z danych PoB.</span>`}</p></div>
         <div class="forgeout">
           <div class="panel"><h2>Cel</h2><div id="cGoal"></div>
             <div class="row" style="margin-top:10px;justify-content:center"><button id="btnRoutes">Znajdź drogę craftu</button><button class="ghost" id="btnClear">Wyczyść</button></div></div>
@@ -679,7 +680,9 @@ const views = {
             <div class="mt">${esc(m.text)}</div>
             <div class="mx">${m.essence_only ? '<span class="pill crafted">tylko esencja</span>' : ""}${ess}
               ${on ? `<select data-tier="${esc(k)}"><option value="0">dowolny tier</option>${m.tiers.map(t => `<option value="${t.level}" ${c.wanted[k].min_level === t.level ? "selected" : ""}>T${t.tier}+ (lvl ${t.level}): ${esc(t.text)}</option>`).join("")}</select>`
-                    : `<span class="muted">${tiers(m.tiers.length)}, najlepszy lvl ${m.tiers[0].level}</span>`}</div></div>`;
+                    : `<span class="muted">${tiers(m.tiers.length)}, najlepszy lvl ${m.tiers[0].level}</span>`}
+              ${m.essence_only ? "" : m.chance_pct < 0.5 ? `<span class="pill" style="color:var(--bad)" title="waga z poe2db">prawie nie wypada</span>`
+                : `<span class="muted" title="szansa, że losowy ${t === "Prefix" ? "prefix" : "suffix"} będzie z tej grupy (wagi z poe2db)">· ${fmt(m.chance_pct, 1)}%</span>`}</div></div>`;
         }).join("") || `<p class="muted small" style="padding:8px">Nic nie pasuje.</p>`;
       }
       document.querySelectorAll(".modrow").forEach(r => r.onclick = e => {
@@ -718,6 +721,7 @@ const views = {
       const k = r.wanted.length;
       const real = (r.realistic || []).map(x => `<tr><td><b>${x.hits} z ${x.of}</b></td><td class="n"><b>${div(x.expected_divine)}</b></td><td class="small muted">${esc(x.route)}</td></tr>`).join("");
       out.innerHTML = (r.need_item_level > c.ilvl ? `<div class="finding warn">Wybrane tiery wymagają item level ${r.need_item_level}.</div>` : "") +
+        (r.warnings || []).map(w => `<div class="finding bad">${esc(w)}</div>`).join("") +
         (real ? `<div class="finding"><h4>Co realnie wyjdzie i za ile</h4><p class="small muted">Najtańsza droga do danej liczby wybranych modów (średnio, do skutku).</p>
           <div class="tablewrap"><table><tr><th>Mody</th><th class="n">Koszt</th><th>Droga</th></tr>${real}</table></div></div>` : "") +
         r.routes.map(x => {
@@ -1141,7 +1145,7 @@ async function refreshBadge() {
   state.loaded = s.loaded;
   state.buildId = s.build_id;
   state.overview = null;
-  $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}` : "· brak bazy wiedzy: uruchom soe kb build";
+  $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}${s.poe2db && s.poe2db.pages ? `, mody: poe2db (${s.poe2db.fetched})` : ""}` : "· brak bazy wiedzy: uruchom soe kb build";
   api("/api/prices").then(p => { state.exPerDiv = p.status.divine_in_exalted; $("#kbInfo").textContent += ` · ceny: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
   $("#loadPanel").open = !s.loaded;
   if (s.loaded) {

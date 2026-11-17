@@ -1,5 +1,5 @@
 """Step-by-step craft of the realistic item for a slot: base, Transmutation, Essence, Exalted Orbs,
-with odds (Monte Carlo over the mod pool, equal weights per mod tier) and the cost of the orbs from poe.ninja.
+with odds (Monte Carlo over the mod pool, spawn weights from poe2db) and the cost of the orbs from poe.ninja.
 
 PoE2 rules used: Orb of Transmutation makes a normal item magic with one mod; an Essence (Lesser / normal /
 Greater) turns a magic item rare and adds its guaranteed mod; an Exalted Orb adds one random mod while the item
@@ -51,7 +51,7 @@ def _simulate(groups, base_tags: set, start: list[dict], wanted: set[str], exalt
                     if counts[atype] < 3 and family(grp) not in fams and can_roll(m, tags)]
             if not pool:
                 break
-            m = rng.choice(pool)
+            m = rng.choices(pool, weights=[x.get("w", 1) for x in pool])[0]
             mods.append(m)
             if family(m["grp"]) in wanted:
                 hits += 1
@@ -127,5 +127,5 @@ def craft_plan(session, slot: str, objective: Objective | None = None, level: in
             "odds": {"wanted_mods": len(wanted), "random_mods": 1 + exalts, "at_least_pct": at_least,
                      "expected_hits": round(sum(i * n for i, n in enumerate(hist)) / total, 2)},
             "cost_divine": round(cost, 3), "cost_complete": all(pr for pr, _ in known),
-            "note": ("Odds: Monte Carlo over the mod pool with equal weights per tier (PoE2 weights are not in PoB's data), "
-                     "so an estimate. A 'hit' is the right mod family at any tier. Costs: one try, poe.ninja prices.")}
+            "note": ("Odds: Monte Carlo over the mod pool with the spawn weights from poe2db (equal weights when poe2db has "
+                     "no page for the base). A 'hit' is the right mod family at any tier. Costs: one try, poe.ninja prices.")}

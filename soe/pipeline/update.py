@@ -99,6 +99,11 @@ def update(tag: str | None = None, pin: bool = True) -> dict:
         log(f"patch report: {md}")
     if pin:
         (ROOT / "POB_VERSION").write_text(tag + "\n")
+    log("poe2db: mod weights, essences, desecrated mods")
+    from soe.kb import poe2db
+    from soe.kb.query import KB
+
+    poe2db_info = poe2db.sync(KB(Path(info["path"])), refresh=True, log=log)
     changes = {}
     if old_check:
         for k, v in check["builds"].items():
@@ -107,7 +112,7 @@ def update(tag: str | None = None, pin: bool = True) -> dict:
                 changes[k] = {"dps": [o["dps"], v["dps"], round((v["dps"] - o["dps"]) / o["dps"] * 100, 1)],
                               "ehp": [o["ehp"], v["ehp"]]}
     return {"ok": True, "from": old_tag, "to": tag, "engine_check": check, "reference_builds_change": changes,
-            "kb": info, "report": report, "seconds": round(time.perf_counter() - t0, 1),
+            "kb": info, "poe2db": poe2db_info, "report": report, "seconds": round(time.perf_counter() - t0, 1),
             "next": "Restart running MCP servers / web app so they load the new PoB and knowledge base; "
                     "run the tests (python -m pytest); re-check builds whose numbers moved a lot."}
 

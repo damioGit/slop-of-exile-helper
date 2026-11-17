@@ -10,6 +10,8 @@ BUILDS = Path(__file__).parent / "builds"
 os.environ["SOE_PRICES_OFFLINE"] = "1"
 os.environ["SOE_PRICES_DIR"] = tempfile.mkdtemp(prefix="soe-prices-")
 os.environ["SOE_LEAGUE"] = "Test League"
+# nor poe2db: saved pages in data/poe2db are used when present, else PoB data with equal weights
+os.environ["SOE_POE2DB"] = "offline"
 
 
 @pytest.fixture(scope="session")
