@@ -354,6 +354,29 @@ def craft_plan(slot: str, damage: float = 1, survive: float = 1):
     return locked(cp, session, slot, _goals(damage, survive))
 
 
+# Crafting tab: KB only (no build, no PoB lock), works before a build is loaded.
+@app.get("/api/craft/bases")
+def craft_bases(type: str | None = None, q: str | None = None):
+    from soe.items.crafter import CRAFT_TYPES, craft_bases as run
+
+    return {"types": list(CRAFT_TYPES), "bases": run(session.kb, type, q)}
+
+
+@app.get("/api/craft/pool")
+def craft_pool(base: str, ilvl: int = 82):
+    from soe.items.crafter import craft_pool as run
+
+    return run(session.kb, base, ilvl)
+
+
+@app.post("/api/craft/routes")
+def craft_routes(payload: dict = Body(...)):
+    from soe.items.crafter import craft_routes as run
+
+    return run(session.kb, payload["base"], int(payload.get("ilvl") or 82), payload.get("wanted") or [],
+               sims=int(payload.get("sims") or 2000))
+
+
 _ICON_POOL = None
 
 

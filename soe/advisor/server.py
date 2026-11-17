@@ -290,6 +290,27 @@ def craft_plan(slot: str, damage: float = 1, survive: float = 1) -> dict:
 
 
 @tool
+def craft_routes(base: str, item_level: int, wanted: list[dict]) -> dict:
+    """Compare crafting routes for chosen mods on a base (no build needed). wanted: [{"group": mod group,
+    "type": "Prefix"|"Suffix", "min_level": minimum mod level, 0 = any tier}] (groups from craft_pool).
+    Routes: Transmute/Augment/Regal + Exalts, Alchemy + Exalts, Essence + Exalts with Sinistral/Dextral Exaltation
+    omens, + Perfect Essence with Crystallisation omens, Greater/Perfect Exalted Orbs, Chaos spam. Each: chance per
+    try, average currency per try, expected cost until it works (poe.ninja). Equal weights per tier: estimate."""
+    from soe.items.crafter import craft_routes as run
+
+    return run(session.kb, base, item_level, wanted)
+
+
+@tool
+def craft_pool(base: str, item_level: int = 82) -> dict:
+    """Every mod family that can roll on a base at an item level (tiers, T1 = best) and the essences that give it,
+    including essence-only mods. Use the 'group' and 'type' values in craft_routes."""
+    from soe.items.crafter import craft_pool as run
+
+    return run(session.kb, base, item_level)
+
+
+@tool
 def craft_odds(base: str, item_level: int, want_groups: list[str]) -> dict:
     """Chance that one random added prefix/suffix lands in the wanted mod families (names as in
     ideal_item / mod_upgrades 'group'). Equal weights: PoB has no real spawn weights, so it is an estimate."""

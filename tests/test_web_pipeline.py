@@ -61,6 +61,16 @@ def test_equipment_and_gear_endpoints(client):
     assert g["slots"] and g["level"]
 
 
+def test_craft_endpoints(client):
+    b = client.get("/api/craft/bases", params={"type": "Ring"}).json()
+    assert "Ring" in b["types"] and any(x["name"] == "Gold Ring" for x in b["bases"])
+    p = client.get("/api/craft/pool", params={"base": "Gold Ring", "ilvl": 82}).json()
+    life = next(f for f in p["families"] if "to maximum Life" in f["text"])
+    r = client.post("/api/craft/routes", json={"base": "Gold Ring", "ilvl": 82, "sims": 200,
+                                                "wanted": [{"group": life["group"], "type": life["type"]}]}).json()
+    assert r["possible"] and r["routes"]
+
+
 def test_skill_groups_have_game_text(client):
     sg = client.get("/api/skill_groups").json()["groups"]
     gems = [g for grp in sg for g in grp["gems"]]

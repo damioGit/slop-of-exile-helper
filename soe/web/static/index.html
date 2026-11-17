@@ -222,6 +222,39 @@ tr.first td { background: color-mix(in srgb, var(--good) 13%, transparent); }
 .empty { text-align: center; padding: 34px 10px; color: var(--muted); }
 .empty b { font-family: var(--display); color: var(--gold); font-size: 18px; display: block; margin-bottom: 6px; }
 .aiAnswer p { margin: 6px 0; max-width: 75ch; } .aiAnswer h3 { color: var(--gold-2); }
+/* forge (crafting tab) */
+.basegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); gap: 6px; max-height: 300px; overflow-y: auto; padding: 2px; margin-top: 10px; }
+button.basebtn { display: grid; grid-template-columns: 38px 1fr; gap: 8px; align-items: center; text-align: left; background: var(--panel-2);
+  border: 1px solid var(--line); color: var(--text); padding: 4px 8px; font-family: var(--sans); font-size: 13.5px; box-shadow: none; text-transform: none; letter-spacing: 0; }
+button.basebtn:hover { border-color: var(--gold-2); filter: none; }
+button.basebtn.on { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--panel-2)); }
+button.basebtn img { width: 38px; height: 38px; object-fit: contain; }
+button.basebtn small { display: block; color: var(--muted); font-size: 12px; }
+.modcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 14px; }
+.modcols > div { min-width: 0; }
+.modcols h3 { display: flex; justify-content: space-between; align-items: baseline; }
+.modlist { max-height: 520px; overflow-y: auto; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-2); }
+.modrow { display: grid; grid-template-columns: 22px 1fr; gap: 4px 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); cursor: pointer; align-items: start; }
+.modrow:last-child { border-bottom: 0; }
+.modrow:hover { background: color-mix(in srgb, var(--gold) 5%, transparent); }
+.modrow.on { background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.modrow.off { opacity: .45; }
+.modrow input[type=checkbox] { accent-color: var(--gold); width: 16px; height: 16px; margin: 2px 0 0; }
+.modrow .mt { color: var(--mod); font-size: 14px; overflow-wrap: anywhere; }
+.modrow .mx { grid-column: 2; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; }
+.modrow select { width: auto; font-size: 12.5px; padding: .2em .4em; max-width: 100%; }
+.forgeout { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.forgeout > * { min-width: 0; }
+@media (max-width: 860px) { .forgeout { grid-template-columns: minmax(0, 1fr); } }
+.route { border: 1px solid var(--line); background: var(--panel-2); border-radius: 3px; padding: 10px 12px; margin: 10px 0; }
+.route.top { border-color: var(--gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent); }
+.route.dead { opacity: .55; }
+.route h4 { margin: 0 0 4px; font-family: var(--display); color: var(--gold-2); font-size: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.orbs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.orb { display: flex; align-items: center; gap: 6px; background: var(--bg-2); border: 1px solid var(--line); padding: 2px 8px 2px 3px; border-radius: 3px; font-size: 13px; }
+.orb img { width: 30px; height: 30px; object-fit: contain; }
+.orb b { color: var(--gold-2); font-variant-numeric: tabular-nums; }
+.orbs .arr { color: var(--muted); }
 @media (max-width: 600px) {
   .gauge { grid-template-columns: 70px 1fr 48px; }
   .tile .v { font-size: 18px; } th, td { padding: 5px 6px; }
@@ -270,6 +303,7 @@ tr.first td { background: color-mix(in srgb, var(--good) 13%, transparent); }
   <nav class="tabs" id="tabs">
     <button data-tab="assistant" class="on">Asystent</button>
     <button data-tab="gear">Gear</button>
+    <button data-tab="craft">Kuźnia</button>
     <button data-tab="skills">Skille</button>
     <button data-tab="checkup">Problemy</button>
     <button data-tab="overview">Przegląd</button>
@@ -578,6 +612,132 @@ const views = {
     });
   },
 
+  async craft(el) {
+    const c = state.craft = state.craft || {type: "Ring", base: null, ilvl: 82, wanted: {}, filter: ""};
+    const types = (await api("/api/craft/bases?" + q({type: "Ring"}))).types;
+    el.innerHTML = `<div class="panel"><h2>Kuźnia</h2>
+      <p class="muted small">Wybierz bazę i mody, które chcesz mieć (do 3 prefiksów i 3 suffiksów). Porównam drogi craftu: najpewniejszą i najtańszą do skutku, z cenami orbów z poe.ninja.</p>
+      <div class="row">
+        <label class="small muted">Typ <select id="cType" style="width:auto">${types.map(t => `<option ${t === c.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+        <input type="text" id="cFind" placeholder="szukaj bazy" style="flex:1;min-width:140px">
+        <label class="small muted">Item level <input type="number" id="cIlvl" min="1" max="86" value="${c.ilvl}" style="width:5em"></label>
+      </div>
+      <div id="cMine" class="chips" style="margin-top:8px"></div>
+      <div id="cBases" class="basegrid"></div></div>
+      <div id="cBody"></div>`;
+    let bases = [];
+    const showBases = () => {
+      const f = $("#cFind").value.trim().toLowerCase();
+      const list = bases.filter(b => !f || b.name.toLowerCase().includes(f));
+      $("#cBases").innerHTML = list.map(b => `<button class="basebtn ${b.name === c.base ? "on" : ""}" data-b="${esc(b.name)}">
+        <img loading="lazy" alt="" src="/api/icon?${q({name: b.name})}" onerror="this.style.visibility='hidden'">
+        <span>${esc(b.name)}<small>${esc(b.sub_type || b.type)} · wym. lvl ${b.level}</small></span></button>`).join("") || `<p class="muted small">Brak baz.</p>`;
+      $("#cBases").querySelectorAll("[data-b]").forEach(btn => btn.onclick = () => { c.base = btn.dataset.b; c.wanted = {}; showBases(); loadPool(); });
+    };
+    const loadBases = async () => { bases = (await api("/api/craft/bases?" + q({type: c.type}))).bases; showBases(); };
+    $("#cType").onchange = async e => { c.type = e.target.value; c.base = null; c.wanted = {}; $("#cBody").innerHTML = ""; await loadBases(); };
+    $("#cFind").oninput = showBases;
+    $("#cIlvl").onchange = e => { c.ilvl = Math.max(1, Math.min(86, +e.target.value || 82)); if (c.base) loadPool(); };
+
+    async function loadPool() {
+      const body = $("#cBody");
+      body.innerHTML = `<div class="panel"><span class="busy"></span> Wczytuję mody…</div>`;
+      const p = await api("/api/craft/pool?" + q({base: c.base, ilvl: c.ilvl}));
+      c.pool = p;
+      body.innerHTML = `<div class="panel"><h2>Mody na ${esc(p.base)}</h2>
+          <input type="text" id="cModFind" placeholder="filtruj, np. life, resistance, spell" value="${esc(c.filter)}">
+          <div class="modcols" style="margin-top:10px">${["Prefix", "Suffix"].map(t => `<div><h3>${t === "Prefix" ? "Prefiksy" : "Suffiksy"} <span class="small muted" id="cnt${t}"></span></h3>
+            <div class="modlist" id="list${t}"></div></div>`).join("")}</div>
+          <p class="muted small">Tier = minimalny poziom moda, który Ci wystarczy. Ikona esencji: ten mod da się dostać na pewno. „Tylko esencja”: nie wypada losowo.</p></div>
+        <div class="forgeout">
+          <div class="panel"><h2>Cel</h2><div id="cGoal"></div>
+            <div class="row" style="margin-top:10px;justify-content:center"><button id="btnRoutes">Znajdź drogę craftu</button><button class="ghost" id="btnClear">Wyczyść</button></div></div>
+          <div class="panel" id="cRoutesPanel"><h2>Drogi craftu</h2><div id="cRoutes"><p class="muted">Zaznacz mody i kliknij „Znajdź drogę craftu”.</p></div></div></div>`;
+      $("#cModFind").oninput = e => { c.filter = e.target.value; drawMods(); };
+      $("#btnClear").onclick = () => { c.wanted = {}; drawMods(); };
+      $("#btnRoutes").onclick = e => busy(e.target, findRoutes);
+      drawMods();
+    }
+
+    const key = f => `${f.type}|${f.group}`;
+    function drawMods() {
+      const p = c.pool, f = c.filter.trim().toLowerCase();
+      const taken = {Prefix: 0, Suffix: 0}, fams = new Set();
+      for (const w of Object.values(c.wanted)) { taken[w.type]++; fams.add(w.family); }
+      for (const t of ["Prefix", "Suffix"]) {
+        const rows = p.families.filter(m => m.type === t && (!f || m.text.toLowerCase().includes(f) || (m.tags || []).join(" ").includes(f) || key(m) in c.wanted))
+          .sort((a, b) => (key(b) in c.wanted) - (key(a) in c.wanted));  // picked ones on top
+        $(`#cnt${t}`).textContent = `${taken[t]}/3 wybrane`;
+        $(`#list${t}`).innerHTML = rows.map(m => {
+          const k = key(m), on = k in c.wanted, full = !on && (taken[t] >= 3 || fams.has(m.family));
+          const ess = m.essences.length ? `<img class="ic" style="width:20px;height:20px" onerror="this.remove()" alt=""" title="${esc(m.essences.map(e => e.name).join(", "))}" src="/api/icon?${q({name: m.essences[0].name})}">` : "";
+          return `<div class="modrow ${on ? "on" : ""} ${full ? "off" : ""}" data-k="${esc(k)}">
+            <input type="checkbox" ${on ? "checked" : ""} ${full ? "disabled" : ""} aria-label="wybierz">
+            <div class="mt">${esc(m.text)}</div>
+            <div class="mx">${m.essence_only ? '<span class="pill crafted">tylko esencja</span>' : ""}${ess}
+              ${on ? `<select data-tier="${esc(k)}"><option value="0">dowolny tier</option>${m.tiers.map(t => `<option value="${t.level}" ${c.wanted[k].min_level === t.level ? "selected" : ""}>T${t.tier}+ (lvl ${t.level}): ${esc(t.text)}</option>`).join("")}</select>`
+                    : `<span class="muted">${tiers(m.tiers.length)}, najlepszy lvl ${m.tiers[0].level}</span>`}</div></div>`;
+        }).join("") || `<p class="muted small" style="padding:8px">Nic nie pasuje.</p>`;
+      }
+      document.querySelectorAll(".modrow").forEach(r => r.onclick = e => {
+        if (e.target.tagName === "SELECT" || e.target.tagName === "OPTION" || r.classList.contains("off")) return;
+        const k = r.dataset.k, m = p.families.find(x => key(x) === k);
+        if (k in c.wanted) delete c.wanted[k]; else c.wanted[k] = {group: m.group, type: m.type, family: m.family, min_level: 0};
+        drawMods();
+      });
+      document.querySelectorAll("[data-tier]").forEach(s => s.onchange = () => { c.wanted[s.dataset.tier].min_level = +s.value; drawGoal(); });
+      drawGoal();
+    }
+
+    function drawGoal() {
+      const p = c.pool, ws = Object.entries(c.wanted);
+      const line = ([k, w]) => { const m = p.families.find(x => key(x) === k);
+        const t = m.tiers.slice().reverse().find(x => x.level >= w.min_level) || m.tiers[0];
+        return w.min_level ? t.text : m.tiers[m.tiers.length - 1].text + " … " + m.tiers[0].text; };
+      const pre = ws.filter(([, w]) => w.type === "Prefix"), suf = ws.filter(([, w]) => w.type === "Suffix");
+      $("#cGoal").innerHTML = ws.length ? `<div class="tip RARE" style="max-width:420px;margin:0 auto">
+        <div class="th"><div class="nm">Twój cel</div><div class="bs">${esc(p.base)}</div></div>
+        <img class="ico" alt="" src="/api/icon?${q({name: p.base})}" onerror="this.remove()">
+        <div class="tb"><div class="small" style="color:#7f7f7f">Item Level: ${p.item_level} · wymaga lvl ${p.base_level}</div>
+          ${pre.map(x => `<div class="ln">${esc(line(x))}</div>`).join("")}${pre.length && suf.length ? '<div class="sep"></div>' : ""}${suf.map(x => `<div class="ln">${esc(line(x))}</div>`).join("")}</div></div>`
+        : `<p class="muted">Zaznacz mody po lewej.</p>`;
+      $("#cRoutes").innerHTML = `<p class="muted">Zaznacz mody i kliknij „Znajdź drogę craftu”.</p>`;
+    }
+
+    async function findRoutes() {
+      const wanted = Object.values(c.wanted).map(w => ({group: w.group, type: w.type, min_level: w.min_level}));
+      if (!wanted.length) { toast("Zaznacz najpierw mody."); return; }
+      const r = await api("/api/craft/routes", {body: {base: c.base, ilvl: c.ilvl, wanted}});
+      const out = $("#cRoutes");
+      if (!r.possible) { out.innerHTML = `<div class="finding bad">${r.problems.map(esc).join("<br>")}</div>`; return; }
+      const div = v => v == null ? "?" : v < 0.1 && state.exPerDiv ? `${fmt(v * state.exPerDiv, v * state.exPerDiv < 10 ? 1 : 0)} ex` : `${fmt(v, v < 1 ? 2 : 1)} div`;
+      out.innerHTML = (r.need_item_level > c.ilvl ? `<div class="finding warn">Wybrane tiery wymagają item level ${r.need_item_level}.</div>` : "") +
+        r.routes.map((x, i) => {
+          const dead = !x.chance_pct;
+          return `<div class="route ${x.badges ? "top" : ""} ${dead ? "dead" : ""}">
+            <h4>${esc(x.name)}${(x.badges || []).map(b => `<span class="pill sure">${esc(b)}</span>`).join("")}${dead ? '<span class="pill">ta droga nie da celu</span>' : ""}</h4>
+            <div class="small muted">${esc(x.about)}</div>
+            <div class="odds">
+              <div class="o"><b>${fmt(x.chance_pct, x.chance_pct < 1 ? 2 : 1)}%</b><span class="small muted">szansa na próbę</span></div>
+              <div class="o"><b>${div(x.cost_try_divine)}</b><span class="small muted">koszt próby${x.cost_complete ? "" : " (bez części cen)"}</span></div>
+              <div class="o"><b>${dead ? "–" : div(x.expected_divine)}</b><span class="small muted">do skutku${x.tries ? ` (~${fmt(x.tries, x.tries < 10 ? 1 : 0)} ${x.key === "chaos" ? "baz" : "prób i baz"})` : ""}</span></div>
+            </div>
+            <div class="orbs">${x.steps.map((s, j) => `${j ? '<span class="arr">→</span>' : ""}<span class="orb" title="${esc(s.orb)}${s.price_divine != null ? ` · ${s.price_divine} div/szt.` : " · brak ceny"}">
+              <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="this.style.visibility='hidden'">${esc(s.orb)} <b>×${fmt(s.avg_count, s.avg_count % 1 ? 2 : 0)}</b></span>`).join("")}</div>
+            <div class="small muted" style="margin-top:6px">Trafione mody: ${Object.entries(x.at_least_pct).map(([k, v]) => `co najmniej ${k}: ${fmt(v, 1)}%`).join(" · ")}</div></div>`;
+        }).join("") + `<p class="muted small">${esc(r.note)} Liczby przy orbach to średnie zużycie na jedną próbę.</p>`;
+    }
+
+    // the player's own gear: one click picks that base
+    if (state.loaded) api("/api/equipment").then(eq => {
+      const mine = (eq.items || []).filter(i => i.base && !/Flask|Charm/.test(i.slot));
+      $("#cMine").innerHTML = mine.length ? `<span class="small muted">Baza z Twojego gearu:</span>` + mine.map(i => `<button class="ghost small" data-mine="${esc(i.base)}">${esc(i.slot)}: ${esc(i.base)}</button>`).join("") : "";
+      $("#cMine").querySelectorAll("[data-mine]").forEach(b => b.onclick = () => openForge(b.dataset.mine));
+    }).catch(() => {});
+    await loadBases();
+    if (c.base) { await loadPool(); }
+  },
+
   async search(el) {
     el.innerHTML = `<div class="panel"><h2>Baza wiedzy</h2><div class="row"><input type="text" id="sq" placeholder="np. life leech, twister, headhunter" style="flex:1;min-width:180px">
       <select id="sk" style="width:auto"><option value="">wszystko</option><option>gem</option><option>unique</option><option>node</option><option>mod</option><option>base</option><option>skill</option></select><button id="btnS">Szukaj</button></div><div id="sOut"></div></div>`;
@@ -799,6 +959,13 @@ function treeView(box, data) {
 }
 
 // ---------------------------------------------------------------- items drawn like in-game tooltips
+const tiers = n => `${n} ${n === 1 ? "tier" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "tiery" : "tierów"}`;
+async function openForge(base) {  // the Kuźnia tab with this base picked
+  const hit = (await api("/api/craft/bases?" + q({q: base}))).bases.find(b => b.name === base);
+  if (!hit) { toast("Tej bazy nie da się craftować w Kuźni."); return; }
+  state.craft = {type: hit.type, base: hit.name, ilvl: (state.craft || {}).ilvl || 82, wanted: {}, filter: ""};
+  state.tab = "craft"; render(); window.scrollTo({top: 0, behavior: "smooth"});
+}
 function iconUrl(name, base, rarity) {  // uniques have their own art; rares / magic use their base
   const own = (rarity || "").toUpperCase() === "UNIQUE" ? name : base;
   return "/api/icon?" + q({name: own || base || name, fallback: base && base !== own ? base : null});
@@ -912,7 +1079,7 @@ async function slotView(slot) {
       api("/api/item_analysis?" + gq).catch(e => ({error: e.message}))]);
     out.innerHTML = (an.error ? `<div class="panel muted">Analiza itemu: ${esc(an.error)}</div>` : renderAnalysis(an))
       + `<div class="panel"><h2>Wycraftuj lepszy item</h2><p class="muted small">Realny rare na Twój level pod ten build i przepis krok po kroku: baza, esencja z pewnym modem, exalty, szanse i koszt jednej próby.</p>
-         <button id="btnRecipe">Pokaż przepis</button><div id="recipeOut" style="margin-top:10px"></div></div>`
+         <div class="row"><button id="btnRecipe">Pokaż przepis</button>${item && item.base ? `<button class="ghost" id="btnForge">Kuźnia: wybierz mody sam</button>` : ""}</div><div id="recipeOut" style="margin-top:10px"></div></div>`
       + `<div class="panel"><h2>Ulepszenia i porównanie</h2><div class="grid2">
       <div><pre>${esc(item.raw.replace(/\{[^}]*\}/g, ""))}</pre>
         <h3>Sprawdź inny item (wklej z gry lub trade)</h3><textarea id="wiText" placeholder="Ctrl+C na itemie w grze i wklej tutaj"></textarea><button id="btnWI" style="margin-top:6px">Porównaj</button><div id="wiOut"></div></div>
@@ -924,6 +1091,7 @@ async function slotView(slot) {
         <div class="row"><select id="mktWanted" style="flex:1"><option value="">(tylko zachowaj obecne mody)</option>${up.upgrades.map(u => `<option>${esc(u.with)}</option>`).join("")}</select><button class="ghost" id="btnMarket">Szukaj na rynku</button></div><div id="marketOut"></div>
         ${uq ? `<h3>Unikaty na ten slot</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td><td class="n small">${u.price ? esc(u.price.text) : "–"}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
       </div></div></div>`;
+    if ($("#btnForge")) $("#btnForge").onclick = () => openForge(item.base);
     $("#btnRecipe").onclick = e => busy(e.target, async () => {
       const r = await api("/api/craft_plan?" + gq);
       $("#recipeOut").innerHTML = recipeView(r);
@@ -950,7 +1118,7 @@ async function slotView(slot) {
 async function render() {
   const el = $("#view");
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
-  if (!state.loaded && state.tab !== "search") { el.innerHTML = `<div class="panel empty"><b>Witaj, wygnańcze</b>Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.</div>`; return; }
+  if (!state.loaded && !["search", "craft"].includes(state.tab)) { el.innerHTML = `<div class="panel empty"><b>Witaj, wygnańcze</b>Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.</div>`; return; }
   el.innerHTML = `<div class="panel"><span class="busy"></span> Liczę w Path of Building…</div>`;
   try { await views[state.tab](el); } catch (e) { el.innerHTML = `<div class="panel"><b class="neg">Błąd:</b> ${esc(e.message)}</div>`; }
 }
@@ -960,7 +1128,7 @@ async function refreshBadge() {
   state.buildId = s.build_id;
   state.overview = null;
   $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}` : "· brak bazy wiedzy: uruchom soe kb build";
-  api("/api/prices").then(p => { $("#kbInfo").textContent += ` · ceny: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
+  api("/api/prices").then(p => { state.exPerDiv = p.status.divine_in_exalted; $("#kbInfo").textContent += ` · ceny: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
   $("#loadPanel").open = !s.loaded;
   if (s.loaded) {
     const sk = await api("/api/skills");

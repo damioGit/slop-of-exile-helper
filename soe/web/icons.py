@@ -73,7 +73,7 @@ def icon_file(name: str, kind: str = "item") -> Path | None:
             m = (_SKILL.search(html) if kind == "skill" else None) or _ITEM.search(html)
             url = m.group(1) if m else None
         except (urllib.error.URLError, OSError, TimeoutError):
-            url = None
+            return None  # network trouble: try again next time, do not remember it as "no icon"
         if not url:
             idx[key] = {"file": None, "t": time.time()}
             _save()
