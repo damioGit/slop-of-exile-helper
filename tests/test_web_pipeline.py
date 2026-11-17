@@ -61,6 +61,14 @@ def test_equipment_and_gear_endpoints(client):
     assert g["slots"] and g["level"]
 
 
+def test_skill_groups_have_game_text(client):
+    sg = client.get("/api/skill_groups").json()["groups"]
+    gems = [g for grp in sg for g in grp["gems"]]
+    twister = next(g for g in gems if g["name"] == "Twister")
+    assert twister["description"] and twister["stats"] and twister["req"].get("dex")
+    assert any(grp["main"] for grp in sg)
+
+
 def test_ai_cli_override(monkeypatch):
     from soe.web import ai
 

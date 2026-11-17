@@ -315,6 +315,71 @@ def item_analysis(slot: str, damage: float = 1, survive: float = 1):
     return locked(ia, session, slot, _goals(damage, survive))
 
 
+@app.get("/api/skill_groups")
+def skill_groups():
+    """Socket groups with every gem's game text (description, stats at its level cap, tags, requirements)
+    and why a support does nothing when it does not apply."""
+    from soe.advisor.assistant import explain_not_applied
+
+    def run():
+        session._need_build()
+        dps = {}
+        for d in session.skill_dps():
+            k = (d.get("group"), d.get("base_name") or d.get("name"))
+            dps[k] = max(dps.get(k, 0), d.get("TotalDPS") or 0, d.get("MinionDPS") or 0, d.get("TotalDotDPS") or 0)
+        out = []
+        for g in session.pob.groups():
+            if not g.get("gems"):
+                continue
+            gems = []
+            for x in g["gems"]:
+                kb = session.kb.gem(x["name"]) or {}
+                gems.append({**{k: x.get(k) for k in ("name", "support", "level", "quality", "enabled", "applies")},
+                             "why_not": explain_not_applied(x["not_applied"]) if x.get("not_applied") else None,
+                             "description": kb.get("description"), "stats": kb.get("stats_text") or [],
+                             "tags": kb.get("tag_string"), "max_level": kb.get("max_level"),
+                             "req": {a: kb.get(f"req_{a}") for a in ("str", "dex", "int") if kb.get(f"req_{a}")}})
+            out.append({"index": g["index"], "main": g.get("main"), "enabled": g.get("enabled"), "label": g.get("label"),
+                        "skills": g.get("skills") or [], "slot": g.get("slot"), "gems": gems,
+                        "dps": max([v for (gi, _), v in dps.items() if gi == g["index"]] or [0])})
+        return {"groups": out}
+    return locked(run)
+
+
+@app.get("/api/craft_plan")
+def craft_plan(slot: str, damage: float = 1, survive: float = 1):
+    from soe.items.craftplan import craft_plan as cp
+
+    return locked(cp, session, slot, _goals(damage, survive))
+
+
+_ICON_POOL = None
+
+
+@app.get("/api/icon")
+async def icon(name: str, kind: str = "item", fallback: str | None = None):
+    """Icon of an item, base or gem from poe2db (cached in data/icons). fallback: tried when name has none
+    (a rare's own name -> its base). Runs on its own two threads, so a page full of new icons never queues
+    the PoB calculations behind poe2db downloads."""
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    from fastapi import HTTPException
+
+    from soe.web.icons import icon_file
+
+    global _ICON_POOL
+    if _ICON_POOL is None:
+        _ICON_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="icons")
+    loop = asyncio.get_running_loop()
+    for n in [name, fallback]:
+        if n:
+            p = await loop.run_in_executor(_ICON_POOL, icon_file, n, kind)
+            if p:
+                return FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
+    raise HTTPException(404, "no icon")
+
+
 @app.get("/api/equipment")
 def equipment():
     """Equipped items (the active weapon set) with their mod lines, for the gear view."""

@@ -280,6 +280,16 @@ def item_analysis(slot: str, damage: float = 1, survive: float = 1) -> dict:
 
 
 @tool
+def craft_plan(slot: str, damage: float = 1, survive: float = 1) -> dict:
+    """Step-by-step craft of a realistic better item for the slot: base and item level, Orb of Transmutation,
+    the Essence that guarantees the most valuable target mod, Exalted Orbs, optional Omens; odds of hitting the
+    other target mods (Monte Carlo, equal weights: estimate) and the cost of one try in poe.ninja prices."""
+    from soe.items.craftplan import craft_plan as cp
+
+    return cp(session, slot, _goals(damage, survive))
+
+
+@tool
 def craft_odds(base: str, item_level: int, want_groups: list[str]) -> dict:
     """Chance that one random added prefix/suffix lands in the wanted mod families (names as in
     ideal_item / mod_upgrades 'group'). Equal weights: PoB has no real spawn weights, so it is an estimate."""

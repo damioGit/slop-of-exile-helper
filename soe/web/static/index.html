@@ -4,124 +4,229 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slop of Exile Helper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
 <style>
+/* Layout: one column of "stash panels" under a sticky character bar; items drawn as in-game tooltips.
+   Dark stone + tarnished gold is the default look; light (parchment) only when chosen with the toggle. */
 :root {
-  --bg: #f4f1ea; --panel: #fffdf8; --panel-2: #efe9dd; --text: #1d1a16; --muted: #6b6358; --line: #ddd3c2;
-  --accent: #a4561c; --accent-2: #c9782f; --good: #2f7d4a; --bad: #b2302a; --warn: #b07a12; --info: #3f6c9e;
-  --fire: #c4471d; --cold: #2f7fb8; --light: #b8950f; --chaos: #8a3f9e; --phys: #7a6a58;
-  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.05);
-  --radius: 10px; --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bg: #0d0b09; --bg-2: #15110d; --panel: #18130f; --panel-2: #211a14; --panel-3: #2a2119;
+  --text: #e3d9c6; --muted: #9d907b; --line: #3a2f22; --line-2: #5a4630;
+  --gold: #c8aa6e; --gold-2: #e7cf95; --accent: #c8aa6e; --accent-2: #e7cf95; --on-accent: #1a130b;
+  --good: #6cc28a; --bad: #e0675d; --warn: #e2b14a; --info: #7fa9de;
+  --r-normal: #c8c8c8; --r-magic: #8888ff; --r-rare: #ffff77; --r-unique: #af6025; --r-gem: #1ba29b;
+  --mod: #8888ff; --implicit: #8888ff; --fractured: #a29162; --crafted: #b4b4ff; --desecrated: #c58adf; --rune: #b7c2c9;
+  --g-str: #d1554f; --g-dex: #5fbf5a; --g-int: #6b8fe6;
+  --fire: #e2622f; --cold: #5aa7e0; --light: #e8c84a; --chaos: #b462d0; --phys: #b9a38a;
+  --shadow: 0 1px 0 rgba(255,220,160,.04) inset, 0 8px 24px rgba(0,0,0,.45);
+  --radius: 4px; --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --sans: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #14120f; --panel: #1d1a16; --panel-2: #26221c; --text: #ece5d8; --muted: #a39886; --line: #3a342b;
-    --accent: #e08a3c; --accent-2: #f0a35a; --good: #5cbf7c; --bad: #e0605a; --warn: #e0b040; --info: #6fa3dc;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #14120f; --panel: #1d1a16; --panel-2: #26221c; --text: #ece5d8; --muted: #a39886; --line: #3a342b;
-  --accent: #e08a3c; --accent-2: #f0a35a; --good: #5cbf7c; --bad: #e0605a; --warn: #e0b040; --info: #6fa3dc;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+:root[data-theme="light"] {
+  --bg: #e9e1d0; --bg-2: #e2d8c3; --panel: #f6f0e3; --panel-2: #ece3d0; --panel-3: #e2d6bd;
+  --text: #2a2116; --muted: #6e6150; --line: #cdbd9f; --line-2: #a98e62;
+  --gold: #8a6421; --gold-2: #6e4e14; --accent: #8a6421; --accent-2: #6e4e14; --on-accent: #fff8ea;
+  --good: #2d7a49; --bad: #b2362c; --warn: #9a6b0b; --info: #33649c;
+  --r-normal: #4b4b4b; --r-magic: #4141b8; --r-rare: #8a7a00; --r-unique: #9c4f15; --r-gem: #137a74;
+  --mod: #3c3cb0; --implicit: #3c3cb0; --fractured: #7c6a2c; --crafted: #5656c8; --desecrated: #8a3fa8; --rune: #546670;
+  --shadow: 0 1px 2px rgba(60,40,10,.12), 0 6px 18px rgba(60,40,10,.10);
+  color-scheme: light;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 var(--sans); }
-a { color: var(--accent); }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 16px/1.45 var(--sans);
+  background-image: radial-gradient(1200px 500px at 50% -120px, color-mix(in srgb, var(--gold) 9%, transparent), transparent 70%),
+                    radial-gradient(900px 600px at 100% 110%, color-mix(in srgb, var(--r-unique) 7%, transparent), transparent 70%);
+  background-attachment: fixed; }
+a { color: var(--gold-2); }
+:focus-visible { outline: 2px solid var(--gold-2); outline-offset: 2px; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button {
-  background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: .5em .9em; cursor: pointer;
-  font-weight: 600; white-space: nowrap;
+  font-family: var(--display); font-weight: 600; letter-spacing: .4px; font-size: 14px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 92%, #fff 8%), color-mix(in srgb, var(--gold) 75%, #000 25%));
+  color: var(--on-accent); border: 1px solid var(--gold-2); border-radius: 3px; padding: .45em 1em; cursor: pointer; white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 2px 6px rgba(0,0,0,.35);
 }
-button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
-button:disabled { opacity: .5; cursor: progress; }
+button:hover { filter: brightness(1.08); }
+button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); box-shadow: none; }
+button.ghost:hover { border-color: var(--gold); color: var(--gold-2); }
+button:disabled { opacity: .55; cursor: progress; }
+button.small { padding: .2em .6em; font-size: 12.5px; }
+button.ex, button.small.ghost { font-family: var(--sans); letter-spacing: 0; font-size: 13.5px; }
 textarea, input[type=text], select {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .5em .6em; width: 100%;
+  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 3px; padding: .45em .6em; width: 100%;
 }
 textarea { font-family: var(--mono); font-size: 12px; min-height: 90px; resize: vertical; }
+select option { background: var(--panel); }
+h1, h2, h3, h4 { text-wrap: balance; }
+
+/* character bar */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg-2); }
 header {
-  position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line);
-  padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: linear-gradient(180deg, var(--bg-2), color-mix(in srgb, var(--bg-2) 92%, transparent));
+  border-bottom: 1px solid var(--line-2); box-shadow: 0 1px 0 color-mix(in srgb, var(--gold) 25%, transparent);
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap; backdrop-filter: blur(6px);
 }
-header h1 { font-size: 17px; margin: 0; letter-spacing: .3px; }
-header h1 span { color: var(--accent); }
-.badge { display: inline-flex; gap: 6px; align-items: center; background: var(--panel-2); border-radius: 999px;
-  padding: 3px 10px; font-size: 13px; color: var(--muted); }
-.badge b { color: var(--text); }
+header h1 { font-family: var(--display); font-size: 18px; margin: 0; letter-spacing: 1px; color: var(--gold); font-weight: 700; }
+header h1 span { color: var(--r-unique); }
+.badge { display: inline-flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.badge b { color: var(--text); font-variant-numeric: tabular-nums; }
+.badge .asc { font-family: var(--display); color: var(--gold-2); font-weight: 600; }
+.badge .stat { border-left: 1px solid var(--line-2); padding-left: 10px; }
 .spacer { flex: 1; }
-main { max-width: 1180px; margin: 0 auto; padding: 16px; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
-  padding: 14px 16px; margin-bottom: 14px; }
-.panel h2 { font-size: 15px; margin: 0 0 10px; }
-.panel h3 { font-size: 14px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; }
+main { max-width: 1220px; margin: 0 auto; padding-block: 16px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* panels: dark stash frames with a thin gold inner line */
+.panel { position: relative; background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 85%, var(--bg)));
+  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: var(--shadow), inset 0 0 0 1px color-mix(in srgb, var(--gold) 10%, transparent);
+  padding: 14px 16px; margin-bottom: 14px; min-width: 0; }
+.panel h2 { font-family: var(--display); font-size: 16px; letter-spacing: .6px; margin: 0 0 10px; color: var(--gold); font-weight: 600;
+  display: flex; align-items: center; gap: 10px; }
+.panel h2::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+.panel h3 { font-family: var(--display); font-size: 13.5px; letter-spacing: .5px; margin: 16px 0 6px; color: var(--gold-2); font-weight: 600; }
+details.panel > summary { cursor: pointer; list-style: none; }
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary b { font-family: var(--display); color: var(--gold); letter-spacing: .5px; }
+details.panel > summary::before { content: "▸"; color: var(--gold); margin-right: 6px; display: inline-block; transition: transform .15s; }
+details.panel[open] > summary::before { transform: rotate(90deg); }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; }
-.goals label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; }
-.goals input { width: 100%; accent-color: var(--accent); }
-nav.tabs { display: flex; gap: 4px; overflow-x: auto; margin: 4px 0 14px; scrollbar-width: thin; }
-nav.tabs button { background: transparent; color: var(--muted); border: 1px solid transparent; font-weight: 600; }
-nav.tabs button.on { background: var(--panel); color: var(--text); border-color: var(--line); box-shadow: var(--shadow); }
+.goals label { font-size: 13.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+.goals label b { color: var(--gold-2); }
+.goals input[type=range] { width: 100%; accent-color: var(--gold); }
+
+/* tabs */
+nav.tabs { display: flex; gap: 2px; overflow-x: auto; margin: 4px 0 14px; scrollbar-width: thin; border-bottom: 1px solid var(--line-2); }
+nav.tabs button { background: transparent; color: var(--muted); border: 1px solid transparent; border-bottom: 0; box-shadow: none;
+  border-radius: 3px 3px 0 0; font-size: 14.5px; padding: .5em 1.05em; }
+nav.tabs button:hover { color: var(--gold-2); filter: none; }
+nav.tabs button.on { background: linear-gradient(180deg, var(--panel-3), var(--panel)); color: var(--gold-2); border-color: var(--line-2);
+  box-shadow: inset 0 2px 0 var(--gold); }
+
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
-.tile { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; }
-.tile .k { font-size: 12px; color: var(--muted); }
-.tile .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.gauge { display: grid; grid-template-columns: 90px 1fr 60px; gap: 8px; align-items: center; margin: 5px 0; font-size: 13px; }
-.bar { height: 10px; background: var(--panel-2); border-radius: 99px; overflow: hidden; position: relative; }
-.bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; }
+.tile { background: var(--panel-2); border: 1px solid var(--line); border-radius: 3px; padding: 10px 12px; }
+.tile .k { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+.tile .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.gauge { display: grid; grid-template-columns: 90px 1fr 60px; gap: 8px; align-items: center; margin: 5px 0; font-size: 13.5px; }
+.bar { height: 10px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; position: relative; }
+.bar > i { position: absolute; inset: 0 auto 0 0; }
 .bar .cap { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .5; }
-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+th { color: var(--gold); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .6px; font-family: var(--sans); }
+tr:hover td { background: color-mix(in srgb, var(--gold) 4%, transparent); }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tablewrap { overflow-x: auto; }
 .pos { color: var(--good); } .neg { color: var(--bad); }
-.finding { border: 1px solid var(--line); border-left: 4px solid var(--info); border-radius: 8px; padding: 10px 12px; margin: 8px 0;
-  background: var(--panel); }
+.finding { border: 1px solid var(--line); border-left: 3px solid var(--info); border-radius: 3px; padding: 10px 12px; margin: 8px 0;
+  background: var(--panel-2); }
 .finding.bad { border-left-color: var(--bad); } .finding.warn { border-left-color: var(--warn); }
-.finding h4 { margin: 0 0 4px; font-size: 14.5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.finding p { margin: 3px 0; font-size: 13.5px; }
-.finding ul { margin: 4px 0 0 18px; padding: 0; font-size: 13.5px; }
-.pill { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 1px 7px; border-radius: 99px;
-  background: var(--panel-2); color: var(--muted); }
+.finding h4 { margin: 0 0 4px; font-size: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.finding p { margin: 3px 0; font-size: 14px; }
+.finding ul { margin: 4px 0 0 18px; padding: 0; font-size: 14px; }
+.pill { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: 1px 7px; border-radius: 2px;
+  background: var(--bg-2); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
 .pill.sure { color: var(--good); } .pill.likely { color: var(--warn); } .pill.check { color: var(--info); }
+.pill.fractured { color: var(--fractured); } .pill.desecrated { color: var(--desecrated); } .pill.crafted { color: var(--crafted); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { background: var(--panel-2); border-radius: 99px; padding: 2px 10px; font-size: 12.5px; }
-.chip.warn { background: color-mix(in srgb, var(--warn) 18%, var(--panel)); }
+.chip { background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; padding: 2px 9px; font-size: 13px; }
+.chip.warn { border-color: var(--warn); }
 .chip.dead { text-decoration: line-through; color: var(--bad); }
-details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; background: var(--panel-2); padding: 8px; border-radius: 8px; margin: 6px 0; }
-.muted { color: var(--muted); } .small { font-size: 12.5px; }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
-.slotlist button { margin: 0 6px 6px 0; }
-.eqgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
-.eqcard { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; background: var(--panel-2); min-width: 0; }
-.eqcard:hover, .eqcard.on { border-color: var(--accent-2); }
-.eqcard .nm { font-weight: 700; overflow-wrap: anywhere; }
-.eqcard.UNIQUE .nm { color: #c06a22; } .eqcard.RARE .nm { color: #b8960c; } .eqcard.MAGIC .nm { color: #4f74b8; }
-.eqcard ul { margin: 4px 0 0; padding-left: 16px; } .eqcard li { overflow-wrap: anywhere; }
-.eqcard .imp { color: var(--info); }
+details summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }
+pre { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; background: var(--bg-2); border: 1px solid var(--line); padding: 8px; border-radius: 3px; margin: 6px 0; }
+code { font-family: var(--mono); font-size: .9em; background: var(--bg-2); padding: 0 4px; border-radius: 2px; }
+.muted { color: var(--muted); } .small { font-size: 13px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 14px; }
+.grid2 > * { min-width: 0; }
+
+/* in-game item tooltip */
+.tip { background: rgba(8, 6, 5, .96); border: 1px solid var(--tc, var(--r-normal)); text-align: center; font-size: 14px; min-width: 0;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5); color: #b7b0a3; }
+:root[data-theme="light"] .tip { background: #1b1612; }
+.tip .th { position: relative; padding: 6px 10px 5px; background: linear-gradient(180deg, color-mix(in srgb, var(--tc) 30%, #000), color-mix(in srgb, var(--tc) 12%, #000));
+  border-bottom: 1px solid color-mix(in srgb, var(--tc) 60%, #000); color: var(--tc); font-family: var(--display); font-weight: 600; line-height: 1.2; }
+.tip .th .nm { font-size: 15.5px; overflow-wrap: anywhere; } .tip .th .bs { font-size: 13.5px; }
+.tip .tb { padding: 6px 10px 8px; display: grid; gap: 1px; }
+.tip .ln { color: #8888ff; overflow-wrap: anywhere; }
+.tip .ln.imp { color: #8888ff; } .tip .ln.rune { color: #b7c2c9; } .tip .ln.fractured { color: #a29162; } .tip .ln.crafted { color: #b4b4ff; }
+.tip .ln.desecrated { color: #c58adf; } .tip .ln.cor { color: #d20000; } .tip .ln.uniq { color: #af6025; }
+.tip .sep { height: 1px; margin: 5px 18%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--tc) 70%, #000), transparent); }
+.tip.NORMAL { --tc: #c8c8c8; } .tip.MAGIC { --tc: #8888ff; } .tip.RARE { --tc: #ffff77; } .tip.UNIQUE { --tc: #af6025; } .tip.GEM { --tc: #1ba29b; }
+.tip .ico { width: 56px; height: 56px; object-fit: contain; margin: 6px auto 0; display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,.8)); }
+
+/* equipment */
+.eqgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 10px; align-items: start; }
+.eqcard { cursor: pointer; text-align: left; position: relative; }
+.eqcard .slotname { position: absolute; top: 4px; left: 6px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; color: #8a8070; font-family: var(--sans); }
+.eqcard:hover, .eqcard.on { outline: 1px solid var(--gold-2); outline-offset: 2px; }
+.eqcard .tb { font-size: 13px; text-align: center; }
+.ic { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
+.ic.lg { width: 44px; height: 44px; }
 .verdict { font-weight: 700; } .verdict.warto { color: var(--good); } .verdict.loteria, .verdict.ryzykowne, .verdict.mały { color: var(--warn); }
 .verdict.nie, .verdict.raczej { color: var(--bad); }
-.craftgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
-.craftgrid > div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-tr.first td { background: color-mix(in srgb, var(--good) 12%, transparent); }
-.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
-  padding: 8px 14px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
-.toast.on { opacity: .95; }
-.busy { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+.craftgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 8px; }
+.craftgrid > div { border: 1px solid var(--line); background: var(--panel-2); border-radius: 3px; padding: 8px 10px; }
+.craftgrid b { font-family: var(--display); color: var(--gold-2); font-weight: 600; }
+tr.first td { background: color-mix(in srgb, var(--good) 13%, transparent); }
+
+/* craft recipe */
+.recipe { display: grid; gap: 0; counter-reset: st; }
+.recipe .st { display: grid; grid-template-columns: 30px 48px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.recipe .st::before { counter-increment: st; content: counter(st); font-family: var(--display); color: var(--gold); font-weight: 700; font-size: 17px; text-align: center; }
+.recipe .st.tip-step::before { content: "?"; color: var(--muted); }
+.recipe .st img { width: 44px; height: 44px; object-fit: contain; }
+.recipe .st .t { font-family: var(--display); color: var(--gold-2); font-weight: 600; }
+.recipe .st .price { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13.5px; white-space: nowrap; }
+.odds { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.odds .o { background: var(--bg-2); border: 1px solid var(--line); padding: 6px 12px; border-radius: 3px; text-align: center; }
+.odds .o b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; color: var(--gold-2); }
+
+/* gems / sockets */
+.groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 10px; }
+.group { border: 1px solid var(--line); background: var(--panel-2); border-radius: 3px; padding: 10px 12px; min-width: 0; }
+.group.main { border-color: var(--gold); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 25%, transparent); }
+.group .gh { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 6px; }
+.group .gh b { font-family: var(--display); color: var(--gold-2); }
+.gem { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.gem:first-of-type { border-top: 0; }
+.gem img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: var(--bg-2); border: 2px solid var(--gc, var(--r-gem)); }
+.gem.str { --gc: var(--g-str); } .gem.dex { --gc: var(--g-dex); } .gem.int { --gc: var(--g-int); }
+.gem .gn { font-weight: 700; color: var(--text); } .gem.sup .gn { font-weight: 500; }
+.gem.off .gn { text-decoration: line-through; color: var(--bad); }
+.gem .lv { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+.gemtext { grid-column: 1 / -1; font-size: 13.5px; color: var(--muted); padding: 2px 0 6px 42px; }
+.gemtext .stats { color: #8888ff; } :root[data-theme="light"] .gemtext .stats { color: var(--mod); }
+.gemtext .why { color: var(--bad); }
+
+.toast { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+  background: var(--panel-3); color: var(--text); border: 1px solid var(--gold); max-width: min(560px, calc(100% - 32px));
+  padding: 8px 14px; border-radius: 3px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
+.toast.on { opacity: .97; }
+.busy { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line-2); border-top-color: var(--gold-2);
   border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.step { display: flex; gap: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; background: var(--panel); }
-.stepn { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
-button.small { padding: .25em .6em; font-size: 12.5px; }
-.treebox { position: relative; height: 520px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); touch-action: none; }
+@media (prefers-reduced-motion: reduce) { .busy { animation-duration: 3s; } * { transition: none !important; } }
+.step { display: flex; gap: 12px; border: 1px solid var(--line); border-radius: 3px; padding: 10px 12px; margin: 8px 0; background: var(--panel-2); }
+.stepn { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--gold); color: var(--gold-2); display: grid; place-items: center;
+  font-weight: 700; font-family: var(--display); }
+.treebox { position: relative; height: 560px; border-radius: 3px; overflow: hidden; border: 1px solid var(--line-2); touch-action: none; background: #070605; }
 .treebox canvas { display: block; cursor: grab; }
-.treetip { position: absolute; display: none; max-width: 250px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12.5px; box-shadow: var(--shadow); pointer-events: none; }
-.market { border-left: 3px solid var(--info); padding: 6px 10px; margin-top: 6px; background: var(--panel-2); border-radius: 6px; }
-.empty { text-align: center; padding: 30px 10px; color: var(--muted); }
+.treetip { position: absolute; display: none; max-width: 260px; background: rgba(8,6,5,.96); color: #d8cdb8; border: 1px solid var(--gold); border-radius: 2px; padding: 6px 8px; font-size: 13px; box-shadow: var(--shadow); pointer-events: none; }
+.market { border-left: 3px solid var(--info); padding: 6px 10px; margin-top: 6px; background: var(--bg-2); border-radius: 2px; }
+.empty { text-align: center; padding: 34px 10px; color: var(--muted); }
+.empty b { font-family: var(--display); color: var(--gold); font-size: 18px; display: block; margin-bottom: 6px; }
+.aiAnswer p { margin: 6px 0; max-width: 75ch; } .aiAnswer h3 { color: var(--gold-2); }
 @media (max-width: 600px) {
-  main { padding: 10px; } header { padding: 8px 10px; } .gauge { grid-template-columns: 70px 1fr 48px; }
-  .tile .v { font-size: 17px; } th, td { padding: 5px 6px; }
+  .gauge { grid-template-columns: 70px 1fr 48px; }
+  .tile .v { font-size: 18px; } th, td { padding: 5px 6px; }
+  .recipe .st { grid-template-columns: 24px 40px 1fr; } .recipe .st .price { grid-column: 3; }
+  header h1 { font-size: 16px; }
 }
 </style>
 </head>
@@ -134,7 +239,7 @@ button.small { padding: .25em .6em; font-size: 12.5px; }
   <button class="ghost" id="btnSync" title="Pobierz postać jeszcze raz z poe.ninja" style="display:none">⟳ Synchronizuj</button>
   <button class="ghost" id="btnExport" title="Skopiuj kod buildu do PoB">Kod PoB</button>
   <button class="ghost" id="btnReset" title="Cofnij zastosowane zmiany">Reset</button>
-  <button class="ghost" id="btnTheme" title="Motyw">◐</button>
+  <button class="ghost" id="btnTheme" title="Jasny / ciemny motyw" aria-label="Zmień motyw">◐</button>
 </header>
 <main>
   <details class="panel" id="loadPanel" open>
@@ -158,24 +263,24 @@ button.small { padding: .25em .6em; font-size: 12.5px; }
       <div><label>Przetrwanie <b id="gSurviveV">2</b></label><input id="gSurvive" type="range" min="0" max="3" step="0.5" value="2"></div>
       <div><label>Prędkość ruchu <b id="gSpeedV">1</b></label><input id="gSpeed" type="range" min="0" max="3" step="0.5" value="1"></div>
       <div><label>Mana <b id="gManaV">1</b></label><input id="gMana" type="range" min="0" max="3" step="0.5" value="1"></div>
-      <div><label>Budżet (divine) <span class="muted">puste = bez limitu</span></label><input id="gBudget" type="text" inputmode="decimal" placeholder="np. 5"></div>
+      <div><label for="gBudget">Budżet (divine) <span class="muted">puste = bez limitu</span></label><input id="gBudget" type="text" inputmode="decimal" placeholder="np. 5"></div>
     </div>
   </section>
 
   <nav class="tabs" id="tabs">
     <button data-tab="assistant" class="on">Asystent</button>
+    <button data-tab="gear">Gear</button>
+    <button data-tab="skills">Skille</button>
     <button data-tab="checkup">Problemy</button>
     <button data-tab="overview">Przegląd</button>
-    <button data-tab="skills">Skille</button>
-    <button data-tab="gear">Gear</button>
     <button data-tab="tree">Drzewko</button>
-    <button data-tab="combo">Synergie</button>
     <button data-tab="plan">Plan</button>
+    <button data-tab="combo">Synergie</button>
     <button data-tab="search">Szukaj</button>
   </nav>
-  <div id="view"><div class="panel empty">Wklej kod buildu, żeby zacząć.</div></div>
+  <div id="view"><div class="panel empty"><b>Witaj, wygnańcze</b>Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.</div></div>
 </main>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -356,14 +461,33 @@ const views = {
   },
 
   async skills(el) {
-    const o = state.overview || (state.overview = await api("/api/overview"));
-    el.innerHTML = `<div class="panel"><h2>DPS każdego skilla</h2><div class="tablewrap"><table><tr><th>Skill</th><th class="n">Hit DPS</th><th class="n">DoT</th><th class="n">Minion</th><th class="n">Ataki/s</th></tr>${
+    const [o, sg] = await Promise.all([state.overview ? state.overview : api("/api/overview"), api("/api/skill_groups")]);
+    state.overview = o;
+    const attr = g => { const r = g.req || {}; const top = Object.entries(r).sort((a, b) => b[1] - a[1])[0]; return top ? top[0] : ""; };
+    const gemRow = (g, gi, i) => `<div class="gem ${attr(g)} ${g.support ? "sup" : ""} ${g.applies === false || g.enabled === false ? "off" : ""}" data-gem="${gi}:${i}">
+        <img loading="lazy" alt="" src="/api/icon?${q({name: g.name, kind: g.support ? "item" : "skill"})}" onerror="this.style.visibility='hidden'">
+        <span><span class="gn">${esc(g.name)}</span>${g.tags ? `<div class="small muted">${esc(g.tags)}</div>` : ""}</span>
+        <span class="lv">${g.level ?? ""}${g.quality ? ` / ${g.quality}%` : ""}</span>
+        <div class="gemtext" hidden>${g.why_not ? `<div class="why">Nie działa: ${esc(g.why_not)}</div>` : ""}${g.description ? `<p>${esc(g.description)}</p>` : ""}
+          ${g.stats.length ? `<div class="stats">${g.stats.map(esc).join("<br>")}</div>` : ""}
+          <div class="small">${Object.entries(g.req).map(([k, v]) => `${k.toUpperCase()} ${v}`).join(" · ")}${g.max_level ? ` · max lvl ${g.max_level}` : ""}
+          · <a href="https://poe2db.tw/us/${encodeURIComponent(g.name.replace(/'/g, "").replace(/\s+/g, "_"))}" target="_blank" rel="noopener">poe2db</a></div></div>
+      </div>`;
+    el.innerHTML = `<div class="panel"><h2>Skille i supporty</h2>
+      <p class="muted small">Kliknij gem, żeby zobaczyć jego opis z gry. Kolor obwódki = atrybut (siła, zręczność, inteligencja). Przekreślone = nie działa na tym skillu (z powodem).</p>
+      <div class="groups">${sg.groups.map((g, gi) => `<div class="group ${g.main ? "main" : ""}">
+        <div class="gh"><b>${esc(g.skills.join(", ") || g.label || "Grupa " + g.index)}</b>${g.main ? '<span class="pill sure">główny</span>' : ""}
+          ${g.dps ? `<span class="small muted">DPS ${fmt(g.dps)}</span>` : ""}<span class="small muted">${esc(g.slot || "")}</span></div>
+        ${g.gems.map((x, i) => gemRow(x, gi, i)).join("")}</div>`).join("")}</div></div>
+    <details class="panel"><summary><b>DPS każdego skilla</b></summary><div class="tablewrap" style="margin-top:8px"><table><tr><th>Skill</th><th class="n">Hit DPS</th><th class="n">DoT</th><th class="n">Minion</th><th class="n">Ataki/s</th></tr>${
       o.skill_dps.map(d => `<tr><td>${esc(d.name)} <span class="muted small">gr. ${d.group}</span></td><td class="n">${fmt(d.TotalDPS)}</td><td class="n">${fmt(d.TotalDotDPS)}</td><td class="n">${fmt(d.MinionDPS)}</td><td class="n">${fmt(d.Speed, 2)}</td></tr>`).join("")
-    }</table></div></div>
-    <div class="panel"><h2>Grupy gemów</h2>${o.skill_groups.filter(g => g.gems.length).map(g => `<div style="margin:8px 0"><b>${g.group}.</b> ${g.main ? '<span class="pill sure">główny</span> ' : ""}${esc(g.skills.join(", ") || "—")} <span class="muted small">${esc(g.slot || "")}</span>
-      <div class="chips" style="margin-top:4px">${g.gems.map(x => `<span class="chip ${/nie|cannot/.test(x) ? "dead" : ""}">${esc(x)}</span>`).join("")}</div></div>`).join("")}</div>
+    }</table></div></details>
     <div class="panel"><h2>Optymalizator supportów (główny skill)</h2><p class="muted small">Każdy pasujący support w każdym slocie, pełne przeliczenia PoB. Trwa ~25 s.</p>
       <button id="btnSup">Szukaj najlepszych supportów</button><div id="supOut"></div></div>`;
+    el.querySelectorAll(".gem").forEach(row => row.onclick = ev => {
+      if (ev.target.closest("a")) return;
+      const t = row.querySelector(".gemtext"); t.hidden = !t.hidden;
+    });
     $("#btnSup").onclick = e => busy(e.target, async () => {
       const g = goals();
       const r = await api("/api/optimize_supports?" + q({damage: g.damage, survive: g.survive, speed: g.speed, budget: g.budget}));
@@ -384,22 +508,23 @@ const views = {
     const order = ["Weapon 1", "Weapon 2", "Weapon 1 Swap", "Weapon 2 Swap", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt"];
     const rank = s => { const i = order.indexOf(s); return i < 0 ? 99 : i; };
     const items = eq.items.slice().sort((a, b) => rank(a.slot) - rank(b.slot));
-    const card = i => `<div class="eqcard ${esc((i.rarity || "").toUpperCase())}" data-slot="${esc(i.slot)}">
-      <div class="small muted">${esc(i.slot)}</div><div class="nm">${esc(i.name.split(",")[0])}</div><div class="small muted">${esc(i.base || i.name.split(", ")[1] || "")}</div>
-      <ul class="small">${i.implicits.filter(m => !m.flags.includes("rune")).map(m => `<li class="imp">${esc(m.text)}</li>`).join("")}${i.mods.map(m => `<li>${esc(m.text)}${m.flags.length ? ` <span class="pill check">${esc(m.flags.join(", "))}</span>` : ""}</li>`).join("")}</ul></div>`;
-    el.innerHTML = `<div class="panel"><h2>Ekwipunek (lvl ${esc(eq.level)})</h2>
-      <p class="muted small">Kliknij item: ile daje każdy mod, czy opłaca się exalt / chaos / annul / fracture, lepsze mody, porównanie z innym itemem i szukanie na trade.</p>
-      <div class="eqgrid">${items.filter(i => !/^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div>
-      <details style="margin-top:8px"><summary class="small muted">Flaski i charmy</summary><div class="eqgrid" style="margin-top:8px">${items.filter(i => /^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div></details></div>
-      <div class="panel"><h2>Co wymienić najpierw</h2>
-      <p class="muted small">Dla każdego slotu: co item daje teraz i ile zyskasz na realnym rare na Twój level: najlepsza baza, którą możesz założyć, 3 prefiksy + 3 suffiksy ze środkowych tierów, dobrane pod build. Bez itemów za mirrora. ~5 s.</p>
+    const card = i => `<div class="eqcard" data-slot="${esc(i.slot)}" tabindex="0" role="button" aria-label="${esc(i.slot)}: ${esc(i.name)}">${itemTip(i, true)}</div>`;
+    el.innerHTML = `<div class="panel"><h2>Co wymienić najpierw</h2>
+      <p class="muted small">Każdy slot porównany z realnym rare na Twój level (lvl ${esc(eq.level)}): najlepsza baza, którą możesz założyć, 3 prefiksy + 3 suffiksy ze środkowych tierów, dobrane pod build. Przy każdym gotowy przepis na craft. ~5 s.</p>
       <button id="btnAudit">Sprawdź cały gear</button><div id="auditOut"></div></div>
+      <div class="panel"><h2>Ekwipunek</h2>
+      <p class="muted small">Kliknij item: ile daje każdy mod, czy opłaca się exalt / chaos / annul / fracture, przepis na lepszy item, porównanie i trade.</p>
+      <div class="eqgrid">${items.filter(i => !/^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div>
+      <details style="margin-top:10px"><summary>Flaski i charmy</summary><div class="eqgrid" style="margin-top:8px">${items.filter(i => /^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div></details></div>
       <div id="slotOut"></div>
       <div class="panel"><h2>Ile wart jest każdy stat</h2><p class="muted small">Jedna linia dodana do biżuterii, policzona w PoB. Szukaj na gearze statów z góry listy.</p><button id="btnSW">Policz wagi statów</button><div id="swOut"></div></div>
       <div class="panel"><h2>Unikat, który Ci się podoba</h2><div class="row"><input type="text" id="uName" placeholder="np. Headhunter" style="flex:1;min-width:180px"><button id="btnTryU">Sprawdź</button></div><div id="tryUOut"></div></div>`;
-    el.querySelectorAll(".eqcard").forEach(b => b.onclick = () => {
-      el.querySelectorAll(".eqcard").forEach(x => x.classList.toggle("on", x === b));
-      slotView(b.dataset.slot); $("#slotOut").scrollIntoView({behavior: "smooth", block: "start"});
+    el.querySelectorAll(".eqcard").forEach(b => {
+      b.onclick = () => {
+        el.querySelectorAll(".eqcard").forEach(x => x.classList.toggle("on", x === b));
+        slotView(b.dataset.slot); $("#slotOut").scrollIntoView({behavior: "smooth", block: "start"});
+      };
+      b.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); b.click(); } };
     });
     $("#btnAudit").onclick = e => busy(e.target, async () => {
       const g = goals();
@@ -655,6 +780,41 @@ function treeView(box, data) {
   };
 }
 
+// ---------------------------------------------------------------- items drawn like in-game tooltips
+function iconUrl(name, base, rarity) {  // uniques have their own art; rares / magic use their base
+  const own = (rarity || "").toUpperCase() === "UNIQUE" ? name : base;
+  return "/api/icon?" + q({name: own || base || name, fallback: base && base !== own ? base : null});
+}
+function itemTip(i, withSlot) {
+  const rarity = (i.rarity || "RARE").toUpperCase();
+  const title = (i.name || "").split(",")[0], base = i.base || (i.name || "").split(", ")[1] || "";
+  const line = m => { const f = m.flags || []; const cls = f.includes("rune") || f.includes("enchant") ? "rune" : f.find(x => ["fractured", "crafted", "desecrated"].includes(x)) || "";
+    return `<div class="ln ${cls}${m.text === "Corrupted" ? " cor" : ""}">${esc(m.text)}</div>`; };
+  const imps = i.implicits || [], mods = i.mods || [];
+  return `<div class="tip ${rarity}">${withSlot ? `<span class="slotname">${esc(i.slot)}</span>` : ""}
+    <div class="th"><div class="nm">${esc(title)}</div>${base && base !== title ? `<div class="bs">${esc(base)}</div>` : ""}</div>
+    <img class="ico" loading="lazy" alt="" src="${iconUrl(title, base, rarity)}" onerror="this.remove()">
+    <div class="tb">${imps.map(line).join("")}${imps.length && mods.length ? '<div class="sep"></div>' : ""}${mods.map(line).join("")}</div></div>`;
+}
+function recipeView(r) {
+  const t = r.target, o = r.odds;
+  const tipItem = {name: "Twój nowy item", base: t.base, rarity: "RARE", implicits: (t.implicit || []).map(text => ({text, flags: []})),
+    mods: t.mods.map(m => ({text: m.text, flags: m.text === r.essence_mod ? ["crafted"] : []}))};
+  const step = s => `<div class="st ${s.kind === "tip" ? "tip-step" : ""}">
+      <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="this.style.visibility='hidden'">
+      <div><div class="t">${esc(s.title)}</div><div class="small muted">${esc(s.detail)}</div></div>
+      <div class="price">${s.price ? esc(s.price.text) + (s.count > 1 ? ` × ${s.count}` : "") : s.kind === "base" ? "cena nieznana" : "nie ma na poe.ninja"}</div></div>`;
+  return `<div class="grid2" style="align-items:start">
+    <div>${itemTip(tipItem)}<p class="small" style="margin-top:8px">Zysk vs obecny: <b class="${t.score > 0.5 ? "pos" : "muted"}">${gainCell(t)}</b>
+      <br><span class="muted">Mod z esencji (pewny) wyróżniony innym kolorem. Wartości to środkowe tiery.</span></p></div>
+    <div><div class="recipe">${r.steps.map(step).join("")}</div>
+      <div class="odds">
+        ${Object.entries(o.at_least_pct).map(([k, v]) => `<div class="o"><b>${v}%</b><span class="small muted">≥ ${k} z ${o.wanted_mods} modów celu</span></div>`).join("")}
+        <div class="o"><b>${r.cost_divine ? fmt(r.cost_divine, 2) + " div" : "?"}</b><span class="small muted">koszt próby${r.cost_complete ? "" : " (część cen nieznana)"}</span></div>
+      </div>
+      <p class="muted small">Szanse z symulacji przy równych wagach modów (prawdziwych wag nie ma w danych PoB), więc to szacunek. Trafienie = dobra rodzina moda, dowolny tier.</p></div></div>`;
+}
+
 function gainCell(x) {
   if (!x) return "–";
   const parts = [];
@@ -673,17 +833,21 @@ function renderAudit(r) {
       return `<tr class="${i === firstIdx ? "first" : ""}"><td>${esc(s.slot)}</td><td class="small">${esc(s.item.split(",")[0])}</td>
         <td class="small">${gainCell(s.item_value)}</td>
         <td class="small">${x.error ? `<span class="muted">${esc(x.error)}</span>` : x.score > 0.5 ? `<b class="pos">${gainCell(x)}</b>` : `<span class="muted">nie lepszy (${gainCell(x)})</span>`}</td>
-        <td>${x.mods ? `<button class="ghost small" data-audit="${i}">Pokaż</button>` : ""}</td></tr>
+        <td>${x.mods ? `<button class="ghost small" data-audit="${i}">Przepis</button>` : ""}</td></tr>
         <tr style="display:none" id="auditRow${i}"><td colspan="5"></td></tr>`; }).join("")}</table></div>
     <p class="muted small">${esc(r.note)}</p>`;
   document.querySelectorAll("[data-audit]").forEach(b => b.onclick = () => {
     const i = +b.dataset.audit, s = r.slots[i], x = s.realistic, row = $("#auditRow" + i);
     row.style.display = row.style.display ? "" : "none";
-    row.firstElementChild.innerHTML = `<div class="grid2"><div><b>${esc(x.base)}</b> <span class="muted small">(wymaga lvl ${esc(x.base_level ?? "?")}, item level ${x.item_level})</span>
-      <ul class="small">${x.implicit.map(t => `<li class="muted">${esc(t)}</li>`).join("")}${x.mods.map(m => `<li>${esc(m.type)}: <b>${esc(m.text)}</b></li>`).join("")}</ul>
-      ${x.kept_runes.length ? `<p class="muted small">Zostawiam Twoje runy: ${esc(x.kept_runes.join("; "))}</p>` : ""}</div>
-      <div><p class="small">Szukaj na trade itemu z najważniejszymi modami (min. ~80% wartości), każda oferta przeliczona w PoB:</p>
-      <button class="ghost" id="auditTrade${i}">Szukaj na trade</button><div id="auditTradeOut${i}"></div></div></div>`;
+    if (row.dataset.loaded) return;
+    row.dataset.loaded = "1";
+    row.firstElementChild.innerHTML = `<div id="auditRecipe${i}"><span class="busy"></span> Układam przepis na craft…</div>
+      <div class="row" style="margin-top:10px"><span class="small">Wolisz kupić? Szukaj na trade itemu z 3 najważniejszymi modami (min. ~80% wartości), każda oferta przeliczona w PoB:</span>
+      <button class="ghost" id="auditTrade${i}">Szukaj na trade</button></div><div id="auditTradeOut${i}"></div>`;
+    const g0 = goals();
+    api("/api/craft_plan?" + q({slot: s.slot, damage: g0.damage, survive: g0.survive}))
+      .then(r => { $("#auditRecipe" + i).innerHTML = recipeView(r); })
+      .catch(e => { $("#auditRecipe" + i).innerHTML = `<p class="muted">Przepis: ${esc(e.message)}</p>`; });
     $("#auditTrade" + i).onclick = e => busy(e.target, async () => {
       const g = goals();
       const m = await api("/api/search_items", {body: {slot: s.slot, mods: x.mods.slice(0, 3).flatMap(mm => mm.text.split(" / ")), budget: g.budget, damage: g.damage, survive: g.survive, speed: g.speed}});
@@ -728,7 +892,10 @@ async function slotView(slot) {
   try {
     const [item, up, uq, an] = await Promise.all([api("/api/item?" + q({slot})), api("/api/mod_upgrades?" + gq), api("/api/uniques?" + gq).catch(() => null),
       api("/api/item_analysis?" + gq).catch(e => ({error: e.message}))]);
-    out.innerHTML = (an.error ? `<div class="panel muted">Analiza itemu: ${esc(an.error)}</div>` : renderAnalysis(an)) + `<div class="panel"><h2>Ulepszenia i porównanie</h2><div class="grid2">
+    out.innerHTML = (an.error ? `<div class="panel muted">Analiza itemu: ${esc(an.error)}</div>` : renderAnalysis(an))
+      + `<div class="panel"><h2>Wycraftuj lepszy item</h2><p class="muted small">Realny rare na Twój level pod ten build i przepis krok po kroku: baza, esencja z pewnym modem, exalty, szanse i koszt jednej próby.</p>
+         <button id="btnRecipe">Pokaż przepis</button><div id="recipeOut" style="margin-top:10px"></div></div>`
+      + `<div class="panel"><h2>Ulepszenia i porównanie</h2><div class="grid2">
       <div><pre>${esc(item.raw.replace(/\{[^}]*\}/g, ""))}</pre>
         <h3>Sprawdź inny item (wklej z gry lub trade)</h3><textarea id="wiText" placeholder="Ctrl+C na itemie w grze i wklej tutaj"></textarea><button id="btnWI" style="margin-top:6px">Porównaj</button><div id="wiOut"></div></div>
       <div><h3>Lepsze mody na tym itemie</h3>${up.corrupted ? "<p>Item jest skorumpowany, nie da się go zmienić.</p>" :
@@ -739,6 +906,10 @@ async function slotView(slot) {
         <div class="row"><select id="mktWanted" style="flex:1"><option value="">(tylko zachowaj obecne mody)</option>${up.upgrades.map(u => `<option>${esc(u.with)}</option>`).join("")}</select><button class="ghost" id="btnMarket">Szukaj na rynku</button></div><div id="marketOut"></div>
         ${uq ? `<h3>Unikaty na ten slot</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td><td class="n small">${u.price ? esc(u.price.text) : "–"}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
       </div></div></div>`;
+    $("#btnRecipe").onclick = e => busy(e.target, async () => {
+      const r = await api("/api/craft_plan?" + gq);
+      $("#recipeOut").innerHTML = recipeView(r);
+    });
     $("#btnWI").onclick = e => busy(e.target, async () => {
       const r = await api("/api/whatif_item", {body: {slot, item_text: $("#wiText").value}});
       $("#wiOut").innerHTML = diffTable(r.changes) + notes(r.notes);
@@ -761,7 +932,7 @@ async function slotView(slot) {
 async function render() {
   const el = $("#view");
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
-  if (!state.loaded && state.tab !== "search") { el.innerHTML = `<div class="panel empty">Wklej kod buildu, żeby zacząć.</div>`; return; }
+  if (!state.loaded && state.tab !== "search") { el.innerHTML = `<div class="panel empty"><b>Witaj, wygnańcze</b>Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.</div>`; return; }
   el.innerHTML = `<div class="panel"><span class="busy"></span> Liczę w Path of Building…</div>`;
   try { await views[state.tab](el); } catch (e) { el.innerHTML = `<div class="panel"><b class="neg">Błąd:</b> ${esc(e.message)}</div>`; }
 }
@@ -782,7 +953,9 @@ async function refreshBadge() {
   if (s.source) $("#btnSync").title = `${s.source.account} / ${s.source.name} (${s.source.league}), poe.ninja: ${s.source.updated || "?"}`;
   if (s.loaded) {
     const m = s.summary;
-    $("#buildBadge").innerHTML = `<b>${esc(m.ascendancy || m.class)}</b> lvl ${m.level} · ${esc(m.main_skill)} · DPS <b>${fmt(m.CombinedDPS)}</b> · EHP <b>${fmt(m.TotalEHP)}</b>`;
+    $("#buildBadge").innerHTML = `<span class="asc">${esc(m.ascendancy || m.class)}</span><span>lvl <b>${m.level}</b></span>
+      <span class="stat">${esc(m.main_skill)}</span><span class="stat">DPS <b>${fmt(m.MainDPS || m.CombinedDPS)}</b></span><span class="stat">EHP <b>${fmt(m.TotalEHP)}</b></span>
+      <span class="stat">Życie <b>${fmt(m.Life)}</b> · ES <b>${fmt(m.EnergyShield)}</b></span>`;
   }
 }
 
@@ -821,8 +994,7 @@ $("#btnExport").onclick = e => busy(e.target, async () => {
 });
 $("#btnReset").onclick = e => busy(e.target, async () => { await api("/api/reset", {body: {}}); await refreshBadge(); render(); toast("Build jak po wczytaniu."); });
 $("#btnTheme").onclick = () => {
-  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  const next = cur === "dark" ? "light" : "dark";
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";  // dark is the default look
   document.documentElement.dataset.theme = next;
   try { localStorage.setItem("soe-theme", next); } catch {}
 };

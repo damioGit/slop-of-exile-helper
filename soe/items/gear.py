@@ -207,13 +207,14 @@ def realistic_item(session, slot: str, objective: Objective | None = None, level
         sc = obj.score(_w(session, real, _make_raw(cur_base, ilvl, lines, keep_head, keep_imp)), session.base)
         singles.append((sc - base_score, atype, grp, typical, lines))
     singles.sort(key=lambda s: s[0], reverse=True)
-    chosen, fams, counts = [], set(), {"Prefix": 0, "Suffix": 0}
+    chosen, fams, counts, gains = [], set(), {"Prefix": 0, "Suffix": 0}, {}
     for gain, atype, grp, mod, lines in singles:
         if counts[atype] >= MAX_AFFIX[atype] or family(grp) in fams:
             continue
         if not can_roll(mod, tags0 | added_tags([c[0] for c in chosen])):
             continue
         chosen.append((mod, lines, atype))
+        gains[mod["id"]] = gain
         fams.add(family(grp))
         counts[atype] += 1
     mod_lines = [ln for _, lines, _ in chosen for ln in lines]
@@ -232,8 +233,10 @@ def realistic_item(session, slot: str, objective: Objective | None = None, level
             best = (ex, b, raw, ok)
     ex, b, raw, ok = best
     return {"slot": real, "current": cur["name"], "base": b["name"], "base_level": (b.get("req") or {}).get("level") or 1,
-            "item_level": ilvl, "mods": [{"type": t, "text": " / ".join(lines)} for m, lines, t in chosen
-                                         if all(ln in ok for ln in lines)],
+            "item_level": ilvl,
+            "mods": [{"type": t, "text": " / ".join(lines), "id": m["id"], "group": m["grp"], "level": m["level"],
+                      "gain": round(gains.get(m["id"], 0), 2)}
+                     for m, lines, t in chosen if all(ln in ok for ln in lines)],
             "implicit": [resolve_ranges(x, "mid") for x in (b.get("implicit") or "").split("\n") if x.strip()],
             "kept_runes": [_clean(x) for x in keep_imp], **_short(ex), "item_text": raw}
 

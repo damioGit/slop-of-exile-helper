@@ -145,6 +145,15 @@ class Session:
         self.base = self.pob.summary()
         return self.base
 
+    _dps_cache: tuple | None = None
+
+    def skill_dps(self) -> list[dict]:
+        """pob.all_skill_dps (slow: every skill recalculated), cached until the build changes."""
+        key = (self.build_id, repr(sorted(self.base.items())))
+        if not self._dps_cache or self._dps_cache[0] != key:
+            self._dps_cache = (key, self.pob.all_skill_dps())
+        return self._dps_cache[1]
+
     def overview(self, with_all_skills: bool = True) -> dict:
         self._need_build()
         p = self.pob
@@ -160,7 +169,7 @@ class Session:
         if with_all_skills:
             res["skill_dps"] = [
                 {k: _r(v) for k, v in d.items() if v or k in ("group", "name")}
-                for d in p.all_skill_dps()
+                for d in self.skill_dps()
                 if d["TotalDPS"] or d["TotalDotDPS"] or d["MinionDPS"]
             ]
         res["items"] = [{"slot": i["slot"], "name": i["name"], "rarity": i["rarity"]} for i in p.items(active_only=True)]

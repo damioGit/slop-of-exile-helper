@@ -40,6 +40,28 @@ def test_realistic_item_respects_level(s):
     assert sum(m["type"] == "Prefix" for m in r["mods"]) <= 3 and sum(m["type"] == "Suffix" for m in r["mods"]) <= 3
 
 
+def test_craft_plan_steps_and_odds(s):
+    from soe.items.craftplan import craft_plan
+
+    r = craft_plan(s, "Ring 1", sims=500)
+    kinds = [st["kind"] for st in r["steps"]]
+    assert kinds[0] == "base" and "currency" in kinds
+    assert any("Exalted Orb" in st["title"] for st in r["steps"])
+    odds = r["odds"]
+    assert odds["random_mods"] >= 4 and 0 <= odds["at_least_pct"][1] <= 100
+    assert odds["at_least_pct"][1] >= odds["at_least_pct"][2]  # more hits are never more likely
+    if r["essence_mod"]:  # the essence step names the mod it guarantees
+        assert any(st["title"].startswith(("Lesser Essence", "Essence", "Greater Essence")) for st in r["steps"])
+    assert s.pob.summary() == s.base
+
+
+def test_icon_page_names():
+    from soe.web.icons import page_name
+
+    assert page_name("Dialla's Desire") == "Diallas_Desire"
+    assert page_name("Gold Ring") == "Gold_Ring"
+
+
 def test_gear_audit_sorted(s):
     g = gear_audit(s)
     scores = [(x["realistic"] or {}).get("score", -1e9) for x in g["slots"]]
