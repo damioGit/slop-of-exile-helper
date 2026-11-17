@@ -383,7 +383,7 @@ const views = {
 
   async tree(el) {
     el.innerHTML = `<div class="panel"><h2>Drzewko pasywne</h2>
-      <p class="muted small">Przeciągaj myszką, kółko = zoom. Pomarańczowe = wzięte, fioletowe = wzięte na drugi zestaw broni, niebieskie = podświetlona ścieżka. Najedź na pasywkę, żeby zobaczyć, co daje.</p>
+      <p class="muted small">Przeciągaj myszką, kółko = zoom. Złote, świecące = wzięte, fioletowe = wzięte na drugi zestaw broni, niebieskie = podświetlona ścieżka. Najedź na pasywkę, żeby zobaczyć, co daje.</p>
       <div id="treeBox" class="treebox"><canvas id="treeCanvas"></canvas><div id="treeTip" class="treetip"></div></div>
       <div id="treeInfo" class="small" style="margin-top:8px"></div></div>
       <div class="grid2">
@@ -698,10 +698,12 @@ function treeView(box, data) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const n of nodes) { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x); minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y); }
   let scale = 1, ox = 0, oy = 0;
-  const css = getComputedStyle(document.documentElement);
-  const col = v => css.getPropertyValue(v).trim();
+  // fixed colours: the tree always sits on a dark canvas, and taken nodes must stand out from the rest
+  const C = {bg: "#070605", line: "#2b2620", node: "#4d463d", taken: "#ffcf5a", takenLine: "#e0a83a",
+             set2: "#c58adf", path: "#5fb8ff", target: "#ffffff"};
   function fit() {
     const w = box.clientWidth, h = box.clientHeight, dpr = devicePixelRatio || 1;
+    if (!w || !h) return false;
     canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.width = w + "px"; canvas.style.height = h + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     // start zoomed on the allocated part of the tree
@@ -711,31 +713,41 @@ function treeView(box, data) {
     for (const n of src) { x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
     scale = Math.min(w / (x1 - x0 + 1500), h / (y1 - y0 + 1500));
     ox = w / 2 - (x0 + x1) / 2 * scale; oy = h / 2 - (y0 + y1) / 2 * scale;
+    return true;
   }
   const R = n => ({Keystone: 10, Notable: 6.5, Mastery: 5, Socket: 6.5, AscendClassStart: 8})[n.type] || 3.2;
   function draw() {
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    ctx.fillStyle = col("--panel-2"); ctx.fillRect(0, 0, w, h);
-    const line = col("--line"), acc = col("--accent"), info = col("--info"), muted = col("--muted"), chaos = col("--chaos");
-    ctx.lineWidth = Math.max(0.6, scale * 6);
+    ctx.fillStyle = C.bg; ctx.fillRect(0, 0, w, h);
+    const base = Math.max(0.6, scale * 6);
+    const edges = [[], []];  // drawn in two passes so taken links sit on top
     for (const n of nodes) for (const id of n.linked || []) {
       if (id < n.id) continue; const m = byId.get(id); if (!m) continue;
       const both = alloc.has(n.id) && alloc.has(id), path = hl.has(n.id) && (hl.has(id) || alloc.has(id)) || hl.has(id) && alloc.has(n.id);
-      ctx.strokeStyle = path ? info : both ? acc : line; ctx.globalAlpha = path || both ? 1 : 0.55;
-      ctx.beginPath(); ctx.moveTo(n.x * scale + ox, n.y * scale + oy); ctx.lineTo(m.x * scale + ox, m.y * scale + oy); ctx.stroke();
+      edges[path || both ? 1 : 0].push([n, m, path ? C.path : both ? C.takenLine : C.line]);
     }
-    ctx.globalAlpha = 1;
+    for (const [i, list] of edges.entries()) {
+      ctx.lineWidth = i ? Math.max(2, base * 2.2) : base;
+      for (const [n, m, c] of list) {
+        ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(n.x * scale + ox, n.y * scale + oy); ctx.lineTo(m.x * scale + ox, m.y * scale + oy); ctx.stroke();
+      }
+    }
+    const lit = [];
     for (const n of nodes) {
       const x = n.x * scale + ox, y = n.y * scale + oy;
       if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
       const r = Math.max(1.5, R(n) * Math.min(2.2, scale * 18));
-      const ws = alloc.get(n.id);
-      ctx.fillStyle = n.id === target ? "#fff" : hl.has(n.id) ? info : alloc.has(n.id) ? (ws && ws !== data.active_weapon_set ? chaos : acc) : muted;
-      ctx.globalAlpha = alloc.has(n.id) || hl.has(n.id) ? 1 : 0.5;
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-      if (n.id === target) { ctx.strokeStyle = info; ctx.lineWidth = 2; ctx.stroke(); }
+      if (alloc.has(n.id) || hl.has(n.id) || n.id === target) { lit.push([n, x, y, r]); continue; }
+      ctx.fillStyle = C.node; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.globalAlpha = 1;
+    for (const [n, x, y, r0] of lit) {  // taken and highlighted nodes: bigger, bright, with a glow
+      const ws = alloc.get(n.id), r = Math.max(3, r0 * 1.35);
+      const c = n.id === target ? C.target : hl.has(n.id) ? C.path : ws && ws !== data.active_weapon_set ? C.set2 : C.taken;
+      ctx.shadowColor = c; ctx.shadowBlur = 8; ctx.fillStyle = c;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      if (n.id === target) { ctx.strokeStyle = C.path; ctx.lineWidth = 2; ctx.stroke(); }
+    }
   }
   function nodeAt(px, py) {
     let best = null, bd = 1e9;
@@ -768,8 +780,14 @@ function treeView(box, data) {
   // touch: one finger pans
   canvas.ontouchstart = e => { const t = e.touches[0]; drag = {x: t.clientX, y: t.clientY, ox, oy}; };
   canvas.ontouchmove = e => { e.preventDefault(); const t = e.touches[0]; if (drag) { ox = drag.ox + t.clientX - drag.x; oy = drag.oy + t.clientY - drag.y; draw(); } };
-  fit(); draw();
-  window.addEventListener("resize", () => { fit(); draw(); });
+  // the box can have no size yet when the view is built (tab switch while loading): fit when it gets one
+  let fitted = fit(); if (fitted) draw();
+  let lastW = box.clientWidth;
+  new ResizeObserver(() => {
+    const w = box.clientWidth;
+    if (!w || (fitted && w === lastW)) return;
+    lastW = w; fitted = fit(); draw();
+  }).observe(box);
   return {
     highlight(ids, id) {
       hl = new Set(ids); target = id;

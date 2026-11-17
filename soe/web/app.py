@@ -83,7 +83,8 @@ def _saved(result):
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    # no-cache: after an update the browser checks for the new page instead of showing the old one
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/status")
