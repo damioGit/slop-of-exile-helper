@@ -769,6 +769,7 @@ const views = {
       const real = (r.realistic || []).map(x => `<tr><td><b>${x.hits} z ${x.of}</b></td><td class="n"><b>${div(x.expected_divine)}</b></td><td class="small muted">${esc(x.route)}</td></tr>`).join("");
       out.innerHTML = (r.need_item_level > c.ilvl ? `<div class="finding warn">Wybrane tiery wymagają item level ${r.need_item_level}.</div>` : "") +
         (r.warnings || []).map(w => `<div class="finding bad">${esc(w)}</div>`).join("") +
+        ((r.rules_changes || []).length ? `<div class="finding warn"><b>Zasady craftingu zmieniły się na poe2db</b> (szczegóły w panelu Dane):<br>${r.rules_changes.map(esc).join("<br>")}</div>` : "") +
         (real ? `<div class="finding"><h4>Co realnie wyjdzie i za ile</h4><p class="small muted">Najtańsza droga do danej liczby wybranych modów (średnio, do skutku).</p>
           <div class="tablewrap"><table><tr><th>Mody</th><th class="n">Koszt</th><th>Droga</th></tr>${real}</table></div></div>` : "") +
         r.routes.map(x => {
@@ -1281,11 +1282,20 @@ async function dataStatus() {
     ["Baza wiedzy", ok(s.kb.matches, s.kb.pob_version ? `z PoB ${esc(s.kb.pob_version)}, drzewko ${esc(s.kb.tree)}, zbudowana ${esc(s.kb.built_at)}` : "brak")],
     ["Mody, wagi, esencje (poe2db)", ok(s.poe2db.pages && !s.poe2db.stale, s.poe2db.pages ? `${s.poe2db.pages} stron, pobrane ${esc(s.poe2db.oldest)}${s.poe2db.stale ? `, ${s.poe2db.stale} starych` : ""}` : "brak")],
     ["Ceny (poe.ninja)", ok(!s.prices.old, s.prices.updated ? `pobrane ${esc(s.prices.updated)}` : "jeszcze nie pobrane")],
+    ["Zasady craftingu (poe2db)", s.rules.checked_items ? ok(!s.rules.changes.length, s.rules.changes.length
+        ? `${s.rules.changes.length} zmian od ostatniego sprawdzenia: drogi w Kuźni mogą być nieaktualne`
+        : `${s.rules.checked_items} orbów, omenów i kości działa tak, jak zakłada Kuźnia${s.rules.checked ? ` (sprawdzone ${esc(s.rules.checked)})` : ""}`)
+      : ok(false, "jeszcze nie sprawdzone")],
     ["Appka", s.app.git ? ok(!s.app.behind, `wersja ${esc(s.app.commit)}${s.app.behind ? `, na GitHubie ${s.app.behind} nowych zmian` : s.app.behind === 0 ? ", aktualna" : ""}`) : "<span class=\"muted\">paczka bez gita: nowe wersje pobierasz ręcznie</span>"],
   ];
   const last = u.last ? `Ostatnia aktualizacja ${esc(u.last.when)}: ${esc((u.last.done || []).join(", ") || "wszystko było aktualne")}${(u.last.errors || []).length ? ` · <span class="neg">${esc(u.last.errors.join("; "))}</span>` : ""}` : "";
   $("#dataBody").innerHTML = `<div class="tablewrap"><table>${rows.map(([k, v]) => `<tr><td class="small muted">${k}</td><td>${v}</td></tr>`).join("")}</table></div>
     <p class="small muted">Appka sama sprawdza to przy starcie i przy wejściu na stronę (najczęściej co 6 h${s.checked ? `, ostatnio ${esc(s.checked)}` : ""}). Nowe PoB instaluje dopiero, gdy przejdzie test na buildach wzorcowych; inaczej zostaje stara wersja.${u.git ? "" : " Brak gita: PoB nie da się zaktualizować automatycznie."}</p>
+    ${s.rules.changes.length ? `<div class="finding bad"><h4>Zmiany zasad craftingu na poe2db</h4><ul>${s.rules.changes.map(c => `<li><b>${esc(c.item)}</b>: ${c.kind === "missing" ? "nie ma już opisu na poe2db" : `<span class="muted">było:</span> ${esc(c.old)}<br><span class="muted">jest:</span> ${esc(c.new)}`}${c.assumes ? `<br><span class="muted">Kuźnia zakłada: ${esc(c.assumes)}</span>` : ""}</li>`).join("")}</ul>
+      <p class="small">Drogi craftu z tymi przedmiotami liczą się po staremu, dopóki kod appki tego nie uwzględni (poprawka przyjdzie z aktualizacją appki).</p>
+      <button class="ghost small" id="btnRulesOk">Przyjmuję do wiadomości</button></div>` : ""}
+    ${s.rules.applied.length ? `<p class="small">Uwzględnione automatycznie: ${s.rules.applied.map(esc).join("; ")}</p>` : ""}
+    ${s.rules.new_omens.length ? `<p class="small">Nowe omeny w grze (Kuźnia ich jeszcze nie używa): ${s.rules.new_omens.map(esc).join(", ")}</p>` : ""}
     ${last ? `<p class="small">${last}</p>` : ""}
     ${u.running && u.log.length ? `<pre>${esc(u.log.join(String.fromCharCode(10)))}</pre>` : ""}
     ${s.app.git && s.app.source ? `<label class="small" style="display:block;margin:6px 0"><input type="checkbox" id="chkAutoApp" ${s.app.auto ? "checked" : ""} style="width:auto;vertical-align:middle">
@@ -1293,6 +1303,7 @@ async function dataStatus() {
     <div class="row"><button class="ghost" id="btnDataNow" ${u.running ? "disabled" : ""}>Sprawdź i zaktualizuj teraz</button>
       ${s.app.behind ? `<button id="btnAppUpdate">Aktualizuj appkę</button>` : ""}</div>`;
   if (!s.ok && !u.running) $("#dataPanel").open = true;
+  if ($("#btnRulesOk")) $("#btnRulesOk").onclick = e => busy(e.target, async () => { await api("/api/rules/accept", {body: {}}); dataStatus(); });
   if ($("#chkAutoApp")) $("#chkAutoApp").onchange = async e => {
     await api("/api/settings", {body: {auto_update_app: e.target.checked}});
     toast(e.target.checked ? "Appka będzie się aktualizować sama przy starcie." : "Automatyczna aktualizacja appki wyłączona.");

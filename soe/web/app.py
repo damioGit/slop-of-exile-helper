@@ -389,6 +389,13 @@ def set_settings(payload: dict = Body(...)):
     return out
 
 
+@app.post("/api/rules/accept")
+def rules_accept():
+    from soe.kb import craft_rules
+
+    return craft_rules.accept()
+
+
 @app.post("/api/data_update")
 def data_update(payload: dict = Body(default={})):
     from soe.pipeline.autoupdate import updater

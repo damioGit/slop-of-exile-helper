@@ -166,6 +166,14 @@ class Updater:
         loc["checked"] = _age(rem.get("checked"))
         loc["updater"] = {"running": self.running, "step": self.step, "log": self.log[-12:],
                           "last": self.state.get("last_result"), "auto": enabled(), "git": shutil.which("git") is not None}
+        try:
+            from soe.kb import craft_rules
+
+            rules = craft_rules.report()
+            rules["checked"] = _age(rules.get("checked"))
+        except Exception:
+            rules = {"changes": [], "applied": [], "new_omens": [], "tracked": 0, "checked_items": 0, "checked": None}
+        loc["rules"] = rules
         todo = []
         if not loc["pob"]["installed"]:
             todo.append("brak Path of Building")
@@ -175,6 +183,10 @@ class Updater:
             todo.append("baza wiedzy do przebudowania")
         if loc["poe2db"]["pages"] == 0 or loc["poe2db"]["stale"]:
             todo.append("dane poe2db do odświeżenia")
+        if rules["changes"]:
+            todo.append(f"zmiany zasad craftingu ({len(rules['changes'])})")
+        if not rules["checked_items"]:
+            todo.append("zasady craftingu niesprawdzone")
         if loc["prices"]["old"]:
             todo.append("ceny do odświeżenia")
         if loc["app"].get("behind"):
@@ -256,6 +268,16 @@ class Updater:
                 result["errors"].append(f"poe2db: {len(info['failed'])} stron bez danych")
             if poe2db.status() != before:
                 result["done"].append("poe2db odświeżone")
+            self.step = "sprawdzam zasady craftingu (poe2db)"
+            try:
+                from soe.kb import craft_rules
+
+                craft_rules.check()
+                rep = craft_rules.report()
+                if rep["changes"]:
+                    result["errors"].append(f"zasady craftingu: {len(rep['changes'])} zmian na poe2db")
+            except Exception as e:
+                result["errors"].append(f"zasady craftingu: {e}")
             self.step = "odświeżam ceny"
             try:
                 from soe.prices import ninja

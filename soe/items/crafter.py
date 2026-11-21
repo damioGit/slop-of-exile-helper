@@ -40,6 +40,7 @@ OMEN_ANNUL = {"Prefix": "Omen of Sinistral Annulment", "Suffix": "Omen of Dextra
 OMEN_CRYST = {"Prefix": "Omen of Sinistral Crystallisation", "Suffix": "Omen of Dextral Crystallisation"}
 OMEN_NECRO = {"Prefix": "Omen of Sinistral Necromancy", "Suffix": "Omen of Dextral Necromancy"}
 ECHOES, LIGHT = "Omen of Abyssal Echoes", "Omen of Light"
+BONE_MIN: dict[str, int] = {"Ancient Rib": 40, "Ancient Collarbone": 40, "Ancient Jawbone": 40}
 LOOP_CAP = 300  # currency uses on one base before we call it a failure
 ONE_SHOT_MAX = 200_000
 EXTEND = {"random", "alchemy", "essence"}  # cheap routes whose full-goal chance is worth measuring well
@@ -366,7 +367,7 @@ class _Run:
         if c[SIDES[1 - SIDES.index(side)]] < 3:
             self.use(OMEN_NECRO[side])  # both sides open: make it this side
         self.use(self.bone)
-        min_lvl = 40 if self.bone.startswith("Ancient") else 0
+        min_lvl = BONE_MIN.get(self.bone, 0)  # Ancient bones: mods of level 40+ (from poe2db, craft_rules)
         need = set(self.want.missing(self.mods))
         chosen = None
         for attempt in range(2):
@@ -623,7 +624,8 @@ def _bone_for(base: dict, wanted: list[dict], ilvl: int) -> str | None:
     if not kind or ilvl < 1:
         return None
     hi = max(int(w.get("min_level") or 0) for w in wanted)
-    return f"{'Ancient' if hi >= 40 else 'Preserved'} {poe2db.BONE[kind]}"
+    ancient = f"Ancient {poe2db.BONE[kind]}"
+    return ancient if hi >= BONE_MIN.get(ancient, 40) else f"Preserved {poe2db.BONE[kind]}"
 
 
 def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 2000, seed: int = 11) -> dict:
@@ -675,6 +677,13 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
     if problems:
         return {"base": base["name"], "item_level": ilvl, "possible": False, "problems": problems, "routes": []}
 
+    from soe.kb import craft_rules
+
+    levels = craft_rules.min_levels()  # what poe2db says today; the code's defaults otherwise
+    MIN_LEVEL.update({k: levels[k] for k in ("Greater Exalted Orb", "Perfect Exalted Orb") if k in levels})
+    BONE_MIN.clear()
+    BONE_MIN.update({k: v for k, v in levels.items() if k.startswith("Ancient")})
+    rules = craft_rules.report()
     pool = _Pool(groups, set(base.get("tags") or []), data, ilvl)
     want = _Want(resolved)
     normal, perfect = _usable_essences(want, ess_by_fam)
@@ -761,6 +770,8 @@ def craft_routes(kb, base_name: str, ilvl: int, wanted: list[dict], sims: int = 
            if data else "Brak danych z poe2db dla tej bazy: równe wagi z danych PoB (mniej dokładne).")
     return {"base": base["name"], "item_level": ilvl, "need_item_level": need_ilvl, "possible": True,
             "weights": "poe2db" if data else "equal", "bone": bone, "warnings": warnings,
+            "rules_changes": [c["text"] + (f" (Kuźnia zakłada: {c['assumes']})" if c.get("assumes") else "")
+                              for c in rules["changes"]],
             "wanted": [{"group": w["group"], "type": w["type"], "min_level": w["min_level"], "family": w["key"],
                         "chance_pct": w["chance_pct"]}
                        for w in resolved], "routes": out, "realistic": realistic,
