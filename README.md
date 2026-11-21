@@ -5,7 +5,17 @@ Plan i harmonogram: [PLAN.md](PLAN.md).
 
 **Status:** fazy 0–6 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`). Do buildu masz doradcę w Claude Code (MCP), lokalną appkę webową i pipeline na dzień premiery.
 
-## Setup (Windows)
+## Dla graczy: instalacja jednym kliknięciem
+
+`instaluj.bat` instaluje brakującego Pythona i Gita (winget) i stawia `.venv`. Potem pobiera Path of Building, buduje bazę wiedzy, ściąga dane z poe2db i robi skrót na pulpicie. Uruchomienie: skrót albo `uruchom.bat`. Paczkę zip dla kogoś innego (bez `data/`, `vendor/` i Twoich ustawień) robi:
+
+```bash
+.venv/Scripts/python scripts/make_package.py     # -> dist/slop-of-exile-helper-<data>-<commit>.zip
+```
+
+Instrukcja dla odbiorcy jest w `JAK ZAINSTALOWAC.txt`. Tryb AI jest opcjonalny (Claude Code zalogowany u odbiorcy).
+
+## Setup (Windows, dla programistów)
 
 ```bash
 py -m venv .venv

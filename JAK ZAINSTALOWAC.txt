@@ -24,5 +24,8 @@ Tryb AI (checkbox "AI" w zakladce Asystent) jest OPCJONALNY. Dziala tylko, jesli
 zalogowany na tym komputerze (claude.com/claude-code). Bez niego cala reszta dziala normalnie:
 szybki przeglad, Gear, Kuznia, Skille, Drzewko, Plan, trade.
 
-Nowa wersja appki: ta paczka nie aktualizuje sama kodu appki. Gdy dostaniesz nowy zip, rozpakuj go
-w to samo miejsce (nadpisz pliki) i uruchom instaluj.bat jeszcze raz.
+Nowe wersje appki: na koncu instalacji instalator podpina folder pod repo na GitHubie. Jesli repo jest
+prywatne, Git otworzy okno logowania do GitHuba (potrzebne zaproszenie do repo od autora). Od tego momentu
+appka przy kazdym uruchomieniu sama pobiera nowa wersje (mozna to wylaczyc w panelu "Dane i aktualizacje").
+Bez dostepu do repo appka dziala normalnie, a nowa wersje dostajesz jako zip: rozpakuj go w to samo miejsce
+(nadpisz pliki) i uruchom instaluj.bat jeszcze raz.

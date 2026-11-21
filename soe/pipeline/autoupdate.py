@@ -25,7 +25,28 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / "data" / "update_state.json"
-LOCK = ROOT / "data" / "update.lock"  # one updater at a time, also across app instances
+LOCK = ROOT / "data" / "update.lock"
+SETTINGS = ROOT / "data" / "user" / "settings.json"  # shared with scripts/self_update.py
+
+
+def settings() -> dict:
+    try:
+        return json.loads(SETTINGS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def set_setting(key: str, value) -> dict:
+    s = settings()
+    s[key] = value
+    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS.write_text(json.dumps(s, indent=1), encoding="utf-8")
+    return s
+
+
+def update_source() -> str | None:
+    f = ROOT / "UPDATE_SOURCE"
+    return f.read_text(encoding="utf-8").split()[0] if f.exists() and f.read_text(encoding="utf-8").split() else None  # one updater at a time, also across app instances
 CHECK_EVERY = 6 * 3600
 
 
@@ -111,7 +132,8 @@ class Updater:
             "poe2db": {"pages": len(fetched), "stale": stale, "oldest": _age(min(fetched)) if fetched else None,
                        "newest": _age(max(fetched)) if fetched else None},
             "prices": {"updated": _age(newest_price), "old": not newest_price or time.time() - newest_price > 6 * 3600},
-            "app": {"commit": commit, "git": commit is not None},
+            "app": {"commit": commit, "git": commit is not None, "source": update_source(),
+                    "auto": bool(settings().get("auto_update_app", True))},
         }
 
     # ---- what is out there (network, cached) ---------------------------------------

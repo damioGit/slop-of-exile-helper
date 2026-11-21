@@ -82,14 +82,14 @@ if "%SOE_NO_SHORTCUT%"=="1" (
 
 echo.
 echo  Gotowe. Appke uruchamiasz skrotem na pulpicie albo plikiem uruchom.bat.
-echo  Dane ^(nowe Path of Building, poe2db, ceny^) appka aktualizuje sama przy starcie.
+echo  Dane ^(nowe Path of Building, poe2db, ceny^) i sama appka aktualizuja sie przy starcie.
 echo  Tryb AI w asystencie jest opcjonalny: wymaga Claude Code zalogowanego na tym komputerze.
 echo.
-if "%SOE_NO_PROMPT%"=="1" exit /b 0
-set /p RUN="Uruchomic appke teraz? [T/n] "
-if /i "!RUN!"=="n" exit /b 0
-start "" "%CD%\scripts\start.bat"
-exit /b 0
+set "RUN="
+if not "%SOE_NO_PROMPT%"=="1" set /p RUN="Uruchomic appke teraz? [T/n] "
+if "%SOE_NO_PROMPT%"=="1" set "RUN=n"
+rem Last line on purpose: linking to GitHub can replace this file with a newer one, so nothing may come after it.
+".venv\Scripts\python.exe" scripts\self_update.py --attach & (if /i not "!RUN!"=="n" start "" "%CD%\scripts\start.bat") & exit /b 0
 
 rem ---------------------------------------------------------------- helpers
 :find_python

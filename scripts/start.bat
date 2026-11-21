@@ -23,6 +23,9 @@ if not exist "data\kb.current" if not exist "data\kb.sqlite" (
     ".venv\Scripts\python.exe" -m soe.kb.build || (pause & exit /b 1)
 )
 
+rem nowa wersja appki z GitHuba (opcja w panelu Dane): po aktualizacji ten plik startuje od nowa, w tej samej linii
+".venv\Scripts\python.exe" scripts\self_update.py & if errorlevel 5 (set SOE_UPDATED=1& call "%~f0" %* & exit /b)
+
 rem 3 = "Aktualizuj appke" w aplikacji: po aktualizacji appka startuje od nowa (bez otwierania nowej karty)
 set SOE_RESTART_CODE=3
 set OPEN=--open

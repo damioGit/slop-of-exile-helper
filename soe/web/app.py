@@ -379,6 +379,16 @@ def data_status():
     return updater.status()
 
 
+@app.post("/api/settings")
+def set_settings(payload: dict = Body(...)):
+    from soe.pipeline.autoupdate import set_setting
+
+    out = {}
+    if "auto_update_app" in payload:
+        out = set_setting("auto_update_app", bool(payload["auto_update_app"]))
+    return out
+
+
 @app.post("/api/data_update")
 def data_update(payload: dict = Body(default={})):
     from soe.pipeline.autoupdate import updater

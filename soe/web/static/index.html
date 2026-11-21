@@ -1288,9 +1288,15 @@ async function dataStatus() {
     <p class="small muted">Appka sama sprawdza to przy starcie i przy wejściu na stronę (najczęściej co 6 h${s.checked ? `, ostatnio ${esc(s.checked)}` : ""}). Nowe PoB instaluje dopiero, gdy przejdzie test na buildach wzorcowych; inaczej zostaje stara wersja.${u.git ? "" : " Brak gita: PoB nie da się zaktualizować automatycznie."}</p>
     ${last ? `<p class="small">${last}</p>` : ""}
     ${u.running && u.log.length ? `<pre>${esc(u.log.join(String.fromCharCode(10)))}</pre>` : ""}
+    ${s.app.git && s.app.source ? `<label class="small" style="display:block;margin:6px 0"><input type="checkbox" id="chkAutoApp" ${s.app.auto ? "checked" : ""} style="width:auto;vertical-align:middle">
+      Aktualizuj appkę automatycznie z GitHuba przy każdym uruchomieniu <span class="muted">(${esc(s.app.source.replace("https://github.com/", "").replace(".git", ""))}; nigdy nie nadpisuje Twoich zmian w plikach)</span></label>` : ""}
     <div class="row"><button class="ghost" id="btnDataNow" ${u.running ? "disabled" : ""}>Sprawdź i zaktualizuj teraz</button>
       ${s.app.behind ? `<button id="btnAppUpdate">Aktualizuj appkę</button>` : ""}</div>`;
   if (!s.ok && !u.running) $("#dataPanel").open = true;
+  if ($("#chkAutoApp")) $("#chkAutoApp").onchange = async e => {
+    await api("/api/settings", {body: {auto_update_app: e.target.checked}});
+    toast(e.target.checked ? "Appka będzie się aktualizować sama przy starcie." : "Automatyczna aktualizacja appki wyłączona.");
+  };
   $("#btnDataNow").onclick = e => busy(e.target, async () => { await api("/api/data_update", {body: {what: "data"}}); toast("Sprawdzam i aktualizuję w tle."); dataStatus(); });
   if ($("#btnAppUpdate")) $("#btnAppUpdate").onclick = e => busy(e.target, async () => {
     const r = await api("/api/data_update", {body: {what: "app"}});
