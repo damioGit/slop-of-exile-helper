@@ -1072,7 +1072,7 @@ function recipeView(r) {
         ${Object.entries(o.at_least_pct).map(([k, v]) => `<div class="o"><b>${v}%</b><span class="small muted">≥ ${k} z ${o.wanted_mods} modów celu</span></div>`).join("")}
         <div class="o"><b>${r.cost_divine ? fmt(r.cost_divine, 2) + " div" : "?"}</b><span class="small muted">koszt próby${r.cost_complete ? "" : " (część cen nieznana)"}</span></div>
       </div>
-      <p class="muted small">Szanse z symulacji przy równych wagach modów (prawdziwych wag nie ma w danych PoB), więc to szacunek. Trafienie = dobra rodzina moda, dowolny tier.</p></div></div>`;
+      <p class="muted small">Szanse z symulacji na wagach modów z poe2db. Trafienie = dobra rodzina moda, dowolny tier.</p></div></div>`;
 }
 
 function gainCell(x) {
@@ -1141,7 +1141,7 @@ function renderAnalysis(a) {
       a.mods.map(m => `<tr><td>${esc(m.text)}${m.flags.length ? ` <span class="pill check">${esc(m.flags.join(", "))}</span>` : ""}</td><td class="small muted">${esc(m.type || "?")}${m.tier ? " " + esc(m.tier) : ""}</td>
         <td class="n">${pct(m.value.dps_pct)}</td><td class="n">${pct(m.value.ehp_pct)}</td><td class="n">${m.value.score < 0.5 ? '<span class="neg">śmieć</span>' : fmt(m.value.score, 1)}</td></tr>`).join("")}</table></div>
     <p class="muted small">Wartość = ile tracisz bez tego moda (DPS/EHP w %, wynik wg Twoich celów). Wolne miejsca: ${af.open_prefix ?? 0} prefix, ${af.open_suffix ?? 0} suffix.</p>
-    <h3>Crafting na tym itemie</h3>${c.possible === false ? `<p class="muted">${esc(c.why)}</p>` : `<div class="craftgrid">${cards.join("")}</div><p class="muted small">Szanse przy równych wagach modów (prawdziwych wag nie ma w danych PoB): szacunek. Wynik liczony dla środkowego tieru.</p>`}</div>`;
+    <h3>Crafting na tym itemie</h3>${c.possible === false ? `<p class="muted">${esc(c.why)}</p>` : `<div class="craftgrid">${cards.join("")}</div><p class="muted small">Szanse na wagach modów z poe2db. Wynik liczony dla środkowego tieru.</p>`}</div>`;
 }
 
 async function slotView(slot) {
