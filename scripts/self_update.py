@@ -59,7 +59,7 @@ def reinstall_if_needed(before: str | None):
     changed = r.stdout.split() if r and r.returncode == 0 else ["pyproject.toml"]
     if "pyproject.toml" in changed:
         print("Nowe zależności: instaluję...", flush=True)
-        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", str(ROOT)])
+        subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", str(ROOT)], capture_output=True)
 
 
 def attach() -> int:
@@ -77,10 +77,12 @@ def attach() -> int:
         print("Auto-aktualizacja appki niedostępna: brak dostępu do repo na GitHubie (prywatne repo wymaga\n"
               "zaproszenia i zalogowania). Appka działa normalnie; nową wersję dostaniesz jako zip.", flush=True)
         return 0
+    zipped = (ROOT / "VERSION.txt").read_text(encoding="utf-8").split()[0] if (ROOT / "VERSION.txt").exists() else None
     git("reset", "-q", "--hard", f"origin/{branch}")
     git("branch", "-q", "-M", branch)
     git("branch", "-q", f"--set-upstream-to=origin/{branch}", branch)
-    reinstall_if_needed(None)
+    known = zipped and git("cat-file", "-e", f"{zipped}^{{commit}}")
+    reinstall_if_needed(zipped if known and known.returncode == 0 else None)  # only when pyproject.toml changed
     print("Auto-aktualizacja appki: włączona (wersja " + (head() or "?")[:7] + ").", flush=True)
     return 0
 
