@@ -26,7 +26,7 @@ def fake_get(code_for, blocked=False):
             return STATE
         for version, code in code_for.items():
             if f"/builds/{version}/character" in url:
-                return {"account": "RoucheS-5084", "name": "Vitya_MageBlood", "league": "Runes of Aldur",
+                return {"account": "Gracz-1234", "name": "Przykladowa_Postac", "league": "Runes of Aldur",
                         "class": "Spirit Walker", "level": 100, "pathOfBuildingExport": code,
                         "updatedUtc": "2026-06-27"}
         raise _http(404)
@@ -34,18 +34,18 @@ def fake_get(code_for, blocked=False):
 
 
 def test_parse_ref():
-    assert ch.parse_ref("https://poe.ninja/poe2/builds/runesofaldur/character/RoucheS-5084/Vitya_MageBlood?i=1") == \
-        ("RoucheS-5084", "Vitya_MageBlood", "runesofaldur")
-    assert ch.parse_ref("RoucheS#5084", "Vitya") == ("RoucheS-5084", "Vitya", None)
-    assert ch.parse_ref("RoucheS#5084/Vitya") == ("RoucheS-5084", "Vitya", None)
+    assert ch.parse_ref("https://poe.ninja/poe2/builds/runesofaldur/character/Gracz-1234/Przykladowa_Postac?i=1") == \
+        ("Gracz-1234", "Przykladowa_Postac", "runesofaldur")
+    assert ch.parse_ref("Gracz#1234", "Postac") == ("Gracz-1234", "Postac", None)
+    assert ch.parse_ref("Gracz#1234/Postac") == ("Gracz-1234", "Postac", None)
     with pytest.raises(ValueError):
-        ch.parse_ref("RoucheS#5084")
+        ch.parse_ref("Gracz#1234")
 
 
 def test_fetch_finds_league(monkeypatch, tmp_path):
     monkeypatch.setattr(ch, "_get", fake_get({"v2": "CODE"}))
     monkeypatch.setattr("soe.prices.ninja.CACHE", tmp_path)
-    c = ch.fetch_character("RoucheS#5084", "Vitya_MageBlood")
+    c = ch.fetch_character("Gracz#1234", "Przykladowa_Postac")
     assert c["code"] == "CODE" and c["league"] == "Runes of Aldur" and c["class"] == "Spirit Walker"
 
 
@@ -64,16 +64,16 @@ def test_session_import_and_resync(monkeypatch, kb_path, spirit_walker_code):
 
     def fake_fetch(ref, name=None):
         calls.append((ref, name))
-        return {"account": "RoucheS-5084", "name": "Vitya_MageBlood", "league": "Runes of Aldur",
+        return {"account": "Gracz-1234", "name": "Przykladowa_Postac", "league": "Runes of Aldur",
                 "class": "Spirit Walker", "level": 100, "code": spirit_walker_code, "updated": "x",
                 "source": "poe.ninja"}
 
     monkeypatch.setattr(ch, "fetch_character", fake_fetch)
     s = Session(kb_path)
-    r = s.import_character("RoucheS#5084", "Vitya_MageBlood")
-    assert r["summary"]["main_skill"] == "Twister" and s.source["account"] == "RoucheS-5084"
+    r = s.import_character("Gracz#1234", "Przykladowa_Postac")
+    assert r["summary"]["main_skill"] == "Twister" and s.source["account"] == "Gracz-1234"
     s.resync()
-    assert calls[-1] == ("RoucheS-5084", "Vitya_MageBlood")
+    assert calls[-1] == ("Gracz-1234", "Przykladowa_Postac")
     s.load(spirit_walker_code)  # pasting a code forgets the import source
     assert s.source is None
     with pytest.raises(RuntimeError):

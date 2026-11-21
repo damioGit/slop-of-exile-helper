@@ -1,6 +1,6 @@
 """Real builds checked against numbers published on poe.ninja (which also calculates with PoB).
 
-spirit_walker.txt: poe.ninja/poe2/builds/runesofaldur/character/RoucheS-5084/Vitya_MageBlood,
+spirit_walker.txt: a public Spirit Walker from the poe.ninja ladder (player name left out),
 Runes of Aldur league, fetched 2026-11-16, PoB v0.23.1.
 """
 from pathlib import Path

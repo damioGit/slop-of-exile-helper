@@ -10,3 +10,4 @@ vendor/
 *.egg-info/
 .pytest_cache/
 /dist/
+*.lnk

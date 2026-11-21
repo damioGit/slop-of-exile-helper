@@ -34,7 +34,7 @@ def _get(url: str, tries: int = 3):
 
 
 def normalize_account(account: str) -> str:
-    """'RoucheS#5084' (in-game) -> 'RoucheS-5084' (poe.ninja)."""
+    """'Gracz#1234' (in-game) -> 'Gracz-1234' (poe.ninja)."""
     return account.strip().replace("#", "-")
 
 
