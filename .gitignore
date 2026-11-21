@@ -9,3 +9,4 @@ __pycache__/
 vendor/
 *.egg-info/
 .pytest_cache/
+/dist/
