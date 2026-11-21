@@ -355,6 +355,83 @@ def craft_plan(slot: str, damage: float = 1, survive: float = 1):
     return locked(cp, session, slot, _goals(damage, survive))
 
 
+# ---- data status and updates ------------------------------------------------------------
+
+def _reload_engine():
+    """After the updater installed a new PoB or knowledge base: a fresh session with the player's build again."""
+    global session
+    old = session
+    session = Session(os.environ.get("SOE_KB") or None)
+    _TREE_CACHE.clear()
+    _restore_last()
+    try:
+        old.close_pool()
+    except Exception:
+        pass
+
+
+@app.get("/api/data_status")
+def data_status():
+    from soe.pipeline.autoupdate import updater
+
+    updater.on_new_engine = updater.on_new_engine or _reload_engine
+    updater.maybe_start()  # every visit: checks again when the last check is older than 6 h
+    return updater.status()
+
+
+@app.post("/api/data_update")
+def data_update(payload: dict = Body(default={})):
+    from soe.pipeline.autoupdate import updater
+
+    updater.on_new_engine = updater.on_new_engine or _reload_engine
+    if payload.get("what") == "app":
+        r = updater.update_app()
+        if r.get("ok") and os.environ.get("SOE_RESTART_CODE"):
+            # started by uruchom.bat / start.bat: exit with the restart code, the launcher starts the new version
+            import threading
+
+            threading.Timer(1.5, lambda: os._exit(int(os.environ["SOE_RESTART_CODE"]))).start()
+            r["restarting"] = True
+        return r
+    started = updater.maybe_start(force=True)
+    return {"started": started, "status": updater.status()}
+
+
+_QUICK: dict = {}
+
+
+@app.get("/api/quick")
+def quick(damage: float = 1, survive: float = 1):
+    """The assistant's quick check-up (no AI): resistances, attributes, spirit, mana, weakest max hit, gear to
+    replace first, best passives. Cached per build state and goals."""
+    from soe.advisor.quick import quick_check
+
+    def run():
+        key = (session.build_id, session.pob.export_xml().__hash__(), damage, survive)
+        if key not in _QUICK:
+            _QUICK.clear()
+            _QUICK[key] = quick_check(session, _goals(damage, survive))
+        return _QUICK[key]
+    return locked(run)
+
+
+@app.get("/api/craft/for_slot")
+def craft_for_slot(slot: str, damage: float = 1, survive: float = 1):
+    from soe.items.forge_build import slot_target
+
+    return locked(slot_target, session, slot, _goals(damage, survive))
+
+
+@app.post("/api/craft/value")
+def craft_value(payload: dict = Body(...)):
+    from soe.items.forge_build import target_value
+
+    if not session.loaded:
+        return {"slot": None, "note": "Wczytaj build, żeby zobaczyć, ile ten item da Twojej postaci."}
+    return locked(target_value, session, payload.get("slot"), payload["base"], int(payload.get("ilvl") or 82),
+                  payload.get("wanted") or [], _goals(payload.get("damage", 1), payload.get("survive", 1)))
+
+
 # Crafting tab: KB only (no build, no PoB lock), works before a build is loaded.
 @app.get("/api/craft/bases")
 def craft_bases(type: str | None = None, q: str | None = None):
@@ -507,6 +584,10 @@ def main(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False):
         threading.Thread(target=opener, daemon=True).start()
 
     _restore_last()
+    from soe.pipeline.autoupdate import updater
+
+    updater.on_new_engine = _reload_engine
+    updater.maybe_start()  # new PoB / poe2db / prices in the background, the app works meanwhile
     print(f"Slop of Exile Helper: {url}  (zamknij to okno, żeby wyłączyć)")
     uvicorn.run(app, host=host, port=port, log_level="warning")
 

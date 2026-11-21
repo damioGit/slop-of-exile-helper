@@ -222,6 +222,16 @@ tr.first td { background: color-mix(in srgb, var(--good) 13%, transparent); }
 .empty { text-align: center; padding: 34px 10px; color: var(--muted); }
 .empty b { font-family: var(--display); color: var(--gold); font-size: 18px; display: block; margin-bottom: 6px; }
 .aiAnswer p { margin: 6px 0; max-width: 75ch; } .aiAnswer h3 { color: var(--gold-2); }
+/* quick check-up cards */
+.qcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 10px; }
+.qcard { border: 1px solid var(--line); border-left: 3px solid var(--info); background: var(--panel-2); border-radius: 3px; padding: 9px 12px; min-width: 0; }
+.qcard.bad { border-left-color: var(--bad); } .qcard.warn { border-left-color: var(--warn); } .qcard.ok { border-left-color: var(--good); }
+.qcard h4 { margin: 0 0 4px; font-family: var(--display); color: var(--gold-2); font-size: 15px; display: flex; gap: 8px; align-items: center; }
+.qcard .qi { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 12px; font-family: var(--sans);
+  background: var(--bg-2); border: 1px solid var(--line); flex: none; }
+.qcard.bad .qi { color: var(--bad); } .qcard.warn .qi { color: var(--warn); } .qcard.ok .qi { color: var(--good); } .qcard.info .qi { color: var(--info); }
+.qcard p { margin: 2px 0 4px; font-size: 13.5px; } .qcard ul { margin: 2px 0 6px 16px; padding: 0; font-size: 13px; color: var(--muted); }
+
 /* forge (crafting tab) */
 .basegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr)); gap: 6px; max-height: 300px; overflow-y: auto; padding: 2px; margin-top: 10px; }
 button.basebtn { display: grid; grid-template-columns: 38px 1fr; gap: 8px; align-items: center; text-align: left; background: var(--panel-2);
@@ -275,6 +285,10 @@ button.basebtn small { display: block; color: var(--muted); font-size: 12px; }
   <button class="ghost" id="btnTheme" title="Jasny / ciemny motyw" aria-label="Zmień motyw">◐</button>
 </header>
 <main>
+  <details class="panel" id="dataPanel">
+    <summary><b>Dane i aktualizacje</b> <span id="dataBadge" class="small"></span></summary>
+    <div id="dataBody" style="margin-top:8px"><span class="busy"></span></div>
+  </details>
   <details class="panel" id="loadPanel" open>
     <summary><b>Wczytaj build</b> <span id="kbInfo" class="muted small"></span></summary>
     <textarea id="code" style="margin-top:10px" placeholder="Wklej kod z Path of Building (Import/Export → Generate → Copy) albo XML"></textarea>
@@ -392,7 +406,9 @@ const views = {
       "Ciągle umieram na bossach, co poprawić?",
       "Brakuje mi many",
     ];
-    el.innerHTML = `<div class="panel"><h2>Zapytaj o swój build</h2>
+    el.innerHTML = `<div class="panel"><h2>Szybki przegląd</h2><p class="muted small">Najczęstsze pytania, policzone od razu w PoB, bez AI.</p>
+      <div id="quickOut"><span class="busy"></span> Liczę (kilka sekund)…</div></div>
+      <div class="panel"><h2>Zapytaj o swój build</h2>
       <p class="muted small">Napisz po swojemu, co Cię boli. Asystent policzy w Path of Building, co konkretnie zmienić, ile to da i ile kosztuje.</p>
       <textarea id="q" style="min-height:70px;font-family:var(--sans);font-size:15px" placeholder="np. nie oneshotuję moba, jak bić mocniej Cometem?"></textarea>
       <div class="chips" style="margin:8px 0">${examples.map(x => `<button class="ghost small ex" style="font-weight:500">${esc(x)}</button>`).join("")}</div>
@@ -405,6 +421,16 @@ const views = {
       <p class="muted small">Liczenie trwa ~20–60 s: sprawdzam supporty, drzewko, gear i unikaty. Budżet bierzemy z pola nad zakładkami albo z pytania („za 5 div”).</p></div>
       <div id="answer"></div>`;
     el.querySelectorAll(".ex").forEach(b => b.onclick = () => { $("#q").value = b.textContent; });
+    const g0 = goals();
+    api("/api/quick?" + q({damage: g0.damage, survive: g0.survive})).then(r => {
+      if (!$("#quickOut")) return;
+      const icon = {bad: "✖", warn: "!", info: "i", ok: "✓"};
+      $("#quickOut").innerHTML = `<div class="qcards">${r.cards.map(c => `<div class="qcard ${c.level}">
+        <h4><span class="qi">${icon[c.level]}</span>${esc(c.title)}</h4><p>${esc(c.text)}</p>
+        ${c.lines.length ? `<ul>${c.lines.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${c.tab && c.tab !== "assistant" ? `<button class="ghost small" data-go="${c.tab}">${esc(c.action || "Pokaż")}</button>` : ""}</div>`).join("")}</div>`;
+      $("#quickOut").querySelectorAll("[data-go]").forEach(b => b.onclick = () => { state.tab = b.dataset.go; render(); window.scrollTo({top: 0}); });
+    }).catch(e => { if ($("#quickOut")) $("#quickOut").innerHTML = `<p class="muted">Szybki przegląd: ${esc(e.message)}</p>`; });
     try { $("#qAi").checked = localStorage.getItem("soe-ai") === "1"; } catch {}
     $("#qAi").onchange = e => { try { localStorage.setItem("soe-ai", e.target.checked ? "1" : "0"); } catch {} };
     $("#btnAsk").onclick = e => busy(e.target, async () => {
@@ -644,6 +670,11 @@ const views = {
       body.innerHTML = `<div class="panel"><span class="busy"></span> Wczytuję mody…</div>`;
       const p = await api("/api/craft/pool?" + q({base: c.base, ilvl: c.ilvl}));
       c.pool = p;
+      for (const [k, w] of Object.entries(c.wanted)) {
+        const m = p.families.find(x => `${x.type}|${x.group}` === k);
+        if (m) { w.family = m.family; if (w.min_level && !m.tiers.some(t => t.level === w.min_level)) w.min_level = (m.tiers.slice().reverse().find(t => t.level >= w.min_level) || m.tiers[0]).level; }
+        else delete c.wanted[k];
+      }
       body.innerHTML = `<div class="panel"><h2>Mody na ${esc(p.base)}</h2>
           <input type="text" id="cModFind" placeholder="filtruj, np. life, resistance, spell" value="${esc(c.filter)}">
           <div class="modcols" style="margin-top:10px">${["Prefix", "Suffix"].map(t => `<div><h3>${t === "Prefix" ? "Prefiksy" : "Suffiksy"} <span class="small muted" id="cnt${t}"></span></h3>
@@ -707,7 +738,23 @@ const views = {
         <div class="tb"><div class="small" style="color:#7f7f7f">Item Level: ${p.item_level} · wymaga lvl ${p.base_level}</div>
           ${pre.map(x => `<div class="ln">${esc(line(x))}</div>`).join("")}${pre.length && suf.length ? '<div class="sep"></div>' : ""}${suf.map(x => `<div class="ln">${esc(line(x))}</div>`).join("")}</div></div>`
         : `<p class="muted">Zaznacz mody po lewej.</p>`;
+      $("#cGoal").insertAdjacentHTML("beforeend", `<div id="cValue" class="small" style="margin-top:8px;text-align:center"></div>`);
       $("#cRoutes").innerHTML = `<p class="muted">Zaznacz mody i kliknij „Znajdź drogę craftu”.</p>`;
+      clearTimeout(c.valueTimer);
+      if (state.loaded && ws.length) c.valueTimer = setTimeout(goalValue, 400);
+    }
+
+    async function goalValue() {  // what this goal gives the loaded build, in its slot
+      const box = $("#cValue"); if (!box) return;
+      box.innerHTML = `<span class="busy"></span> liczę zysk dla Twojej postaci…`;
+      const g = goals();
+      try {
+        const v = await api("/api/craft/value", {body: {slot: c.slot, base: c.base, ilvl: c.ilvl, damage: g.damage, survive: g.survive,
+          wanted: Object.values(c.wanted).map(w => ({group: w.group, type: w.type, min_level: w.min_level}))}});
+        if (!$("#cValue")) return;
+        $("#cValue").innerHTML = v.slot ? `Dla Twojej postaci (${esc(v.slot)}, zamiast ${esc((v.current || "pustego slotu").split(",")[0])}): DPS ${pct(v.dps_pct)} · EHP ${pct(v.ehp_pct)}<div class="muted">${esc(v.note)}</div>`
+          : `<span class="muted">${esc(v.note)}</span>`;
+      } catch (e) { if ($("#cValue")) $("#cValue").innerHTML = `<span class="muted">Zysk: ${esc(e.message)}</span>`; }
     }
 
     async function findRoutes() {
@@ -745,8 +792,15 @@ const views = {
     // the player's own gear: one click picks that base
     if (state.loaded) api("/api/equipment").then(eq => {
       const mine = (eq.items || []).filter(i => i.base && !/Flask|Charm/.test(i.slot));
-      $("#cMine").innerHTML = mine.length ? `<span class="small muted">Baza z Twojego gearu:</span>` + mine.map(i => `<button class="ghost small" data-mine="${esc(i.base)}">${esc(i.slot)}: ${esc(i.base)}</button>`).join("") : "";
+      $("#cMine").innerHTML = mine.length ? `<span class="small muted">Ułóż cel pod mój build:</span>` + mine.map(i => `<button class="ghost small" data-goal="${esc(i.slot)}" title="Najlepsza baza na Twój level i 3+3 mody, które najwięcej dają temu buildowi">${esc(i.slot)}</button>`).join("")
+        + `<span class="small muted" style="margin-left:8px">albo sama baza z gearu:</span>` + mine.map(i => `<button class="ghost small" data-mine="${esc(i.base)}">${esc(i.base)}</button>`).join("") : "";
       $("#cMine").querySelectorAll("[data-mine]").forEach(b => b.onclick = () => openForge(b.dataset.mine));
+      $("#cMine").querySelectorAll("[data-goal]").forEach(b => b.onclick = () => busy(b, async () => {
+        const g = goals();
+        const t = await api("/api/craft/for_slot?" + q({slot: b.dataset.goal, damage: g.damage, survive: g.survive}));
+        await openForge(t.base, t);
+        toast(`Cel dla ${t.slot}: ${t.base}, DPS ${t.gain.dps_pct > 0 ? "+" : ""}${fmt(t.gain.dps_pct, 1)}%, EHP ${t.gain.ehp_pct > 0 ? "+" : ""}${fmt(t.gain.ehp_pct, 1)}% względem obecnego itemu.`, 6000);
+      }));
     }).catch(() => {});
     await loadBases();
     if (c.base) { await loadPool(); }
@@ -978,10 +1032,13 @@ function iconRetry(img) {  // icons come from poe2db one by one: a slow first fe
   img.dataset.retry = 1; setTimeout(() => { img.src = img.src + "&retry=1"; }, 3000);
 }
 const tiers = n => `${n} ${n === 1 ? "tier" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "tiery" : "tierów"}`;
-async function openForge(base) {  // the Kuźnia tab with this base picked
+async function openForge(base, preset) {  // the Kuźnia tab with this base picked (and a goal from the build)
   const hit = (await api("/api/craft/bases?" + q({q: base}))).bases.find(b => b.name === base);
   if (!hit) { toast("Tej bazy nie da się craftować w Kuźni."); return; }
-  state.craft = {type: hit.type, base: hit.name, ilvl: (state.craft || {}).ilvl || 82, wanted: {}, filter: ""};
+  const wanted = {};
+  for (const w of (preset && preset.wanted) || []) wanted[`${w.type}|${w.group}`] = {group: w.group, type: w.type, min_level: w.min_level};
+  state.craft = {type: hit.type, base: hit.name, ilvl: (preset && preset.item_level) || (state.craft || {}).ilvl || 82,
+                 wanted, filter: "", slot: preset && preset.slot};
   state.tab = "craft"; render(); window.scrollTo({top: 0, behavior: "smooth"});
 }
 function iconUrl(name, base, rarity) {  // uniques have their own art; rares / magic use their base
@@ -1208,6 +1265,48 @@ for (const id of ["gDamage", "gSurvive", "gSpeed", "gMana"]) {
 }
 try { const t = localStorage.getItem("soe-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
 refreshBadge().then(render).catch(() => render());
+dataStatus();
+
+// ---------------------------------------------------------------- data status and updates
+let dataTimer = null;
+async function dataStatus() {
+  let s;
+  try { s = await api("/api/data_status"); } catch (e) { $("#dataBadge").textContent = "· status niedostępny"; return; }
+  const ok = (good, text) => `<span class="${good ? "pos" : "neg"}">${good ? "✓" : "!"}</span> ${text}`;
+  const u = s.updater;
+  $("#dataBadge").innerHTML = u.running ? `<span class="busy"></span> ${esc(u.step || "aktualizuję")}…`
+    : s.ok ? `<span class="pos">· wszystko aktualne</span>` : `<span class="neg">· ${esc(s.todo.join(", "))}</span>`;
+  const rows = [
+    ["Path of Building", ok(s.pob.installed && !s.pob.update, `${esc(s.pob.pinned || "?")}${s.pob.latest ? ` (najnowsze na GitHubie: ${esc(s.pob.latest)})` : ""}`)],
+    ["Baza wiedzy", ok(s.kb.matches, s.kb.pob_version ? `z PoB ${esc(s.kb.pob_version)}, drzewko ${esc(s.kb.tree)}, zbudowana ${esc(s.kb.built_at)}` : "brak")],
+    ["Mody, wagi, esencje (poe2db)", ok(s.poe2db.pages && !s.poe2db.stale, s.poe2db.pages ? `${s.poe2db.pages} stron, pobrane ${esc(s.poe2db.oldest)}${s.poe2db.stale ? `, ${s.poe2db.stale} starych` : ""}` : "brak")],
+    ["Ceny (poe.ninja)", ok(!s.prices.old, s.prices.updated ? `pobrane ${esc(s.prices.updated)}` : "jeszcze nie pobrane")],
+    ["Appka", s.app.git ? ok(!s.app.behind, `wersja ${esc(s.app.commit)}${s.app.behind ? `, na GitHubie ${s.app.behind} nowych zmian` : s.app.behind === 0 ? ", aktualna" : ""}`) : "<span class=\"muted\">paczka bez gita: nowe wersje pobierasz ręcznie</span>"],
+  ];
+  const last = u.last ? `Ostatnia aktualizacja ${esc(u.last.when)}: ${esc((u.last.done || []).join(", ") || "wszystko było aktualne")}${(u.last.errors || []).length ? ` · <span class="neg">${esc(u.last.errors.join("; "))}</span>` : ""}` : "";
+  $("#dataBody").innerHTML = `<div class="tablewrap"><table>${rows.map(([k, v]) => `<tr><td class="small muted">${k}</td><td>${v}</td></tr>`).join("")}</table></div>
+    <p class="small muted">Appka sama sprawdza to przy starcie i przy wejściu na stronę (najczęściej co 6 h${s.checked ? `, ostatnio ${esc(s.checked)}` : ""}). Nowe PoB instaluje dopiero, gdy przejdzie test na buildach wzorcowych; inaczej zostaje stara wersja.${u.git ? "" : " Brak gita: PoB nie da się zaktualizować automatycznie."}</p>
+    ${last ? `<p class="small">${last}</p>` : ""}
+    ${u.running && u.log.length ? `<pre>${esc(u.log.join(String.fromCharCode(10)))}</pre>` : ""}
+    <div class="row"><button class="ghost" id="btnDataNow" ${u.running ? "disabled" : ""}>Sprawdź i zaktualizuj teraz</button>
+      ${s.app.behind ? `<button id="btnAppUpdate">Aktualizuj appkę</button>` : ""}</div>`;
+  if (!s.ok && !u.running) $("#dataPanel").open = true;
+  $("#btnDataNow").onclick = e => busy(e.target, async () => { await api("/api/data_update", {body: {what: "data"}}); toast("Sprawdzam i aktualizuję w tle."); dataStatus(); });
+  if ($("#btnAppUpdate")) $("#btnAppUpdate").onclick = e => busy(e.target, async () => {
+    const r = await api("/api/data_update", {body: {what: "app"}});
+    if (!r.ok) { toast("Błąd: " + r.error); return; }
+    toast(r.restarting ? "Zaktualizowane, appka uruchamia się ponownie…" : "Zaktualizowane. Zamknij okno appki i uruchom ją jeszcze raz.", 9000);
+    if (r.restarting) setTimeout(() => location.reload(), 8000);
+  });
+  clearTimeout(dataTimer);
+  if (u.running) {
+    state.dataWasRunning = true;
+    dataTimer = setTimeout(dataStatus, 3000);
+  } else if (state.dataWasRunning) {  // finished: the server may have a new engine and the same build again
+    state.dataWasRunning = false; state.cache = {};
+    await refreshBadge(); render();
+  }
+}
 </script>
 </body>
 </html>

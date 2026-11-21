@@ -12,6 +12,8 @@ os.environ["SOE_PRICES_DIR"] = tempfile.mkdtemp(prefix="soe-prices-")
 os.environ["SOE_LEAGUE"] = "Test League"
 # nor poe2db: saved pages in data/poe2db are used when present, else PoB data with equal weights
 os.environ["SOE_POE2DB"] = "offline"
+# nor the auto-updater (GitHub, git, poe2db refresh)
+os.environ["SOE_AUTOUPDATE"] = "0"
 
 
 @pytest.fixture(scope="session")

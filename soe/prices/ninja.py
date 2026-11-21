@@ -44,7 +44,10 @@ class Prices:
     def __init__(self, league: str | None = None, ttl: int = 3600, offline: bool = False, cache_dir: Path = CACHE):
         self.ttl, self.offline, self.cache_dir = ttl, offline, cache_dir
         self._league = league or os.environ.get("SOE_LEAGUE")
+        self._league_pinned = bool(self._league)
+        self._league_at = 0.0
         self._index: dict[str, dict] | None = None
+        self._built_at = 0.0
         self.rates = {"exalted": None, "chaos": None}
         self.stale: list[str] = []
         self.errors: list[str] = []
@@ -52,8 +55,10 @@ class Prices:
     # ---- league -----------------------------------------------------------------
     @property
     def league(self) -> str:
-        if self._league:
+        # a new league (e.g. a launch) shows up within a day without restarting the app
+        if self._league and (self._league_pinned or self.offline or time.time() - self._league_at < 86400):
             return self._league
+        self._league_at = time.time()
         cached = self.cache_dir / "_league.json"
         try:
             if self.offline:
@@ -126,8 +131,11 @@ class Prices:
 
     @property
     def index(self) -> dict[str, dict]:
-        if self._index is None:
+        # rebuilt after the cache TTL, so an app that runs for days still shows today's prices
+        if self._index is None or (not self.offline and time.time() - self._built_at > self.ttl):
+            self.stale, self.errors = [], []
             self._build_index()
+            self._built_at = time.time()
         return self._index
 
     # ---- lookups -------------------------------------------------------------------

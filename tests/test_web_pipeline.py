@@ -135,3 +135,15 @@ def test_diff_kb(kb_path, tmp_path):
     md = report_md(d)
     assert "v9.9.9" in md and "Fireball" in md and "Headhunter" in md
     assert diff_kb(kb_path, kb_path)["counts"]["gems"] == {"added": 0, "removed": 0, "changed": 0}
+
+
+def test_quick_and_forge_build_endpoints(client):
+    r = client.get("/api/quick").json()
+    assert r["cards"] and {c["id"] for c in r["cards"]} >= {"res", "attr", "gear"}
+    t = client.get("/api/craft/for_slot", params={"slot": "Ring 1"}).json()
+    assert t["base"] and t["wanted"]
+    v = client.post("/api/craft/value", json={"base": t["base"], "ilvl": t["item_level"], "slot": "Ring 1",
+                                               "wanted": t["wanted"]}).json()
+    assert v["slot"] == "Ring 1" and "dps_pct" in v
+    s = client.get("/api/data_status").json()
+    assert "pob" in s and "todo" in s

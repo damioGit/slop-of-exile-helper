@@ -23,5 +23,14 @@ if not exist "data\kb.current" if not exist "data\kb.sqlite" (
     ".venv\Scripts\python.exe" -m soe.kb.build || (pause & exit /b 1)
 )
 
-".venv\Scripts\python.exe" -m soe.web.app --open
+rem 3 = "Aktualizuj appke" w aplikacji: po aktualizacji appka startuje od nowa (bez otwierania nowej karty)
+set SOE_RESTART_CODE=3
+set OPEN=--open
+:run
+".venv\Scripts\python.exe" -m soe.web.app %OPEN%
+if errorlevel 3 if not errorlevel 4 (
+    set OPEN=
+    echo Uruchamiam nowa wersje...
+    goto run
+)
 if errorlevel 1 pause

@@ -47,5 +47,7 @@ When the user pastes a build code or asks about their build, use the `soe` tools
 - AI mode of the web assistant: `soe/web/ai.py` runs Claude Code headless (`claude -p`, the player's own login) with the soe MCP tools
 - Web app: `soe/web/app.py` (FastAPI over the same `Session`) + `soe/web/static/index.html` (one file, no build step, Polish UI). Run `soe web`; API docs at /api/docs
 - Real-character check: `scripts/fetch_corpus.py` then `scripts/run_corpus.py` (data/corpus, never commit other players' characters). Run it after engine changes.
+- Auto-update: `soe/pipeline/autoupdate.py` checks at app start and on page visits (every 6 h): new PoB release (update + engine check + KB + poe2db, then the app swaps sessions), stale poe2db pages, prices, app commits behind origin (pulled only on the player's click; `scripts/start.bat` restarts on exit code 3). `SOE_AUTOUPDATE=0` turns it off.
+- Web page: one syntax error blanks the whole app; `tests/test_page_js.py` runs `node --check` on its script
 - Launch day: `soe update [tag]` (fetch → engine check on tests/builds → new KB → patch report in data/), `soe compare old new`
 - Check-up and optimizer texts are English (MCP clients translate); the web UI shows them as they are
