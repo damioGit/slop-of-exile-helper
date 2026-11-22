@@ -1,6 +1,6 @@
 [project]
 name = "slop-of-exile-helper"
-version = "0.1.0"
+version = "0.1.1"
 description = "PoE2 build optimizer on top of the Path of Building engine"
 requires-python = ">=3.12"
 dependencies = ["lupa>=2.4", "mcp>=2.3,<3", "fastapi>=0.115", "uvicorn>=0.30"]
