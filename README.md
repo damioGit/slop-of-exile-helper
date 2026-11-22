@@ -1,179 +1,112 @@
 # Slop of Exile Helper
 
-Optymalizator buildów do Path of Exile 2, oparty na silniku Path of Building (PoE2) i Claude'zie.
-Plan i harmonogram: [PLAN.md](PLAN.md).
+Lokalna appka do Path of Exile 2, która mówi, co poprawić w buildzie i jak to wycraftować. Wszystko liczy prawdziwym silnikiem **Path of Building (PoE2)** na Twojej postaci, a nie z pamięci czy z poradników. Dane modów i craftingu bierze z **poe2db**, a ceny z **poe.ninja**.
 
-**Status:** fazy 0–6 gotowe. PoB2 działa headless w Pythonie (LuaJIT przez `lupa`). Do buildu masz doradcę w Claude Code (MCP), lokalną appkę webową i pipeline na dzień premiery.
+Działa w przeglądarce, na Twoim komputerze. Twój build zostaje u Ciebie.
 
-## Dla graczy: instalacja jednym kliknięciem
+> **Claude nie jest potrzebny.** Cała appka działa bez AI: liczenie, Kuźnia, Gear, drzewko, trade i aktualizacje. Claude to opcjonalny dodatek dla tych, którzy mają Claude Code (patrz [niżej](#opcjonalnie-claude)).
 
-`instaluj.bat` instaluje brakującego Pythona i Gita (winget) i stawia `.venv`. Potem pobiera Path of Building, buduje bazę wiedzy, ściąga dane z poe2db i robi skrót na pulpicie. Uruchomienie: skrót albo `uruchom.bat`. Paczkę zip dla kogoś innego (bez `data/`, `vendor/` i Twoich ustawień) robi:
+## Instalacja (Windows 10/11)
 
-```bash
-.venv/Scripts/python scripts/make_package.py     # -> dist/slop-of-exile-helper-<data>-<commit>.zip
-```
+1. Pobierz `slop-of-exile-helper-vX.Y.Z.zip` z **[Releases](https://github.com/damioGit/slop-of-exile-helper/releases/latest)** i rozpakuj go w stałe miejsce. Potrzeba ok. 1 GB.
+2. Kliknij dwa razy **`instaluj.bat`**. Jeśli nie masz Pythona albo Gita, instalator doinstaluje je sam (winget). Pobranie Path of Building trwa kilka minut.
+3. Uruchamiasz skrótem **Slop of Exile Helper** na pulpicie (albo `uruchom.bat`). Appka otworzy się w przeglądarce, a zamknięcie czarnego okna ją wyłącza.
+4. Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja (`Nazwa#1234` + nazwa postaci).
 
-Instrukcja dla odbiorcy jest w `JAK ZAINSTALOWAC.txt`. Tryb AI jest opcjonalny (Claude Code zalogowany u odbiorcy).
+Jak coś nie wyjdzie, uruchom `instaluj.bat` jeszcze raz: robi tylko to, czego brakuje.
 
-## Setup (Windows, dla programistów)
+## Co potrafi
+
+- **Asystent:** szybki przegląd buildu w kilka sekund:
+  - resy do capu, brakujące atrybuty, spirit, czy mana się trzyma;
+  - typ obrażeń, który najsłabiej znosisz (największy przeżywalny hit);
+  - co wymienić najpierw i najlepsze pasywki w zasięgu.
+
+  Do tego pytania pisane po swojemu („nie oneshotuję bossa, jak bić mocniej?”). Odpowiedź to lista zmian z zyskiem i kosztem, każda z przyciskiem „Zastosuj”.
+- **Gear:** ekwipunek wygląda jak w grze. Dla każdego itemu widzisz:
+  - ile jest wart każdy mod i czy opłaca się Exalt, Chaos, Annul albo Fracture (z szansami i cenami);
+  - który slot wymienić najpierw w porównaniu z realnym rare na Twój level;
+  - przepis na lepszy item;
+  - wyszukiwanie zamienników na oficjalnym trade, przeliczonych w PoB na Twoim buildzie.
+- **Kuźnia:** wybierasz bazę i mody albo klikasz „ułóż cel pod mój build”. Appka porównuje drogi craftu:
+  - esencje i Perfect Essence;
+  - omeny Exaltation, Annulment i Crystallisation;
+  - desecration (kości);
+  - Greater/Perfect Exalty;
+  - tanie bazy do 5/6 z dokończeniem.
+
+  Dostajesz szansę na próbę, koszt do skutku i koszt, gdy wystarczy 4/6 albo 5/6. Widzisz też, ile DPS i EHP da ten item Twojej postaci. Mody, które na danej bazie praktycznie nie wypadają, są oznaczone od razu.
+- **Skille:** gemy z opisami z gry, DPS każdego skilla, supporty, które nie działają (z powodem), i optymalizator supportów.
+- **Drzewko:** drzewo pasywne jak w PoB, najlepsze nowe pasywki, co zwolnić i optymalizator drzewka.
+- **Plan i Synergie:** wszystkie zmiany policzone razem; mechaniki, które build tworzy i z których korzysta; warunki z configu bez źródła w buildzie (czyli DPS jest zawyżony).
+
+## Aktualizacje same się robią
+
+Przy starcie i co kilka godzin appka sprawdza:
+- **nowe Path of Building:** instaluje je dopiero po teście na buildach wzorcowych, więc na premierę nowej ligi albo 1.0 nic nie trzeba robić;
+- **dane z poe2db:** wagi modów, esencje, mody desecrated;
+- **zasady craftingu:** jeśli GGG zmieni działanie orba albo omena, appka to zgłosi;
+- **ceny z poe.ninja i aktualną ligę;**
+- **nową wersję samej appki** z tego repo (można to wyłączyć).
+
+Stan danych widać w panelu **„Dane i aktualizacje”**. Jest tam też przycisk „Wymuś pełną aktualizację”, który pobiera wszystko od nowa.
+
+## Opcjonalnie: Claude
+
+Appka **nie wymaga** Claude'a. Jeśli masz [Claude Code](https://claude.com/claude-code), możesz go podpiąć na dwa sposoby:
+- **Checkbox „AI” w Asystencie:** pytanie trafia do Claude Code zalogowanego na Twoim koncie. Claude używa tych samych narzędzi co appka i może szukać na wiki, więc rozumie dowolne pytania. Bez Claude Code checkbox po prostu nie zadziała, a reszta appki działa normalnie.
+- **Serwer MCP `soe`** (zarejestrowany w `.mcp.json`): w Claude Code w tym folderze rozmawiasz o buildzie, a Claude liczy wszystko w PoB przez ~40 narzędzi (`load_build`, `checkup`, `optimize_supports`, `craft_routes`, `find_upgrade`...). Zasady odpowiadania są w [CLAUDE.md](CLAUDE.md).
+
+## Ważne do wiedzenia
+
+- **Szanse craftu to symulacja na wagach modów z poe2db.** Przy desecration poe2db nie mówi, jak często opcje to zwykłe mody bazy. To założenie jest opisane przy wynikach.
+- **Import postaci działa dla publicznych postaci, które zna poe.ninja.** Przy zbyt wielu zapytaniach poe.ninja chwilowo blokuje dostęp i wtedy ceny lecą z cache.
+- **Brak ceny na poe.ninja znaczy „nieznana”.** Nic nie jest zgadywane.
+- **Projekt fanowski, niezwiązany z Grinding Gear Games.**
+
+---
+
+## Dla programistów
 
 ```bash
 py -m venv .venv
 .venv/Scripts/python -m pip install -e ".[dev]"
 .venv/Scripts/python scripts/fetch_pob.py      # PoB w wersji z POB_VERSION -> vendor/
-.venv/Scripts/soe kb build                     # baza wiedzy
+.venv/Scripts/soe kb build                     # baza wiedzy z danych PoB
+.venv/Scripts/soe poe2db sync                  # wagi modów, esencje, mody desecrated
 .venv/Scripts/python -m pytest
 ```
 
-## Użycie
+Najważniejsze komendy:
 
 ```bash
-.venv/Scripts/soe web                           # appka: http://127.0.0.1:8765
-.venv/Scripts/soe eval <kod buildu PoB>         # podsumowanie: DPS, EHP, resy, atrybuty
-.venv/Scripts/soe eval build.txt --full         # wszystkie staty, które liczy PoB
+.venv/Scripts/soe web                          # appka: http://127.0.0.1:8765
+.venv/Scripts/soe eval <kod buildu PoB>        # DPS, EHP, resy, atrybuty
+.venv/Scripts/soe refresh [--full]             # sprawdź / wymuś aktualizację danych
+.venv/Scripts/soe update [tag]                 # nowe PoB: pobierz -> test silnika -> baza -> raport zmian
+.venv/Scripts/soe kb search life leech         # baza wiedzy: gemy, mody, bazy, unikaty, notable
+.venv/Scripts/python scripts/make_package.py   # zip dla graczy -> dist/
 ```
 
-## Odpalanie jednym kliknięciem
+Budowa projektu:
+- **`soe/engine/`:** PoB2 headless w Pythonie (LuaJIT przez `lupa`).
+  - `pob.py` ma what-if bez zmiany buildu (~130/s na rdzeń);
+  - `pool.py` to pula procesów;
+  - `lua/soe_api.lua` to jedyny plik, który dotyka wnętrzności PoB.
+- **`soe/kb/`:** baza wiedzy z danych PoB oraz `poe2db.py` (wagi, esencje, desecrated) i `craft_rules.py` (czujnik zasad craftingu).
+- **`soe/items/`:** Kuźnia (`crafter.py`), gear (`gear.py`, `craftplan.py`, `forge_build.py`), unikaty, mody.
+- **`soe/optimize/`:** cel (ważony DPS/EHP z karami), wagi statów, supporty, drzewko, plan.
+- **`soe/advisor/`:** sesja, check-up, szybki przegląd i serwer MCP.
+- **`soe/web/`:** FastAPI i jeden plik `index.html` (bez builda, polski UI).
+- **`soe/prices/`:** poe.ninja, trade, import postaci.
+- **`soe/pipeline/`:** aktualizacje (`autoupdate.py`, `update.py`) i raport zmian między wersjami.
+- **Testy:** `pytest`, ok. 4 min. Pilnują między innymi, żeby w repo nie było tokenów, haseł ani prywatnych ścieżek.
 
-Kliknij dwa razy **`Slop of Exile Helper`** (skrót z pomarańczowym kryształem w głównym folderze). Uruchomi appkę i sam otworzy ją w przeglądarce. Przy pierwszym razie, jeśli trzeba, pobierze PoB i zbuduje bazę wiedzy.
-- Appka działa, dopóki jest otwarte jej okno (zminimalizowane na pasku zadań). Zamknięcie okna wyłącza appkę.
-- Drugie kliknięcie przy działającej appce tylko otwiera ją w przeglądarce.
-- Skrót wskazuje na `scripts/start.bat`, a ikona leży w `assets/soe.ico` (rysuje ją `scripts/make_icon.py`).
-- Jeśli przeniesiesz folder, skrót przestanie działać. Wtedy uruchom `scripts/start.bat` albo zrób nowy skrót do niego.
+Pułapki: pola tabel Lua o nazwach `items`, `keys` i `values` czytaj przez `tbl["items"]` (w lupa `.items` to metoda Pythona). LuaJIT na Windows rzuca SEH `0xe24c4a02` przy złapanych błędach Lua: to nie crash. Jedna instancja `PoB` na proces.
 
-## Rynek (oficjalny trade)
+## Źródła i podziękowania
 
-Przy sugestiach gearu asystent i zakładka Gear szukają **prawdziwych ofert** na trade (bieżąca liga). Szukany jest item, który zachowa najmocniejsze mody Twojego obecnego (na ~80% Twoich rolli) i doda wybrany mod. Każda oferta jest przeliczana w PoB na Twoim buildzie, a wynik pokazuje item ze statami, cenę (≈ div), zysk i link do tego samego wyszukiwania na trade. Jeśli w budżecie nic nie bije obecnego itemu, appka mówi to wprost.
-- **Mody na gearze** są oceniane po realnym rollu (środkowy tier). Najlepszy możliwy roll jest pokazany osobno, z szansą na exalta.
-- **Cel „clear”** dla pytań o czyszczenie map: liczy DPS, pociski, obszar i ruch.
-
-## Import postaci z profilu (poe.ninja)
-
-W appce, w panelu „Wczytaj build”, podaj konto tak jak w grze (`Nazwa#1234`) i nazwę postaci albo wklej link do postaci z poe.ninja, potem „Importuj”. Liga dobiera się sama. „⟳ Synchronizuj” pobiera postać jeszcze raz, np. po zmianach w grze, gdy poe.ninja ją odświeży. W Claude Code działają narzędzia `import_character` i `resync_character`.
-- **Działa tylko dla publicznych postaci, które poe.ninja już zna.** PoB loguje się do oficjalnego API GGG (OAuth) na własnym, zarejestrowanym identyfikatorze aplikacji. Żeby zrobić to samo bez poe.ninja, ten projekt musiałby zarejestrować własną aplikację u GGG.
-- **Przy zbyt wielu zapytaniach poe.ninja chwilowo blokuje dostęp** (rate limit / sprawdzanie botów). Wtedy appka mówi to wprost, a ceny lecą z cache. Blokada nie jest obchodzona.
-
-## Asystent (pierwsza zakładka w appce)
-
-Wpisujesz pytanie po swojemu, np. „nie oneshotuję moba, jak bić mocniej Lightning Boltem za 3 div” albo „ciągle umieram na bossach”. Asystent:
-- rozpoznaje cel: oneshot = średni hit, nie DPS; do tego DPS, przetrwanie, mana, prędkość;
-- rozpoznaje skill (albo bierze go z listy) i budżet z tekstu (div, ex);
-- liczy dla tego skilla w PoB: poziom gema, supporty, które na niego nie działają (z powodem), lepsze supporty, ruchy na drzewku, lepsze mody na każdym slocie, unikaty i to, czego szukać na gearze;
-- przy skillach z kilkoma częściami (np. Whirling Slash) bierze tę, która zadaje obrażenia;
-- zwraca ponumerowaną listę „zrób to” z zyskiem i kosztem, przyciski „Zastosuj w buildzie” i „Pokaż na drzewku” oraz wynik „wszystko naraz”.
-
-W nagłówku jest wybór głównego skilla. Zakładka **Drzewko** pokazuje drzewo pasywne jak w PoB (przesuwanie, zoom, najechanie pokazuje, co daje pasywka). Przy rankingach jest opis pasywek i „pokaż”, które podświetla ścieżkę.
-
-## Appka webowa
-
-`soe web` uruchamia lokalną stronę na tym samym silniku co doradca MCP. Wklejasz kod buildu i masz zakładki:
-- **Check-up**: co hamuje build, kolejność według suwaków celów
-- **Przegląd**: kafle statów, mierniki resów do capu, max hit per typ, punkty, config
-- **Skille**: DPS każdego skilla, gemy (supporty, które nie działają, są przekreślone), optymalizator supportów z „Zastosuj”
-- **Gear**: widok slotu (tekst itemu, lepsze mody z esencjami, idealny item, unikaty na slot, porównanie wklejonego itemu), wagi statów, „unikat, który mi się podoba”
-- **Drzewko**: najlepsze nowe pasywki, co zwolnić, optymalizator drzewka z „Zastosuj”
-- **Combo**: co build tworzy / z czego korzysta, payoffy, enablery, ostrzeżenia z configu
-- **Plan**: wszystkie zmiany posortowane, razem zmierzone, „Zastosuj gemy i drzewko”
-- **Szukaj**: baza wiedzy
-
-„Kod PoB” kopiuje aktualny build (ze zmianami) do schowka, a „Reset” wraca do wczytanego. Jest jasny i ciemny motyw, a układ działa na telefonie.
-
-## Dzień premiery (PoB z danymi 1.0)
-
-```bash
-.venv/Scripts/soe update             # najnowszy release PoB: pobierz -> test silnika -> nowa baza -> raport zmian
-.venv/Scripts/soe update v1.0.0      # konkretny tag
-.venv/Scripts/soe compare v0.22.0 v0.23.1   # sam raport różnic między wersjami
-```
-
-`update` testuje silnik na buildach z `tests/builds/`. Jeśli test padnie, wraca do poprzedniej wersji. Raport zmian (gemy, unikaty, notable, ascendancy, mody, bazy) trafia do `data/patch-<stara>-<nowa>.md`. Przykład z próby: [docs/patch-example-v0.22.0-v0.23.1.md](docs/patch-example-v0.22.0-v0.23.1.md) (~1 min).
-Po aktualizacji zrestartuj serwer MCP i appkę, a potem odpal testy. Liczby z `tests/test_reference_builds.py` (poe.ninja) trzeba będzie podmienić na buildach z 1.0.
-
-## Doradca w Claude Code (MCP)
-
-Serwer `soe` jest zarejestrowany w `.mcp.json`. Claude Code w tym folderze pyta przy starcie, czy go włączyć.
-Wymaga zbudowanej bazy (`soe kb build`). Narzędzia: `load_build`, `build_overview`, `checkup`, `get_item`, `build_config`,
-`whatif_passives`, `whatif_item`, `try_changes`, `apply_changes`, `rank_passives`, `rank_respec`,
-`stat_weights`, `optimize_supports`, `optimize_tree`, `improvement_plan`, `try_unique`, `rank_uniques`,
-`mod_upgrades`, `ideal_item`, `craft_odds`, `suggest_combos`, `price_check`, `export_build`, `reset_build`,
-`kb_search`, `kb_gem`, `kb_supports_for`, `kb_unique`, `kb_mods`, `kb_node`. Zasady odpowiadania są w [CLAUDE.md](CLAUDE.md).
-
-`checkup` to lista tego, co hamuje build: resy, najsłabszy max hit, atrybuty, spirit, mana, supporty, które nie działają,
-poziomy gemów, punkty, pasywki z drugiego zestawu broni oraz pasywki i mody, które nic nie dają (zmierzone w PoB).
-Wynik ułożony jest wg wag celów gracza. Format jest wzorowany na [Exile Build Advisor](https://github.com/reytla/exile-build-adviser)
-(reytla, MIT), szczegóły w [NOTICE](NOTICE).
-
-Ręczne uruchomienie: `.venv/Scripts/python -m soe.advisor.server` (stdio).
-
-### Optymalizatory (`soe/optimize/`)
-
-- `objective.py`: cel = waga_dmg · ln(DPS) + waga_surv · ln(EHP), z karami za spadek resów, niespełnione atrybuty i przekroczony spirit
-- `stat_weights.py`: ile wart jest każdy z ~45 statów gearowych (dodany do biżuterii, what-if, < 0.5 s)
-- `supports.py`: wszystkie pasujące supporty w każdym slocie, pełne przeliczenia PoB na puli procesów, 2 etapy (~25 s); reguły: support raz na skill, jedna rodzina gemów
-- `tree.py`: zachłanne ruchy na drzewku (zwolnij słabe → weź mocne), każdy ruch sprawdzony w PoB; pasywek, których PoB nie liczy, nie rusza
-- `plan.py`: `improvement_plan` łączy wszystko (supporty, drzewko, najlepsza zmiana moda na każdym slocie), mierzy całość razem i dokłada priorytety statów na gear
-
-### Itemy i combo (`soe/items/`, `soe/combo/`)
-
-- `uniques.py`: `try_unique` (wstaw unikat, zobacz zmiany, linie, których PoB nie liczy, co psuje) i `rank_uniques` (wszystkie unikaty danego typu vs obecny item, ~0.5 s)
-- `craft.py`: pula modów bazy dla ilvl (zasada pierwszego pasującego tagu wagi), rozpoznawanie tieru moda (z zakresem, też ponad tiery po katalizatorach), `mod_upgrades` (co wymienić, na co, esencja), `ideal_item` (sufit 3+3), `craft_odds` (równe wagi = szacunek)
-- `mechanics.py`: słownik ~25 mechanik (ailmenty, charge'e, whirlwind, infusion, ground, herald...), profil buildu (tworzy / korzysta), payoffy i enablery mierzone w PoB, sprawdzenie warunków włączonych w configu bez źródła w buildzie (~10 s z pulą)
-- baza wiedzy: tabela esencji; każda budowa to nowy plik `data/kb-*.sqlite` + wskaźnik `data/kb.current` (na Windows otwartej bazy nie da się podmienić)
-
-## Baza wiedzy
-
-```bash
-.venv/Scripts/soe kb build                       # data/kb.sqlite z danych PoB (~2 s)
-.venv/Scripts/soe kb search life leech           # szuka we wszystkim: gemy, skille, mody, bazy, unikaty, notable, ascendancy
-.venv/Scripts/soe kb gem Twister                 # typy skilla, tagi, staty na max poziomie jako tekst
-.venv/Scripts/soe kb supports Twister            # supporty, które PoB pozwala podpiąć
-.venv/Scripts/soe kb unique Headhunter           # aktualny wariant: implicity i mody
-.venv/Scripts/soe kb mods "maximum Life" --slot ring --type Prefix
-```
-
-W Pythonie: `from soe.kb import KB` i dalej `KB().search(...)`, `gem`, `supports_for`, `unique`, `base`, `node`, `mods(slot=...)`, `mod_tiers(group, slot=...)`, `classes()`.
-Wagi modów w danych PoB to tylko 0/1 (patrz PLAN.md, ryzyko 4).
-
-## Jak to działa
-
-- `soe/engine/pob.py`: klasa `PoB`, jedna instancja PoB:
-  - **ładowanie i eksport:** `load_code`, `load_xml`, `export_code`, `export_xml`
-  - **wyniki:** `summary()` (najważniejsze staty, brakujące = 0), `output()` (wszystko), `all_skill_dps()` (DPS, DoT i miniony każdego skilla)
-  - **what-if bez zmiany buildu (~130/s na rdzeń):** `whatif(add_nodes=[...], with_path=True)`, `whatif(remove_nodes=[...])`, `whatif(slot="Ring 2", item_raw=...)`, `whatif(slot="Ring 2")` (pusty slot)
-  - **zmiany:** drzewko (`alloc_node`, `dealloc_node`, `reachable`, `node_info`, `node_path`), gemy (`groups`, `set_gem(group, gem, name=/level=/quality=/enabled=)`, `remove_gem`, `set_main_skill`, `paste_gems`), itemy (`items`, `equip`, `unequip`), config (`config_options`, `set_config`), postać (`set_class`, `set_level`)
-  - **cofanie:** `with pob.trial(): ...` (albo `snapshot()` i `restore()`)
-  - „Weapon 1/2” samo trafia w aktywny zestaw broni (swap), `exact_slot=True` wyłącza to mapowanie
-- `soe/engine/pool.py`: `PoBPool` to wiele procesów z tym samym buildem. Zadania to słowniki (`{"call": "whatif", "kwargs": {...}}` albo `{"trial": [[metoda, kwargs], ...]}`). Na 16 rdzeniach daje ~800 what-if/s (`scripts/bench.py`).
-- `soe/engine/lua/soe_api.lua`: jedyne miejsce, które dotyka wnętrzności PoB. Przy aktualizacji PoB naprawiamy tylko ten plik.
-- `soe/engine/lua/bootstrap.lua`: odpala `HeadlessWrapper.lua` z PoB, podpina zlib z Pythona i pure-Lua shim za `lua-utf8`.
-- Nową wersję PoB (np. 1.0 w dniu premiery) ściągasz przez `python scripts/fetch_pob.py <tag>` i zmianę `POB_VERSION`.
-
-## Znane pułapki
-
-- Pola tabel Lua o nazwach `items`, `keys`, `values` czytaj przez `tbl["items"]`, bo w lupa `.items` to metoda Pythona.
-- LuaJIT na Windows rzuca wyjątek SEH `0xe24c4a02` przy każdym złapanym błędzie Lua. To nie crash; faulthandler w pytest jest wyłączony z tego powodu.
-- Jedna instancja `PoB` na proces/wątek. Do równoległych obliczeń używaj wielu procesów.
-
-## Ceny (poe.ninja)
-
-`soe/prices/ninja.py` pobiera ceny z poe.ninja (PoE2): walutę, esencje, runy, fragmenty, soul core'y, uncut gemy, lineage supporty i unikaty wszystkich typów. Ceny są w divine, z przeliczeniem na exalted i chaos.
-- **Liga:** najnowsza indeksowana liga softcore albo zmienna `SOE_LEAGUE`.
-- **Cache:** `data/prices/<liga>/` na 1 h. Bez internetu używany jest ostatni cache, oznaczony jako nieaktualny.
-- **Brak ceny = nieznana.** Nic nie jest zgadywane.
-- **Gdzie widać ceny:** `price_check`, ranking i test unikatów, optymalizator supportów (lineage), esencje w `mod_upgrades`, `craft_odds` (oczekiwana liczba exaltów i koszt), `improvement_plan` (koszt, zysk na divine, znany koszt całości) oraz appka.
-
-## Test na prawdziwych postaciach (poe.ninja)
-
-```bash
-.venv/Scripts/python scripts/fetch_corpus.py --league runesofaldur   # po 1 postaci na ascendancy -> data/corpus/ (poza repo)
-.venv/Scripts/python scripts/run_corpus.py [--quick]                # wszystkie narzędzia + porównanie z liczbami poe.ninja
-```
-
-Raport trafia do `data/corpus_report.md` i `.json`. poe.ninja ostro limituje zapytania (429), więc skrypt pobiera powoli i ponawia, a przy kolejnym uruchomieniu dociąga brakujące ascendancy.
-
-Ostatni wynik (16.11, Runes of Aldur + 2 postacie z Forbidden Rites, 23/23 ascendancy):
-- 0 błędów we wszystkich narzędziach;
-- staty obronne zgodne z poe.ninja u wszystkich postaci;
-- 79 skilli z DPS zgodnym co do ±3% (hit i DoT osobno, miniony, stat sety, skille z drugiego zestawu broni);
-- żadne narzędzie nie zmieniło buildu;
-- znane drobne różnice: część skilli minionów z kilkoma atakami (Ruzhan's Brand, Skeletal Arsonist, Wild Protector).
+- [Path of Building Community (PoE2)](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2): silnik obliczeń, pobierany przy instalacji.
+- [poe2db.tw](https://poe2db.tw): wagi modów, esencje, mody desecrated, opisy orbów, ikony.
+- [poe.ninja](https://poe.ninja): ceny i publiczne postacie.
+- Format check-upu wzorowany na [Exile Build Advisor](https://github.com/reytla/exile-build-adviser) (reytla, MIT). Szczegóły są w [NOTICE](NOTICE).
