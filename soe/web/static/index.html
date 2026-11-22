@@ -1272,7 +1272,11 @@ dataStatus();
 let dataTimer = null;
 async function dataStatus() {
   let s;
-  try { s = await api("/api/data_status"); } catch (e) { $("#dataBadge").textContent = "· status niedostępny"; return; }
+  try { s = await api("/api/data_status"); } catch (e) {
+    $("#dataBadge").textContent = state.fullUpdate ? "· appka uruchamia się ponownie…" : "· status niedostępny";
+    if (state.fullUpdate) setTimeout(() => location.reload(), 5000);
+    return;
+  }
   const ok = (good, text) => `<span class="${good ? "pos" : "neg"}">${good ? "✓" : "!"}</span> ${text}`;
   const u = s.updater;
   $("#dataBadge").innerHTML = u.running ? `<span class="busy"></span> ${esc(u.step || "aktualizuję")}…`
@@ -1300,13 +1304,23 @@ async function dataStatus() {
     ${u.running && u.log.length ? `<pre>${esc(u.log.join(String.fromCharCode(10)))}</pre>` : ""}
     ${s.app.git && s.app.source ? `<label class="small" style="display:block;margin:6px 0"><input type="checkbox" id="chkAutoApp" ${s.app.auto ? "checked" : ""} style="width:auto;vertical-align:middle">
       Aktualizuj appkę automatycznie z GitHuba przy każdym uruchomieniu <span class="muted">(${esc(s.app.source.replace("https://github.com/", "").replace(".git", ""))}; nigdy nie nadpisuje Twoich zmian w plikach)</span></label>` : ""}
+    ${u.restart_needed ? `<div class="finding warn">Appka pobrała nową wersję kodu: zamknij okno appki i uruchom ją ponownie (skrótem uruchamia się sama).</div>` : ""}
     <div class="row"><button class="ghost" id="btnDataNow" ${u.running ? "disabled" : ""}>Sprawdź i zaktualizuj teraz</button>
+      <button class="ghost" id="btnDataFull" ${u.running ? "disabled" : ""} title="Pobiera wszystko od nowa, niezależnie od ostatniego sprawdzenia">Wymuś pełną aktualizację</button>
       ${s.app.behind ? `<button id="btnAppUpdate">Aktualizuj appkę</button>` : ""}</div>`;
   if (!s.ok && !u.running) $("#dataPanel").open = true;
   if ($("#btnRulesOk")) $("#btnRulesOk").onclick = e => busy(e.target, async () => { await api("/api/rules/accept", {body: {}}); dataStatus(); });
   if ($("#chkAutoApp")) $("#chkAutoApp").onchange = async e => {
     await api("/api/settings", {body: {auto_update_app: e.target.checked}});
     toast(e.target.checked ? "Appka będzie się aktualizować sama przy starcie." : "Automatyczna aktualizacja appki wyłączona.");
+  };
+  $("#btnDataFull").onclick = e => {
+    if (!confirm("Pełna aktualizacja pobierze wszystko od nowa: bazę wiedzy, wszystkie strony poe2db, zasady craftingu i ceny. Naprawi też uszkodzone Path of Building i pobierze nową wersję appki z GitHuba (wtedy appka uruchomi się ponownie). Trwa kilka minut, w tym czasie appka działa. Kontynuować?")) return;
+    busy(e.target, async () => {
+      await api("/api/data_update", {body: {what: "full"}});
+      toast("Pełna aktualizacja ruszyła w tle. Postęp widać w tym panelu.", 6000);
+      state.fullUpdate = true; dataStatus();
+    });
   };
   $("#btnDataNow").onclick = e => busy(e.target, async () => { await api("/api/data_update", {body: {what: "data"}}); toast("Sprawdzam i aktualizuję w tle."); dataStatus(); });
   if ($("#btnAppUpdate")) $("#btnAppUpdate").onclick = e => busy(e.target, async () => {

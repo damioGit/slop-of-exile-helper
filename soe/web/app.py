@@ -410,7 +410,20 @@ def data_update(payload: dict = Body(default={})):
             threading.Timer(1.5, lambda: os._exit(int(os.environ["SOE_RESTART_CODE"]))).start()
             r["restarting"] = True
         return r
-    started = updater.maybe_start(force=True)
+    full = payload.get("what") == "full"
+    started = updater.maybe_start(force=True, full=full)
+    if started and full and os.environ.get("SOE_RESTART_CODE"):
+        import threading
+        import time
+
+        def restart_when_done():  # a forced update that pulled new app code: start the new version
+            time.sleep(2)
+            while updater.running:
+                time.sleep(1)
+            if updater.restart_needed:
+                time.sleep(2)
+                os._exit(int(os.environ["SOE_RESTART_CODE"]))
+        threading.Thread(target=restart_when_done, daemon=True).start()
     return {"started": started, "status": updater.status()}
 
 

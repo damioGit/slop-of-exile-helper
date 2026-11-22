@@ -78,6 +78,7 @@ class Updater:
         self.step: str | None = None
         self.log: list[str] = []
         self.on_new_engine = None  # called after PoB / the knowledge base changed (the app reloads its session)
+        self.restart_needed = False  # the app's own code was pulled: it has to start again
         self.state = self._load()
 
     # ---- state --------------------------------------------------------------------
@@ -165,6 +166,7 @@ class Updater:
         loc["app"]["behind"] = rem.get("app_behind")
         loc["checked"] = _age(rem.get("checked"))
         loc["updater"] = {"running": self.running, "step": self.step, "log": self.log[-12:],
+                          "restart_needed": self.restart_needed,
                           "last": self.state.get("last_result"), "auto": enabled(), "git": shutil.which("git") is not None}
         try:
             from soe.kb import craft_rules
@@ -196,22 +198,26 @@ class Updater:
         return loc
 
     # ---- doing it -----------------------------------------------------------------
-    def maybe_start(self, force: bool = False) -> bool:
-        """Start a background check + update if it is due (or forced). Returns True when one started."""
+    def maybe_start(self, force: bool = False, full: bool = False) -> bool:
+        """Start a background check + update if it is due (or forced). Returns True when one started.
+        full: refetch everything now (see run)."""
         if self.running or (not force and not enabled()):
             return False
         last = (self.state.get("remote") or {}).get("checked") or 0
         if not force and time.time() - last < CHECK_EVERY:
             return False
-        threading.Thread(target=self.run, kwargs={"force": force}, daemon=True).start()
+        threading.Thread(target=self.run, kwargs={"force": force, "full": full}, daemon=True).start()
         return True
 
-    def run(self, force: bool = False):
+    def run(self, force: bool = False, full: bool = False):
+        """Check and update. full (the player's "force update"): rebuild the knowledge base, refetch every poe2db
+        page, the crafting rules and all prices, repair a damaged Path of Building and pull the app's new commits,
+        whatever the last check said."""
         with self.lock:
             if self.running:
                 return
             try:
-                if LOCK.exists() and time.time() - LOCK.stat().st_mtime < 3600:
+                if LOCK.exists() and time.time() - LOCK.stat().st_mtime < (60 if full else 3600):
                     return  # another instance is updating
                 LOCK.parent.mkdir(parents=True, exist_ok=True)
                 LOCK.write_text(str(os.getpid()))
@@ -219,7 +225,10 @@ class Updater:
                 return
             self.running = True
         changed_engine = False
-        result = {"at": time.time(), "done": [], "errors": []}
+        self.restart_needed = False
+        result = {"at": time.time(), "done": [], "errors": [], "full": full}
+        if full:
+            self._log("pełna aktualizacja: wszystko od nowa")
         try:
             self.step = "sprawdzam wersje"
             rem = self.remote(force=True)
@@ -241,16 +250,20 @@ class Updater:
                         changed_engine = True
                     else:
                         result["errors"].append(f"PoB {latest}: test silnika nie przeszedł, zostaje {pinned}")
-            elif not loc["pob"]["installed"] and git_ok and pinned:
+            elif git_ok and pinned and (not loc["pob"]["installed"] or (full and self._pob_damaged())):
                 self.step = f"pobieram Path of Building {pinned}"
                 self._log(self.step)
                 sys.path.insert(0, str(ROOT / "scripts"))
                 from fetch_pob import fetch
 
+                if loc["pob"]["installed"]:  # damaged copy of the same version: download it again
+                    from fetch_pob import DEST, _rm
+
+                    _rm(DEST)
                 fetch(pinned)
                 result["done"].append(f"PoB {pinned} pobrane")
                 changed_engine = True
-            if not changed_engine and not self.local()["kb"]["matches"]:
+            if not changed_engine and (full or not self.local()["kb"]["matches"]):
                 self.step = "buduję bazę wiedzy"
                 self._log(self.step)
                 from soe.kb.build import build
@@ -263,7 +276,7 @@ class Updater:
             from soe.kb.query import KB
 
             before = poe2db.status()
-            info = poe2db.sync(KB(), refresh=False, log=lambda m: None)  # only missing or week-old pages
+            info = poe2db.sync(KB(), refresh=full, log=lambda m: None)  # normally only missing or week-old pages
             if info["failed"]:
                 result["errors"].append(f"poe2db: {len(info['failed'])} stron bez danych")
             if poe2db.status() != before:
@@ -272,7 +285,7 @@ class Updater:
             try:
                 from soe.kb import craft_rules
 
-                craft_rules.check()
+                craft_rules.check(force=full)
                 rep = craft_rules.report()
                 if rep["changes"]:
                     result["errors"].append(f"zasady craftingu: {len(rep['changes'])} zmian na poe2db")
@@ -282,9 +295,28 @@ class Updater:
             try:
                 from soe.prices import ninja
 
-                ninja.default_prices().status()
+                pr = ninja.default_prices()
+                if full:  # every price file again, not only the ones past their TTL
+                    ttl, pr.ttl, pr._index, pr._league_at = pr.ttl, 0, None, 0
+                    try:
+                        pr.status()
+                    finally:
+                        pr.ttl = ttl
+                    result["done"].append("ceny pobrane od nowa")
+                else:
+                    pr.status()
             except Exception as e:
                 result["errors"].append(f"ceny: {e}")
+            if full:
+                self.step = "sprawdzam nową wersję appki"
+                behind = (self.state.get("remote") or {}).get("app_behind")
+                if behind:
+                    r = self.update_app()
+                    if r.get("ok"):
+                        result["done"].append(f"appka zaktualizowana ({behind} zmian)")
+                        self.restart_needed = True
+                    else:
+                        result["errors"].append(f"appka: {r.get('error')}")
             if changed_engine and self.on_new_engine:
                 self.step = "przełączam appkę na nowe dane"
                 self.on_new_engine()
@@ -299,6 +331,14 @@ class Updater:
             self.step = None
             self.running = False
             LOCK.unlink(missing_ok=True)
+
+    def _pob_damaged(self) -> bool:
+        """Files of the vendored Path of Building changed or missing (git status in vendor/)."""
+        dest = ROOT / "vendor" / "PathOfBuilding-PoE2"
+        if not (dest / "src" / "HeadlessWrapper.lua").exists():
+            return True
+        out = _git("status", "--porcelain", cwd=dest, timeout=120)
+        return bool(out)
 
     def update_app(self) -> dict:
         """git pull + reinstall; the app has to start again afterwards."""

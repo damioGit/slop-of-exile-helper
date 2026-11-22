@@ -39,6 +39,13 @@ def _out(obj):
     print(json.dumps(obj, indent=2, ensure_ascii=False, default=str))
 
 
+def cmd_refresh(args):
+    from soe.pipeline.autoupdate import updater
+
+    updater.run(force=True, full=args.full)
+    _out({**updater.state.get("last_result", {}), "restart_needed": updater.restart_needed})
+
+
 def cmd_poe2db(args):
     from soe.kb import poe2db
     from soe.kb.query import KB
@@ -105,6 +112,10 @@ def main(argv=None):
     c.add_argument("old")
     c.add_argument("new")
     c.set_defaults(func=lambda a: _out(__import__("soe.pipeline.update", fromlist=["compare"]).compare(a.old, a.new)))
+
+    r = sub.add_parser("refresh", help="check and update PoB, knowledge base, poe2db, crafting rules and prices now")
+    r.add_argument("--full", action="store_true", help="force: refetch everything and pull the app's new commits")
+    r.set_defaults(func=cmd_refresh)
 
     d = sub.add_parser("poe2db", help="mod weights, essences and desecrated mods from poe2db.tw")
     ds = d.add_subparsers(dest="db_cmd", required=True)

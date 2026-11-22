@@ -40,3 +40,26 @@ def test_quick_cards():
     assert quick.spirit_card(b)["level"] == "bad"
     assert quick.mana_card(b)["level"] == "warn"
     assert quick.max_hit_card(b)["title"].endswith("Fizyczne")
+
+
+def test_full_update_refetches_everything(monkeypatch):
+    from soe.kb import build as kb_build
+    from soe.kb import craft_rules, poe2db
+
+    u = autoupdate.Updater()
+    u.state = {}  # not the real state file of this machine
+    calls = {}
+    monkeypatch.setattr(u, "_save", lambda: None)
+    monkeypatch.setattr(u, "remote", lambda force=False: u.state.setdefault("remote", {"pob_latest": None, "app_behind": 3}))
+    monkeypatch.setattr(u, "_pob_damaged", lambda: False)
+    monkeypatch.setattr(kb_build, "build", lambda *a, **k: calls.setdefault("kb", True))
+    monkeypatch.setattr(poe2db, "sync", lambda kb, refresh=False, log=None: calls.setdefault("poe2db", refresh) and
+                        {"pages": 1, "ok": 1, "failed": []} or {"pages": 1, "ok": 1, "failed": []})
+    monkeypatch.setattr(craft_rules, "check", lambda force=False, fetch=None: calls.setdefault("rules", force))
+    monkeypatch.setattr(u, "update_app", lambda: calls.setdefault("app", True) and {"ok": True})
+    engine = []
+    u.on_new_engine = lambda: engine.append(1)
+    u.run(force=True, full=True)
+    assert calls == {"kb": True, "poe2db": True, "rules": True, "app": True}
+    assert engine and u.restart_needed and not u.running
+    assert any("appka" in d for d in u.state["last_result"]["done"])
