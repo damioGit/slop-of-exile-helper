@@ -11,6 +11,7 @@ from __future__ import annotations
 from soe.advisor.checkup import join_item, split_item
 from soe.items.craft import (MAX_AFFIX, _clean, _item_level, _mod_of, added_tags, can_roll, family, identify,
                              pool_by_group, resolve_ranges)
+from soe.i18n import t
 from soe.optimize.objective import Objective
 
 SKIP_SLOTS = ("Flask", "Charm")
@@ -29,6 +30,15 @@ def _w(session, slot, raw):
 
 def _lines(exp: list[str]) -> list[int]:
     return [i for i, ln in enumerate(exp) if ln.strip() and _clean(ln) not in ("Corrupted", "Mirrored")]
+
+
+def _verdict(o: dict, key: str) -> dict:
+    """verdict = a stable key (also the page's CSS class), verdict_text = what the player reads."""
+    o["verdict"] = key
+    o["verdict_text"] = {"worth": t("worth it", "warto"), "lottery": t("lottery", "loteria"),
+                         "small": t("small gain", "mały zysk"), "risky": t("risky", "ryzykowne"),
+                         "no": t("rather not", "raczej nie")}[key]
+    return o
 
 
 def _short(ex: dict) -> dict:
@@ -81,9 +91,12 @@ def item_analysis(session, slot: str, objective: Objective | None = None) -> dic
     if unknown and counts["Prefix"] + counts["Suffix"] + unknown >= 6:  # a line we cannot name still takes a slot
         res["affixes"]["open_prefix"] = res["affixes"]["open_suffix"] = 0
     if corrupted or rarity != "RARE" or not groups:
-        why = ("Item jest skorumpowany: żadna waluta go już nie zmieni." if corrupted else
-               "Unikat: nie da się go craftować walutą (zostają korupcja i runy)." if rarity == "UNIQUE" else
-               "Crafting liczę tylko dla rare." if rarity != "RARE" else "Brak puli modów dla tej bazy.")
+        why = (t("The item is corrupted: no currency changes it any more.",
+                 "Item jest skorumpowany: żadna waluta go już nie zmieni.") if corrupted else
+               t("Unique: it cannot be crafted with currency (corruption and runes remain).",
+                 "Unikat: nie da się go craftować walutą (zostają korupcja i runy).") if rarity == "UNIQUE" else
+               t("Crafting is calculated for rares only.", "Crafting liczę tylko dla rare.") if rarity != "RARE" else
+               t("No mod pool for this base.", "Brak puli modów dla tej bazy."))
         res["crafting"] = {"possible": False, "why": why}
         return res
 
@@ -126,8 +139,8 @@ def item_analysis(session, slot: str, objective: Objective | None = None) -> dic
     open_types = {t for t, k in (("Prefix", "open_prefix"), ("Suffix", "open_suffix")) if res["affixes"][k] > 0}
     if open_types:
         o = summarize(outcomes(open_types, None), "Exalted Orb")
-        o["verdict"] = ("raczej nie" if o["chance_pct"] < 10 or o["gain_if_good"] < 1 else
-                        "mały zysk" if o["gain_if_good"] < 3 else "warto" if o["chance_pct"] >= 30 else "loteria")
+        _verdict(o, "no" if o["chance_pct"] < 10 or o["gain_if_good"] < 1 else
+                 "small" if o["gain_if_good"] < 3 else "worth" if o["chance_pct"] >= 30 else "lottery")
         craft["exalt"] = o
     # Chaos Orb: removes a random mod (not fractured) and adds a random one of the same kind
     removable = [m for m in mods if "fractured" not in m["flags"] and m["type"]]
@@ -140,13 +153,13 @@ def item_analysis(session, slot: str, objective: Objective | None = None) -> dic
                 all_outs.append({**x, "weight": x["weight"] / total, "removes": m["text"]})
             per_mod.append(m["text"])
         o = summarize(all_outs, "Chaos Orb")
-        o["verdict"] = ("warto" if o["chance_pct"] >= 30 and o["expected_score"] > 0 else
-                        "ryzykowne" if o["chance_pct"] >= 10 else "raczej nie")
+        _verdict(o, "worth" if o["chance_pct"] >= 30 and o["expected_score"] > 0 else
+                 "risky" if o["chance_pct"] >= 10 else "no")
         craft["chaos"] = o
         junk = [m for m in removable if m["value"]["score"] < NOTICEABLE]
         craft["annul"] = {"chance_pct": round(len(junk) / len(removable) * 100, 1),
                           "junk_mods": [m["text"] for m in junk], "price": _price("Orb of Annulment"),
-                          "verdict": "warto" if len(junk) / len(removable) >= 0.5 else "ryzykowne" if junk else "nie"}
+                          **_verdict({}, "worth" if len(junk) / len(removable) >= 0.5 else "risky" if junk else "no")}
     fractured = any("fractured" in m["flags"] for m in mods)
     if len(mods) >= 4 and not fractured:
         best = mods[0]
@@ -155,8 +168,8 @@ def item_analysis(session, slot: str, objective: Objective | None = None) -> dic
                              "chance_best_pct": round(100 / len(mods), 1),
                              "chance_junk_pct": round(len(junk) / len(mods) * 100, 1),
                              "price": _price("Fracturing Orb"),
-                             "verdict": ("warto" if best["value"]["score"] >= 5 and len(junk) <= 1 else
-                                         "loteria" if best["value"]["score"] >= 5 else "nie")}
+                             **_verdict({}, "worth" if best["value"]["score"] >= 5 and len(junk) <= 1 else
+                                        "lottery" if best["value"]["score"] >= 5 else "no")}
     res["crafting"] = craft
     res["note"] = ("Odds use the spawn weights from poe2db (equal weights when poe2db has no page for the base). "
                    "Outcomes use a middle tier with a middle roll. 'value' = what you lose without the mod.")

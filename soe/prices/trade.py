@@ -19,6 +19,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+from soe.i18n import t as _t
 
 API = "https://www.pathofexile.com/api/trade2"
 SITE = "https://www.pathofexile.com/trade2/search/poe2"
@@ -270,8 +271,10 @@ def search_items(session, slot: str, mods: list[str], budget_divine: float | Non
     if cur:
         own = [ln.split(":", 1)[1].strip() for ln in cur["raw"].split("\n") if ln.split("}")[-1].startswith("Grants Skill:")]
         if own:
-            warn = (f"Twój obecny item daje skill: {', '.join(own)}. Item bez tego skilla go zabierze; "
-                    "liczby niżej już to uwzględniają.")
+            warn = _t(f"Your current item grants a skill: {', '.join(own)}. An item without it takes it away; "
+                     "the numbers below already include that.",
+                     f"Twój obecny item daje skill: {', '.join(own)}. Item bez tego skilla go zabierze; "
+                     "liczby niżej już to uwzględniają.")
     return {"slot": session.pob.resolve_slot(slot), "league": league, "found": len(ids), "items": items[:5],
             "link": link, "unknown_mods": unknown, "warning": warn,
             "note": "Cheapest listings with these mods, each measured in PoB in your slot. Prices are what sellers "

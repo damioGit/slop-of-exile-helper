@@ -1,0 +1,40 @@
+SLOP OF EXILE HELPER - how to install (Windows 10/11)
+=====================================================
+
+1. Unzip the whole folder somewhere it can stay, e.g. C:\Games\slop-of-exile-helper
+   (do not run it from inside the zip). It needs about 1 GB of space.
+
+2. Double-click install.bat.
+   - If you have no Python or Git, the installer adds them (winget). Windows may ask for permission.
+   - Downloading Path of Building takes a few minutes. Keep the window open until it says "Done".
+   - If something fails: run install.bat again (it only does what is missing).
+     If it still fails, take a screenshot of the window and send it to whoever gave you the app.
+
+3. Start it with the "Slop of Exile Helper" desktop shortcut (or run.bat).
+   A browser tab opens with the app. Closing the black window stops the app.
+   The app is in English; the PL button in the top bar switches it to Polish.
+
+4. In the app: paste a Path of Building code, or import a character from poe.ninja (account + character name).
+
+What the app does by itself:
+- On start it checks for a new Path of Building, new mod data from poe2db and current poe.ninja prices,
+  and downloads them. The status is in the "Data and updates" panel at the top.
+- Everything runs locally on your computer. Your build stays with you.
+
+AI mode (the "AI" checkbox in the Assistant tab) is OPTIONAL. It works only if Claude Code is logged in on
+this computer (claude.com/claude-code). Without it everything else works: quick check, Gear, Forge, Skills,
+Tree, Plan, trade.
+
+New app versions: at the end of the install the folder is linked to the repository on GitHub. From then on
+the app downloads a new version by itself on every start (you can turn this off in "Data and updates").
+
+
+PO POLSKU
+---------
+1. Rozpakuj cały folder w stałe miejsce (ok. 1 GB), nie uruchamiaj ze środka zipa.
+2. Kliknij dwa razy install.bat. Brakującego Pythona i Gita instalator doinstaluje sam. Gdy coś się wysypie,
+   uruchom go jeszcze raz.
+3. Uruchamiasz skrótem "Slop of Exile Helper" na pulpicie (albo run.bat). Przycisk PL w górnym pasku
+   przełącza appkę na polski.
+4. Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.
+Tryb AI jest opcjonalny (wymaga zalogowanego Claude Code). Dane i sama appka aktualizują się przy starcie.

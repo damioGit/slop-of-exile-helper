@@ -201,7 +201,7 @@ def sync(kb, refresh: bool = True, log=print) -> dict:
 
 
 def status() -> dict:
-    files = sorted(DIR.glob("*.json")) if DIR.exists() else []
+    files = sorted(f for f in DIR.glob("*.json") if not f.name.startswith("_")) if DIR.exists() else []  # _rules.json is no page
     if not files:
         return {"pages": 0, "fetched": None}
     newest = max(json.loads(f.read_text(encoding="utf-8")).get("fetched", 0) for f in files)

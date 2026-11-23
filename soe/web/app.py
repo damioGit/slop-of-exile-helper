@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import Body, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
+from soe.i18n import t
 from soe.advisor.session import Session
 
 STATIC = Path(__file__).parent / "static"
@@ -51,8 +52,15 @@ def _restore_last():
 
 @app.middleware("http")
 async def _build_header(request: Request, call_next):
-    """Every answer says which build it was computed on; the page compares it with the build it shows."""
-    resp = await call_next(request)
+    """Every answer says which build it was computed on; the page compares it with the build it shows.
+    The page's language (X-SOE-Lang: en|pl) applies to every text this request produces."""
+    from soe.i18n import reset_lang, set_lang
+
+    token = set_lang(request.headers.get("X-SOE-Lang") or request.query_params.get("lang"))
+    try:
+        resp = await call_next(request)
+    finally:
+        reset_lang(token)
     if session.build_id:
         resp.headers["X-SOE-Build"] = session.build_id
     return resp
@@ -386,6 +394,8 @@ def set_settings(payload: dict = Body(...)):
     out = {}
     if "auto_update_app" in payload:
         out = set_setting("auto_update_app", bool(payload["auto_update_app"]))
+    if payload.get("lang") in ("en", "pl"):  # background updates speak the language the player picked
+        out = set_setting("lang", payload["lang"])
     return out
 
 
@@ -404,7 +414,7 @@ def data_update(payload: dict = Body(default={})):
     if payload.get("what") == "app":
         r = updater.update_app()
         if r.get("ok") and os.environ.get("SOE_RESTART_CODE"):
-            # started by uruchom.bat / start.bat: exit with the restart code, the launcher starts the new version
+            # started by run.bat / start.bat: exit with the restart code, the launcher starts the new version
             import threading
 
             threading.Timer(1.5, lambda: os._exit(int(os.environ["SOE_RESTART_CODE"]))).start()
@@ -437,7 +447,7 @@ def quick(damage: float = 1, survive: float = 1):
     from soe.advisor.quick import quick_check
 
     def run():
-        key = (session.build_id, session.pob.export_xml().__hash__(), damage, survive)
+        key = (session.build_id, session.pob.export_xml().__hash__(), damage, survive, __import__("soe.i18n", fromlist=["lang"]).lang())
         if key not in _QUICK:
             _QUICK.clear()
             _QUICK[key] = quick_check(session, _goals(damage, survive))
@@ -457,7 +467,8 @@ def craft_value(payload: dict = Body(...)):
     from soe.items.forge_build import target_value
 
     if not session.loaded:
-        return {"slot": None, "note": "Wczytaj build, żeby zobaczyć, ile ten item da Twojej postaci."}
+        return {"slot": None, "note": t("Load a build to see what this item gives your character.",
+                                         "Wczytaj build, żeby zobaczyć, ile ten item da Twojej postaci.")}
     return locked(target_value, session, payload.get("slot"), payload["base"], int(payload.get("ilvl") or 82),
                   payload.get("wanted") or [], _goals(payload.get("damage", 1), payload.get("survive", 1)))
 
@@ -599,7 +610,7 @@ def main(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False):
 
     url = f"http://{host}:{port}"
     if _already_running(url):  # second click on the launcher: just show the app
-        print(f"Slop of Exile Helper już działa: {url}")
+        print(f"Slop of Exile Helper is already running: {url}")
         if open_browser:
             webbrowser.open(url)
         return
@@ -618,7 +629,7 @@ def main(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = False):
 
     updater.on_new_engine = _reload_engine
     updater.maybe_start()  # new PoB / poe2db / prices in the background, the app works meanwhile
-    print(f"Slop of Exile Helper: {url}  (zamknij to okno, żeby wyłączyć)")
+    print(f"Slop of Exile Helper: {url}  (close this window to stop it)")
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 

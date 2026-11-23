@@ -1,7 +1,7 @@
 """Keeps the app's own code current from GitHub (the repo in UPDATE_SOURCE).
 
     python scripts/self_update.py           at launch (start.bat): pull new commits when the option is on
-    python scripts/self_update.py --attach  at install (instaluj.bat): turn an unzipped copy into a git checkout
+    python scripts/self_update.py --attach  at install (install.bat): turn an unzipped copy into a git checkout
 
 Exit code 5 = the code changed (start.bat then starts again with the new files), 0 = nothing to do or not possible.
 Never touches data/, vendor/ or .venv/ (gitignored), never overwrites local edits (pull only when the tracked files
@@ -58,7 +58,7 @@ def reinstall_if_needed(before: str | None):
     r = git("diff", "--name-only", f"{before}..HEAD") if before else None
     changed = r.stdout.split() if r and r.returncode == 0 else ["pyproject.toml"]
     if "pyproject.toml" in changed:
-        print("Nowe zależności: instaluję...", flush=True)
+        print("New dependencies: installing...", flush=True)
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", str(ROOT)], capture_output=True)
 
 
@@ -68,14 +68,14 @@ def attach() -> int:
     if not src or (ROOT / ".git").exists():
         return 0
     url, branch = src
-    print(f"Podpinam auto-aktualizację appki z {url} ...", flush=True)
+    print(f"Linking app updates to {url} ...", flush=True)
     git("init", "-q")
     git("remote", "add", "origin", url)
     r = git("fetch", "-q", "--depth", "50", "origin", branch, interactive=True, timeout=300)
     if not r or r.returncode != 0:
         shutil.rmtree(ROOT / ".git", ignore_errors=True)
-        print("Auto-aktualizacja appki niedostępna: brak dostępu do repo na GitHubie (prywatne repo wymaga\n"
-              "zaproszenia i zalogowania). Appka działa normalnie; nową wersję dostaniesz jako zip.", flush=True)
+        print("App updates unavailable: no access to the repository on GitHub (a private repository needs an\n"
+              "invitation and a login). The app works normally; new versions come as a zip.", flush=True)
         return 0
     zipped = (ROOT / "VERSION.txt").read_text(encoding="utf-8").split()[0] if (ROOT / "VERSION.txt").exists() else None
     git("reset", "-q", "--hard", f"origin/{branch}")
@@ -83,7 +83,7 @@ def attach() -> int:
     git("branch", "-q", f"--set-upstream-to=origin/{branch}", branch)
     known = zipped and git("cat-file", "-e", f"{zipped}^{{commit}}")
     reinstall_if_needed(zipped if known and known.returncode == 0 else None)  # only when pyproject.toml changed
-    print("Auto-aktualizacja appki: włączona (wersja " + (head() or "?")[:7] + ").", flush=True)
+    print("App updates: on (version " + (head() or "?")[:7] + ").", flush=True)
     return 0
 
 
@@ -106,7 +106,7 @@ def update() -> int:
     if not r or r.returncode != 0:
         return 0
     reinstall_if_needed(before)
-    print(f"Zaktualizowano appkę ({behind.stdout.strip()} zmian), uruchamiam nową wersję...", flush=True)
+    print(f"App updated ({behind.stdout.strip()} changes), starting the new version...", flush=True)
     return UPDATED
 
 

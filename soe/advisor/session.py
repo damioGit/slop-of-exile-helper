@@ -8,6 +8,7 @@ import threading
 import uuid
 from pathlib import Path
 
+from soe.i18n import t
 from soe.engine.pob import PoB, SUMMARY_KEYS
 
 METRICS = {
@@ -162,7 +163,7 @@ class Session:
             {"group": g["index"], "main": g["main"], "enabled": g["enabled"], "slot": g.get("slot"),
              "skills": g["skills"],
              "gems": [f"{x['name']} {x['level']}/{x['quality']}" + ("" if x["enabled"] else " (disabled)")
-                     + ("" if x.get("applies", True) or not x["enabled"] else " (nie działa na ten skill)")
+                     + ("" if x.get("applies", True) or not x["enabled"] else t(" (does not apply to this skill)", " (nie działa na ten skill)"))
                      for x in g["gems"]]}
             for g in p.groups()
         ]

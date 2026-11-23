@@ -22,9 +22,23 @@ def test_parse(q, goal, skill, budget):
     assert p["goal"] == goal and p["skill"] == skill and p["budget_divine"] == budget
 
 
-def test_not_applied_reason_in_polish():
+def test_not_applied_reason_in_both_languages():
+    from soe.i18n import reset_lang, set_lang
+
     assert "triggered" in explain_not_applied({"excluded_by": ["Triggered"], "missing": []})
-    assert "czarem" in explain_not_applied({"excluded_by": [], "missing": ["Spell"]})
+    assert "spells" in explain_not_applied({"excluded_by": [], "missing": ["Spell"]})
+    tok = set_lang("pl")
+    try:
+        assert "czarem" in explain_not_applied({"excluded_by": [], "missing": ["Spell"]})
+    finally:
+        reset_lang(tok)
+
+
+def test_english_questions():
+    q = parse_question("I keep dying to bosses", [])
+    assert q["goal"] == "survive"
+    assert parse_question("how do I hit harder for 5 div", [])["goal"] == "hit"
+    assert parse_question("how do I hit harder for 5 div", [])["budget_divine"] == 5
 
 
 @pytest.fixture(scope="module")

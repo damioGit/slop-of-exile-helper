@@ -1,6 +1,14 @@
 """Auto-updater status and the quick check-up cards (no network: conftest switches the updater off)."""
+import pytest
+
 from soe.advisor import quick
 from soe.pipeline import autoupdate
+
+
+@pytest.fixture(autouse=True)
+def no_player_settings(monkeypatch):
+    """Not this computer's settings file (its language, its auto-update switch)."""
+    monkeypatch.setattr(autoupdate, "settings", lambda: {})
 
 
 def test_status_shape_and_todo(monkeypatch):
@@ -8,7 +16,7 @@ def test_status_shape_and_todo(monkeypatch):
     u.state = {"remote": {"checked": 1, "pob_latest": "v99.0.0", "app_behind": 2}}
     s = u.status()
     assert s["pob"]["update"] and s["pob"]["latest"] == "v99.0.0"
-    assert any("v99.0.0" in t for t in s["todo"]) and any("appki" in t for t in s["todo"])
+    assert any("v99.0.0" in t for t in s["todo"]) and any("new app version" in t for t in s["todo"])
     assert not s["ok"] and s["updater"]["auto"] is False  # SOE_AUTOUPDATE=0 in tests
     assert u.maybe_start() is False  # switched off: nothing starts on its own
 
@@ -39,7 +47,7 @@ def test_quick_cards():
     assert quick.attribute_card(b)["level"] == "bad" and "Str 30" in quick.attribute_card(b)["text"]
     assert quick.spirit_card(b)["level"] == "bad"
     assert quick.mana_card(b)["level"] == "warn"
-    assert quick.max_hit_card(b)["title"].endswith("Fizyczne")
+    assert quick.max_hit_card(b)["title"].endswith("Physical")
 
 
 def test_full_update_refetches_everything(monkeypatch):
@@ -62,4 +70,14 @@ def test_full_update_refetches_everything(monkeypatch):
     u.run(force=True, full=True)
     assert calls == {"kb": True, "poe2db": True, "rules": True, "app": True}
     assert engine and u.restart_needed and not u.running
-    assert any("appka" in d for d in u.state["last_result"]["done"])
+    assert any("app updated" in d for d in u.state["last_result"]["done"])
+
+
+def test_polish_on_request():
+    from soe.i18n import reset_lang, set_lang
+
+    tok = set_lang("pl")
+    try:
+        assert quick.max_hit_card({"PhysicalMaximumHitTaken": 2000, "FireMaximumHitTaken": 9000})["title"].endswith("Fizyczne")
+    finally:
+        reset_lang(tok)

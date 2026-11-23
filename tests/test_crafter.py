@@ -46,7 +46,7 @@ def test_routes_rank_and_essence(kb):
     rnd = next(x for x in r["routes"] if x["key"] == "random")
     assert ess["chance_pct"] > rnd["chance_pct"]  # a guaranteed mod is more deterministic
     assert ess["at_least_pct"][1] == 100.0
-    best = [x for x in r["routes"] if "najpewniejsza" in (x.get("badges") or [])]
+    best = [x for x in r["routes"] if "surest" in (x.get("badges") or [])]
     assert len(best) == 1 and best[0]["key"] != "chaos"
     for x in r["routes"]:
         assert 0 <= x["chance_pct"] <= 100 and x["steps"]
@@ -70,7 +70,7 @@ def test_impossible_picks(kb):
     pool = craft_pool(kb, "Gold Ring", 82)
     sufs = [f for f in pool["families"] if f["type"] == "Suffix"][:4]
     r = craft_routes(kb, "Gold Ring", 82, [_want(f) for f in sufs], sims=50)
-    assert not r["possible"] and any("najwyżej 3" in p for p in r["problems"])
+    assert not r["possible"] and any("3 at most" in p for p in r["problems"])
     life = _fam(pool, "to maximum Life", "Prefix")
     r = craft_routes(kb, "Gold Ring", 82, [_want(life, min_level=999)], sims=50)
     assert not r["possible"]

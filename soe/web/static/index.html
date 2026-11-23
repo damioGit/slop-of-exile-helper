@@ -168,8 +168,8 @@ code { font-family: var(--mono); font-size: .9em; background: var(--bg-2); paddi
 .eqcard .tb { font-size: 13px; text-align: center; }
 .ic { width: 28px; height: 28px; object-fit: contain; vertical-align: middle; }
 .ic.lg { width: 44px; height: 44px; }
-.verdict { font-weight: 700; } .verdict.warto { color: var(--good); } .verdict.loteria, .verdict.ryzykowne, .verdict.mały { color: var(--warn); }
-.verdict.nie, .verdict.raczej { color: var(--bad); }
+.verdict { font-weight: 700; } .verdict.worth { color: var(--good); } .verdict.lottery, .verdict.risky, .verdict.small { color: var(--warn); }
+.verdict.no { color: var(--bad); }
 .craftgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 8px; }
 .craftgrid > div { border: 1px solid var(--line); background: var(--panel-2); border-radius: 3px; padding: 8px 10px; }
 .craftgrid b { font-family: var(--display); color: var(--gold-2); font-weight: 600; }
@@ -276,92 +276,112 @@ button.basebtn small { display: block; color: var(--muted); font-size: 12px; }
 <body>
 <header>
   <h1>Slop of <span>Exile</span> Helper</h1>
-  <span id="buildBadge" class="badge">brak buildu</span>
+  <span id="buildBadge" class="badge" data-pl="brak buildu">no build</span>
   <span class="spacer"></span>
-  <label class="small muted" id="mainSkillWrap" style="display:none">Główny skill: <select id="mainSkill" style="width:auto;padding:.3em .5em"></select></label>
-  <button class="ghost" id="btnSync" title="Pobierz postać jeszcze raz z poe.ninja" style="display:none">⟳ Synchronizuj</button>
-  <button class="ghost" id="btnExport" title="Skopiuj kod buildu do PoB">Kod PoB</button>
-  <button class="ghost" id="btnReset" title="Cofnij zastosowane zmiany">Reset</button>
-  <button class="ghost" id="btnTheme" title="Jasny / ciemny motyw" aria-label="Zmień motyw">◐</button>
+  <label class="small muted" id="mainSkillWrap" style="display:none"><span data-pl="Główny skill:">Main skill:</span> <select id="mainSkill" style="width:auto;padding:.3em .5em"></select></label>
+  <button class="ghost" id="btnSync" title="Fetch the character from poe.ninja again" data-pl-title="Pobierz postać jeszcze raz z poe.ninja" data-pl="⟳ Synchronizuj" style="display:none">⟳ Sync</button>
+  <button class="ghost" id="btnExport" title="Copy the build code for PoB" data-pl-title="Skopiuj kod buildu do PoB" data-pl="Kod PoB">PoB code</button>
+  <button class="ghost" id="btnReset" title="Undo applied changes" data-pl-title="Cofnij zastosowane zmiany">Reset</button>
+  <button class="ghost" id="btnLang" title="Język: polski / Language: English" aria-label="Language">PL</button>
+  <button class="ghost" id="btnTheme" title="Light / dark theme" data-pl-title="Jasny / ciemny motyw" aria-label="Theme">◐</button>
 </header>
 <main>
   <details class="panel" id="dataPanel">
-    <summary><b>Dane i aktualizacje</b> <span id="dataBadge" class="small"></span></summary>
+    <summary><b data-pl="Dane i aktualizacje">Data and updates</b> <span id="dataBadge" class="small"></span></summary>
     <div id="dataBody" style="margin-top:8px"><span class="busy"></span></div>
   </details>
   <details class="panel" id="loadPanel" open>
-    <summary><b>Wczytaj build</b> <span id="kbInfo" class="muted small"></span></summary>
-    <textarea id="code" style="margin-top:10px" placeholder="Wklej kod z Path of Building (Import/Export → Generate → Copy) albo XML"></textarea>
+    <summary><b data-pl="Wczytaj build">Load a build</b> <span id="kbInfo" class="muted small"></span></summary>
+    <textarea id="code" style="margin-top:10px" placeholder="Paste a Path of Building code (Import/Export → Generate → Copy) or XML" data-pl-ph="Wklej kod z Path of Building (Import/Export → Generate → Copy) albo XML"></textarea>
     <div class="row" style="margin-top:8px">
-      <button id="btnLoad">Wczytaj</button>
+      <button id="btnLoad" data-pl="Wczytaj">Load</button>
     </div>
-    <h3>…albo zaimportuj postać z profilu (poe.ninja)</h3>
+    <h3 data-pl="…albo zaimportuj postać z profilu (poe.ninja)">…or import a character from its profile (poe.ninja)</h3>
     <div class="row">
-      <input type="text" id="impAcc" placeholder="Konto#1234 albo link do postaci z poe.ninja" style="flex:2;min-width:200px">
-      <input type="text" id="impName" placeholder="Nazwa postaci" style="flex:1;min-width:140px">
-      <button id="btnImport">Importuj</button>
+      <input type="text" id="impAcc" placeholder="Account#1234 or a poe.ninja character link" data-pl-ph="Konto#1234 albo link do postaci z poe.ninja" style="flex:2;min-width:200px">
+      <input type="text" id="impName" placeholder="Character name" data-pl-ph="Nazwa postaci" style="flex:1;min-width:140px">
+      <button id="btnImport" data-pl="Importuj">Import</button>
     </div>
-    <p class="muted small">Działa dla publicznych postaci, które poe.ninja już zna (ladder, publiczny profil). Po zmianach w grze użyj „Synchronizuj”.</p>
+    <p class="muted small" data-pl="Działa dla publicznych postaci, które poe.ninja już zna (ladder, publiczny profil). Po zmianach w grze użyj „Synchronizuj”.">Works for public characters poe.ninja already knows (ladder, public profile). After changes in game use “Sync”.</p>
   </details>
 
   <section class="panel">
     <div class="goals">
-      <div><label>Obrażenia <b id="gDamageV">2</b></label><input id="gDamage" type="range" min="0" max="3" step="0.5" value="2"></div>
-      <div><label>Przetrwanie <b id="gSurviveV">2</b></label><input id="gSurvive" type="range" min="0" max="3" step="0.5" value="2"></div>
-      <div><label>Prędkość ruchu <b id="gSpeedV">1</b></label><input id="gSpeed" type="range" min="0" max="3" step="0.5" value="1"></div>
+      <div><label><span data-pl="Obrażenia">Damage</span> <b id="gDamageV">2</b></label><input id="gDamage" type="range" min="0" max="3" step="0.5" value="2"></div>
+      <div><label><span data-pl="Przetrwanie">Survival</span> <b id="gSurviveV">2</b></label><input id="gSurvive" type="range" min="0" max="3" step="0.5" value="2"></div>
+      <div><label><span data-pl="Prędkość ruchu">Movement speed</span> <b id="gSpeedV">1</b></label><input id="gSpeed" type="range" min="0" max="3" step="0.5" value="1"></div>
       <div><label>Mana <b id="gManaV">1</b></label><input id="gMana" type="range" min="0" max="3" step="0.5" value="1"></div>
-      <div><label for="gBudget">Budżet (divine) <span class="muted">puste = bez limitu</span></label><input id="gBudget" type="text" inputmode="decimal" placeholder="np. 5"></div>
+      <div><label for="gBudget"><span data-pl="Budżet (divine)">Budget (divine)</span> <span class="muted" data-pl="puste = bez limitu">empty = no limit</span></label><input id="gBudget" type="text" inputmode="decimal" placeholder="e.g. 5" data-pl-ph="np. 5"></div>
     </div>
   </section>
 
   <nav class="tabs" id="tabs">
-    <button data-tab="assistant" class="on">Asystent</button>
+    <button data-tab="assistant" class="on" data-pl="Asystent">Assistant</button>
     <button data-tab="gear">Gear</button>
-    <button data-tab="craft">Kuźnia</button>
-    <button data-tab="skills">Skille</button>
-    <button data-tab="checkup">Problemy</button>
-    <button data-tab="overview">Przegląd</button>
-    <button data-tab="tree">Drzewko</button>
+    <button data-tab="craft" data-pl="Kuźnia">Forge</button>
+    <button data-tab="skills" data-pl="Skille">Skills</button>
+    <button data-tab="checkup" data-pl="Problemy">Problems</button>
+    <button data-tab="overview" data-pl="Przegląd">Overview</button>
+    <button data-tab="tree" data-pl="Drzewko">Tree</button>
     <button data-tab="plan">Plan</button>
-    <button data-tab="combo">Synergie</button>
-    <button data-tab="search">Szukaj</button>
+    <button data-tab="combo" data-pl="Synergie">Synergies</button>
+    <button data-tab="search" data-pl="Szukaj">Search</button>
   </nav>
-  <div id="view"><div class="panel empty"><b>Witaj, wygnańcze</b>Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.</div></div>
+  <div id="view"></div>
 </main>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
+// ---------------------------------------------------------------- language: English by default, Polish for Polish browsers
+let LANG = (() => {
+  try { const v = localStorage.getItem("soe-lang"); if (v === "en" || v === "pl") return v; } catch {}
+  return (navigator.language || "").toLowerCase().startsWith("pl") ? "pl" : "en";
+})();
+const T = (en, pl) => LANG === "pl" ? pl : en;
+function applyStaticLang() {  // HTML written in English carries its Polish in data-pl / data-pl-ph / data-pl-title
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-pl]").forEach(e => { if (e.dataset.en == null) e.dataset.en = e.innerHTML; e.innerHTML = LANG === "pl" ? e.dataset.pl : e.dataset.en; });
+  document.querySelectorAll("[data-pl-ph]").forEach(e => { if (e.dataset.enPh == null) e.dataset.enPh = e.placeholder; e.placeholder = LANG === "pl" ? e.dataset.plPh : e.dataset.enPh; });
+  document.querySelectorAll("[data-pl-title]").forEach(e => { if (e.dataset.enTitle == null) e.dataset.enTitle = e.title; e.title = LANG === "pl" ? e.dataset.plTitle : e.dataset.enTitle; });
+  const b = document.getElementById("btnLang"); if (b) b.textContent = LANG === "pl" ? "EN" : "PL";
+}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const fmt = (v, d = 0) => v == null ? "–" : (typeof v === "number" ? v.toLocaleString("pl-PL", {maximumFractionDigits: d}) : esc(v));
+const fmt = (v, d = 0) => v == null ? "–" : (typeof v === "number" ? v.toLocaleString(LANG === "pl" ? "pl-PL" : "en-US", {maximumFractionDigits: d}) : esc(v));
 const pct = v => v == null ? "–" : `<span class="${v > 0 ? "pos" : v < 0 ? "neg" : ""}">${v > 0 ? "+" : ""}${fmt(v, 1)}%</span>`;
-const STAT_PL = {CombinedDPS: "DPS (łączny)", TotalDPS: "DPS (hit)", TotalEHP: "EHP", Life: "Życie", EnergyShield: "Energy Shield",
-  Mana: "Mana", Spirit: "Spirit", Evasion: "Evasion", Armour: "Armour", EvadeChance: "Unik %", DeflectChance: "Deflect %",
-  DeflectionRating: "Deflection", FireResist: "Res. ogień", ColdResist: "Res. zimno", LightningResist: "Res. błyskawice",
-  ChaosResist: "Res. chaos", Speed: "Ataki/s", CritChance: "Crit %", CritMultiplier: "Crit mnożnik", AverageHit: "Średni hit",
-  MovementSpeedMod: "Prędkość ruchu", SpiritUnreserved: "Wolny spirit", SpiritReserved: "Zarezerwowany spirit",
-  ManaPerSecondCost: "Koszt many/s", ManaRegenRecovery: "Regen many/s", Str: "Siła", Dex: "Zręczność", Int: "Inteligencja"};
+const STAT_NAMES = {CombinedDPS: ["DPS (combined)", "DPS (łączny)"], TotalDPS: ["DPS (hit)", "DPS (hit)"], TotalEHP: ["EHP", "EHP"],
+  Life: ["Life", "Życie"], EnergyShield: ["Energy Shield", "Energy Shield"], Mana: ["Mana", "Mana"], Spirit: ["Spirit", "Spirit"],
+  Evasion: ["Evasion", "Evasion"], Armour: ["Armour", "Armour"], EvadeChance: ["Evade %", "Unik %"], DeflectChance: ["Deflect %", "Deflect %"],
+  DeflectionRating: ["Deflection", "Deflection"], FireResist: ["Fire res.", "Res. ogień"], ColdResist: ["Cold res.", "Res. zimno"],
+  LightningResist: ["Lightning res.", "Res. błyskawice"], ChaosResist: ["Chaos res.", "Res. chaos"], Speed: ["Attacks/s", "Ataki/s"],
+  CritChance: ["Crit %", "Crit %"], CritMultiplier: ["Crit multiplier", "Crit mnożnik"], AverageHit: ["Average hit", "Średni hit"],
+  MovementSpeedMod: ["Movement speed", "Prędkość ruchu"], SpiritUnreserved: ["Free spirit", "Wolny spirit"],
+  SpiritReserved: ["Reserved spirit", "Zarezerwowany spirit"], ManaPerSecondCost: ["Mana cost/s", "Koszt many/s"],
+  ManaRegenRecovery: ["Mana regen/s", "Regen many/s"], Str: ["Strength", "Siła"], Dex: ["Dexterity", "Zręczność"], Int: ["Intelligence", "Inteligencja"]};
+const statName = k => STAT_NAMES[k] ? T(...STAT_NAMES[k]) : k;
 const SLOTS = ["Weapon 1", "Weapon 2", "Helmet", "Body Armour", "Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt"];
 
 let state = {tab: "assistant", loaded: false, overview: null, cache: {}};
 
-function toast(msg, ms) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), ms || (msg.startsWith("Błąd") ? 9000 : 2500)); }
+function toast(msg, ms) { const box = $("#toast"); box.textContent = msg; box.classList.add("on"); clearTimeout(box._h); box._h = setTimeout(() => box.classList.remove("on"), ms || (/^(Błąd|Error)/.test(msg) ? 9000 : 2500)); }
 function goals() {
   const b = parseFloat(($("#gBudget").value || "").replace(",", "."));
   return {damage: +$("#gDamage").value, survive: +$("#gSurvive").value, speed: +$("#gSpeed").value, mana: +$("#gMana").value,
           budget: isNaN(b) ? null : b};
 }
 async function api(path, opts = {}) {
-  const r = await fetch(path, opts.body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(opts.body)} : {});
+  const headers = {"X-SOE-Lang": LANG};  // texts computed on the server come back in the page's language
+  const r = await fetch(path, opts.body ? {method: "POST", headers: {...headers, "Content-Type": "application/json"}, body: JSON.stringify(opts.body)} : {headers});
   const j = await r.json();
   const bid = r.headers.get("X-SOE-Build");
   if (bid && ["/api/load", "/api/import", "/api/resync", "/api/status"].includes(path)) state.buildId = bid;
   else if (bid && state.buildId && bid !== state.buildId) {
     // the server has another build than this page shows (loaded in another window or by Claude in the terminal)
     state.buildId = bid; state.cache = {};
-    toast("Uwaga: na serwerze jest teraz inny build (wczytany w innym oknie albo przez Claude). Pokazuję aktualny, sprawdź nagłówek.");
+    toast(T("Note: the server has another build now (loaded in another window or by Claude). Showing the current one, check the header.",
+            "Uwaga: na serwerze jest teraz inny build (wczytany w innym oknie albo przez Claude). Pokazuję aktualny, sprawdź nagłówek."));
     await refreshBadge(); render();
-    throw new Error("build na serwerze się zmienił, wynik pominięty");
+    throw new Error(T("the build on the server changed, result skipped", "build na serwerze się zmienił, wynik pominięty"));
   }
   if (!r.ok || (j && j.error)) throw new Error(j.error || r.statusText);
   return j;
@@ -371,15 +391,15 @@ const q = o => new URLSearchParams(Object.entries(o).filter(([, v]) => v != null
 async function busy(btn, fn) {
   const old = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.innerHTML = `<span class="busy"></span> ${old}`; }
-  try { return await fn(); } catch (e) { toast("Błąd: " + e.message); console.error(e); }
+  try { return await fn(); } catch (e) { toast(T("Error: ", "Błąd: ") + e.message); console.error(e); }
   finally { if (btn) { btn.disabled = false; btn.innerHTML = old; } }
 }
 
 function diffTable(changes) {
   const rows = Object.entries(changes || {});
-  if (!rows.length) return `<p class="muted small">Brak zmian w statach.</p>`;
-  return `<div class="tablewrap"><table><tr><th>Stat</th><th class="n">Przed</th><th class="n">Po</th><th class="n">Zmiana</th></tr>${
-    rows.map(([k, [a, b, d, p]]) => `<tr><td>${esc(STAT_PL[k] || k)}</td><td class="n">${fmt(a, 1)}</td><td class="n">${fmt(b, 1)}</td><td class="n">${p == null ? fmt(d, 1) : pct(p)}</td></tr>`).join("")
+  if (!rows.length) return `<p class="muted small">${T("No change in stats.", "Brak zmian w statach.")}</p>`;
+  return `<div class="tablewrap"><table><tr><th>Stat</th><th class="n">${T("Before", "Przed")}</th><th class="n">${T("After", "Po")}</th><th class="n">${T("Change", "Zmiana")}</th></tr>${
+    rows.map(([k, [a, b, d, p]]) => `<tr><td>${esc(statName(k))}</td><td class="n">${fmt(a, 1)}</td><td class="n">${fmt(b, 1)}</td><td class="n">${p == null ? fmt(d, 1) : pct(p)}</td></tr>`).join("")
   }</table></div>`;
 }
 function notes(list) { return (list || []).length ? `<ul class="small muted">${list.map(n => `<li>${esc(n)}</li>`).join("")}</ul>` : ""; }
@@ -390,7 +410,7 @@ async function applySteps(steps, btn) {
     const r = await api("/api/apply", {body: {steps}});
     state.cache = {};
     await refreshBadge();
-    toast("Zastosowano. Nowy kod buildu w przycisku „Kod PoB”.");
+    toast(T("Applied. The new build code is under “PoB code”.", "Zastosowano. Nowy kod buildu w przycisku „Kod PoB”."));
     render();
     return r;
   });
@@ -400,25 +420,30 @@ async function applySteps(steps, btn) {
 const views = {
   async assistant(el) {
     const skills = await api("/api/skills");
-    const examples = [
+    const examples = LANG === "pl" ? [
       "Nie jestem w stanie oneshotować moba, co zrobić żeby bić mocniej?",
       "Jak zwiększyć DPS za 5 div?",
       "Ciągle umieram na bossach, co poprawić?",
       "Brakuje mi many",
+    ] : [
+      "I can't one-shot mobs, how do I hit harder?",
+      "How do I raise my DPS for 5 div?",
+      "I keep dying to bosses, what should I fix?",
+      "I run out of mana",
     ];
-    el.innerHTML = `<div class="panel"><h2>Szybki przegląd</h2><p class="muted small">Najczęstsze pytania, policzone od razu w PoB, bez AI.</p>
-      <div id="quickOut"><span class="busy"></span> Liczę (kilka sekund)…</div></div>
-      <div class="panel"><h2>Zapytaj o swój build</h2>
-      <p class="muted small">Napisz po swojemu, co Cię boli. Asystent policzy w Path of Building, co konkretnie zmienić, ile to da i ile kosztuje.</p>
-      <textarea id="q" style="min-height:70px;font-family:var(--sans);font-size:15px" placeholder="np. nie oneshotuję moba, jak bić mocniej Cometem?"></textarea>
+    el.innerHTML = `<div class="panel"><h2>${T("Quick check", "Szybki przegląd")}</h2><p class="muted small">${T("The most common questions, calculated in PoB right away, no AI.", "Najczęstsze pytania, policzone od razu w PoB, bez AI.")}</p>
+      <div id="quickOut"><span class="busy"></span> ${T("Calculating (a few seconds)…", "Liczę (kilka sekund)…")}</div></div>
+      <div class="panel"><h2>${T("Ask about your build", "Zapytaj o swój build")}</h2>
+      <p class="muted small">${T("Say in your own words what bothers you. The assistant calculates in Path of Building what to change, what it gains and what it costs.", "Napisz po swojemu, co Cię boli. Asystent policzy w Path of Building, co konkretnie zmienić, ile to da i ile kosztuje.")}</p>
+      <textarea id="q" style="min-height:70px;font-family:var(--sans);font-size:15px" placeholder="${T("e.g. I can't one-shot mobs, how do I hit harder with Comet?", "np. nie oneshotuję moba, jak bić mocniej Cometem?")}"></textarea>
       <div class="chips" style="margin:8px 0">${examples.map(x => `<button class="ghost small ex" style="font-weight:500">${esc(x)}</button>`).join("")}</div>
       <div class="row">
-        <label class="small muted">Skill: <select id="qSkill" style="width:auto">${skills.map(s => `<option value="${s.group}:${s.skill}" ${s.main ? "selected" : ""}>${esc(s.label)}${s.main ? " (główny)" : ""}</option>`).join("")}</select></label>
-        <label class="small muted">Cel: <select id="qGoal" style="width:auto"><option value="">z pytania</option><option value="dps">DPS</option><option value="hit">pojedynczy hit (oneshot)</option><option value="survive">przetrwanie</option><option value="clear">clear map</option><option value="mana">mana</option><option value="speed">prędkość ruchu</option></select></label>
-        <label class="small" title="Pytanie idzie do Claude z Twoim buildem i tymi samymi narzędziami. Rozumie dowolne pytania, liczy w PoB, szuka na wiki. Trwa 1–3 min."><input type="checkbox" id="qAi" style="width:auto;vertical-align:middle"> <b>AI</b> (Claude)</label>
-        <button id="btnAsk">Zapytaj</button>
+        <label class="small muted">Skill: <select id="qSkill" style="width:auto">${skills.map(s => `<option value="${s.group}:${s.skill}" ${s.main ? "selected" : ""}>${esc(s.label)}${s.main ? T(" (main)", " (główny)") : ""}</option>`).join("")}</select></label>
+        <label class="small muted">${T("Goal", "Cel")}: <select id="qGoal" style="width:auto"><option value="">${T("from the question", "z pytania")}</option><option value="dps">DPS</option><option value="hit">${T("single hit (one-shot)", "pojedynczy hit (oneshot)")}</option><option value="survive">${T("survival", "przetrwanie")}</option><option value="clear">${T("map clear", "clear map")}</option><option value="mana">mana</option><option value="speed">${T("movement speed", "prędkość ruchu")}</option></select></label>
+        <label class="small" title="${T("The question goes to Claude with your build and the same tools. It understands any question, calculates in PoB, looks things up on the wiki. Takes 1–3 min. Optional: needs Claude Code logged in on this computer.", "Pytanie idzie do Claude z Twoim buildem i tymi samymi narzędziami. Rozumie dowolne pytania, liczy w PoB, szuka na wiki. Trwa 1–3 min. Opcjonalne: wymaga zalogowanego Claude Code na tym komputerze.")}"><input type="checkbox" id="qAi" style="width:auto;vertical-align:middle"> <b>AI</b> (Claude)</label>
+        <button id="btnAsk">${T("Ask", "Zapytaj")}</button>
       </div>
-      <p class="muted small">Liczenie trwa ~20–60 s: sprawdzam supporty, drzewko, gear i unikaty. Budżet bierzemy z pola nad zakładkami albo z pytania („za 5 div”).</p></div>
+      <p class="muted small">${T("Calculating takes ~20–60 s: supports, tree, gear and uniques. The budget comes from the field above the tabs or from the question (“for 5 div”).", "Liczenie trwa ~20–60 s: sprawdzam supporty, drzewko, gear i unikaty. Budżet bierzemy z pola nad zakładkami albo z pytania („za 5 div”).")}</p></div>
       <div id="answer"></div>`;
     el.querySelectorAll(".ex").forEach(b => b.onclick = () => { $("#q").value = b.textContent; });
     const g0 = goals();
@@ -428,9 +453,9 @@ const views = {
       $("#quickOut").innerHTML = `<div class="qcards">${r.cards.map(c => `<div class="qcard ${c.level}">
         <h4><span class="qi">${icon[c.level]}</span>${esc(c.title)}</h4><p>${esc(c.text)}</p>
         ${c.lines.length ? `<ul>${c.lines.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-        ${c.tab && c.tab !== "assistant" ? `<button class="ghost small" data-go="${c.tab}">${esc(c.action || "Pokaż")}</button>` : ""}</div>`).join("")}</div>`;
+        ${c.tab && c.tab !== "assistant" ? `<button class="ghost small" data-go="${c.tab}">${esc(c.action || T("Show", "Pokaż"))}</button>` : ""}</div>`).join("")}</div>`;
       $("#quickOut").querySelectorAll("[data-go]").forEach(b => b.onclick = () => { state.tab = b.dataset.go; render(); window.scrollTo({top: 0}); });
-    }).catch(e => { if ($("#quickOut")) $("#quickOut").innerHTML = `<p class="muted">Szybki przegląd: ${esc(e.message)}</p>`; });
+    }).catch(e => { if ($("#quickOut")) $("#quickOut").innerHTML = `<p class="muted">${T("Quick check", "Szybki przegląd")}: ${esc(e.message)}</p>`; });
     try { $("#qAi").checked = localStorage.getItem("soe-ai") === "1"; } catch {}
     $("#qAi").onchange = e => { try { localStorage.setItem("soe-ai", e.target.checked ? "1" : "0"); } catch {} };
     $("#btnAsk").onclick = e => busy(e.target, async () => {
@@ -442,21 +467,21 @@ const views = {
   },
 
   async tree(el) {
-    el.innerHTML = `<div class="panel"><h2>Drzewko pasywne</h2>
-      <p class="muted small">Przeciągaj myszką, kółko = zoom. Złote, świecące = wzięte, fioletowe = wzięte na drugi zestaw broni, niebieskie = podświetlona ścieżka. Najedź na pasywkę, żeby zobaczyć, co daje.</p>
+    el.innerHTML = `<div class="panel"><h2>${T("Passive tree", "Drzewko pasywne")}</h2>
+      <p class="muted small">${T("Drag with the mouse, wheel = zoom. Glowing gold = taken, purple = taken on the other weapon set, blue = highlighted path. Hover a passive to see what it gives.", "Przeciągaj myszką, kółko = zoom. Złote, świecące = wzięte, fioletowe = wzięte na drugi zestaw broni, niebieskie = podświetlona ścieżka. Najedź na pasywkę, żeby zobaczyć, co daje.")}</p>
       <div id="treeBox" class="treebox"><canvas id="treeCanvas"></canvas><div id="treeTip" class="treetip"></div></div>
       <div id="treeInfo" class="small" style="margin-top:8px"></div></div>
       <div class="grid2">
-      <div class="panel"><h2>Co warto wziąć</h2><div class="row"><select id="tMetric" style="width:auto"><option value="dps">DPS</option><option value="ehp">EHP</option><option value="life">Życie</option><option value="es">Energy Shield</option><option value="movement">Prędkość ruchu</option></select><button id="btnRank">Policz</button></div><div id="rankOut"></div></div>
-      <div class="panel"><h2>Co można zwolnić</h2><p class="muted small">Pasywki, których zwolnienie najmniej kosztuje.</p><button id="btnRespec">Policz</button><div id="respecOut"></div></div></div>
-      <div class="panel"><h2>Optymalizator drzewka</h2><p class="muted small">Zwalnia słabe pasywki i bierze mocne, każdy ruch sprawdzony w PoB (~10–30 s).</p><button id="btnTree">Optymalizuj</button><div id="treeOut"></div></div>`;
+      <div class="panel"><h2>${T("Worth taking", "Co warto wziąć")}</h2><div class="row"><select id="tMetric" style="width:auto"><option value="dps">DPS</option><option value="ehp">EHP</option><option value="life">${T("Life", "Życie")}</option><option value="es">Energy Shield</option><option value="movement">${T("Movement speed", "Prędkość ruchu")}</option></select><button id="btnRank">${T("Calculate", "Policz")}</button></div><div id="rankOut"></div></div>
+      <div class="panel"><h2>${T("What to refund", "Co można zwolnić")}</h2><p class="muted small">${T("Passives that cost the least to refund.", "Pasywki, których zwolnienie najmniej kosztuje.")}</p><button id="btnRespec">${T("Calculate", "Policz")}</button><div id="respecOut"></div></div></div>
+      <div class="panel"><h2>${T("Tree optimizer", "Optymalizator drzewka")}</h2><p class="muted small">${T("Refunds weak passives and takes strong ones, every move checked in PoB (~10–30 s).", "Zwalnia słabe pasywki i bierze mocne, każdy ruch sprawdzony w PoB (~10–30 s).")}</p><button id="btnTree">${T("Optimize", "Optymalizuj")}</button><div id="treeOut"></div></div>`;
     const data = await api("/api/tree");
     const tv = treeView($("#treeBox"), data);
     const showNode = async (id) => {
       const r = await api("/api/node_path?" + q({id}));
       tv.highlight(r.path.length ? r.path : [id], id);
       const n = r.node;
-      $("#treeInfo").innerHTML = n ? `<b>${esc(n.name)}</b> <span class="muted">(${esc(n.type)}${n.alloc ? ", wzięta" : `, ${r.path.length} pkt ścieżki`})</span><br>${(n.stats || []).map(esc).join("<br>")}` : "";
+      $("#treeInfo").innerHTML = n ? `<b>${esc(n.name)}</b> <span class="muted">(${esc(n.type)}${n.alloc ? T(", taken", ", wzięta") : T(`, ${r.path.length} pts of path`, `, ${r.path.length} pkt ścieżki`)})</span><br>${(n.stats || []).map(esc).join("<br>")}` : "";
       $("#treeBox").scrollIntoView({behavior: "smooth", block: "center"});
     };
     const statsCell = x => `<div class="small muted">${(x.stats || []).map(esc).join("<br>")}</div>`;
@@ -464,23 +489,23 @@ const views = {
       const metric = $("#tMetric").value;
       const r = await api("/api/rank_passives?" + q({metric}));
       const other = metric === "dps" ? ["d_TotalEHP", "EHP"] : ["d_MainDPS", "DPS"];
-      $("#rankOut").innerHTML = `<div class="tablewrap"><table><tr><th>Pasywka i co daje</th><th class="n">Pkt</th><th class="n">Zysk</th><th class="n">${other[1]} Δ</th><th></th></tr>${
-        r.map(x => `<tr><td><b>${esc(x.node)}</b>${x.not_calculated ? ' <span class="pill check">część efektu PoB nie liczy</span>' : ""}${statsCell(x)}</td><td class="n">${x.points}</td><td class="n">${pct(x.gain_pct)}</td><td class="n">${fmt(x[other[0]])}</td><td><button class="ghost small" data-node="${x.id}">pokaż</button></td></tr>`).join("")}</table></div>`;
+      $("#rankOut").innerHTML = `<div class="tablewrap"><table><tr><th>${T("Passive and what it gives", "Pasywka i co daje")}</th><th class="n">${T("Pts", "Pkt")}</th><th class="n">${T("Gain", "Zysk")}</th><th class="n">${other[1]} Δ</th><th></th></tr>${
+        r.map(x => `<tr><td><b>${esc(x.node)}</b>${x.not_calculated ? ` <span class="pill check">${T("PoB does not count part of it", "część efektu PoB nie liczy")}</span>` : ""}${statsCell(x)}</td><td class="n">${x.points}</td><td class="n">${pct(x.gain_pct)}</td><td class="n">${fmt(x[other[0]])}</td><td><button class="ghost small" data-node="${x.id}">${T("show", "pokaż")}</button></td></tr>`).join("")}</table></div>`;
       $("#rankOut").querySelectorAll("[data-node]").forEach(b => b.onclick = () => showNode(+b.dataset.node));
     });
     $("#btnRespec").onclick = e => busy(e.target, async () => {
       const r = await api("/api/rank_respec");
-      $("#respecOut").innerHTML = `<p class="small">Punkty: ${r.points.used} wydane z ${r.points.available}</p><div class="tablewrap"><table><tr><th>Pasywka</th><th class="n">Zwalnia</th><th class="n">Strata DPS</th><th class="n">EHP Δ</th><th></th></tr>${
-        r.cheapest_refunds.map(x => `<tr><td><b>${esc(x.node)}</b>${x.not_calculated ? '<div class="small muted">część efektu PoB nie liczy, oceń sam</div>' : ""}</td><td class="n">${x.points_freed}</td><td class="n">${fmt(x.loss_pct, 2)}%</td><td class="n">${fmt(x.d_TotalEHP)}</td><td><button class="ghost small" data-node="${x.id}">pokaż</button></td></tr>`).join("")}</table></div>
-        ${r.inactive_weapon_set_nodes.length ? `<p class="muted small">${r.inactive_weapon_set_nodes.length} pasywek jest na drugim zestawie broni i liczy się tylko, gdy go trzymasz.</p>` : ""}`;
+      $("#respecOut").innerHTML = `<p class="small">${T(`Points: ${r.points.used} spent of ${r.points.available}`, `Punkty: ${r.points.used} wydane z ${r.points.available}`)}</p><div class="tablewrap"><table><tr><th>${T("Passive", "Pasywka")}</th><th class="n">${T("Frees", "Zwalnia")}</th><th class="n">${T("DPS loss", "Strata DPS")}</th><th class="n">EHP Δ</th><th></th></tr>${
+        r.cheapest_refunds.map(x => `<tr><td><b>${esc(x.node)}</b>${x.not_calculated ? `<div class="small muted">${T("PoB does not count part of it, judge it yourself", "część efektu PoB nie liczy, oceń sam")}</div>` : ""}</td><td class="n">${x.points_freed}</td><td class="n">${fmt(x.loss_pct, 2)}%</td><td class="n">${fmt(x.d_TotalEHP)}</td><td><button class="ghost small" data-node="${x.id}">${T("show", "pokaż")}</button></td></tr>`).join("")}</table></div>
+        ${r.inactive_weapon_set_nodes.length ? `<p class="muted small">${T(`${r.inactive_weapon_set_nodes.length} passives are on the other weapon set and count only while you hold it.`, `${r.inactive_weapon_set_nodes.length} pasywek jest na drugim zestawie broni i liczy się tylko, gdy go trzymasz.`)}</p>` : ""}`;
       $("#respecOut").querySelectorAll("[data-node]").forEach(b => b.onclick = () => showNode(+b.dataset.node));
     });
     $("#btnTree").onclick = e => busy(e.target, async () => {
       const g = goals();
       const r = await api("/api/optimize_tree?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
-      $("#treeOut").innerHTML = r.moves.length ? `<div class="tablewrap"><table><tr><th>Weź</th><th>Zwolnij</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
-        r.moves.map(m => `<tr><td><b>${esc(m.add)}</b> (${m.add_points} pkt)</td><td class="small">${esc(m.refund.join(", ") || "—")}</td><td class="n">${pct(m.dps_pct)}</td><td class="n">${pct(m.ehp_pct)}</td></tr>`).join("")}</table></div>
-        <p>Razem: DPS ${pct(r.total.dps_pct)} · EHP ${pct(r.total.ehp_pct)} · punkty ${r.points.before} → ${r.points.after}</p><button id="btnTreeApply">Zastosuj ruchy</button>` : "<p>Nie znalazłem ruchu, który się opłaca.</p>";
+      $("#treeOut").innerHTML = r.moves.length ? `<div class="tablewrap"><table><tr><th>${T("Take", "Weź")}</th><th>${T("Refund", "Zwolnij")}</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
+        r.moves.map(m => `<tr><td><b>${esc(m.add)}</b> (${m.add_points} ${T("pts", "pkt")})</td><td class="small">${esc(m.refund.join(", ") || "—")}</td><td class="n">${pct(m.dps_pct)}</td><td class="n">${pct(m.ehp_pct)}</td></tr>`).join("")}</table></div>
+        <p>${T("Total", "Razem")}: DPS ${pct(r.total.dps_pct)} · EHP ${pct(r.total.ehp_pct)} · ${T("points", "punkty")} ${r.points.before} → ${r.points.after}</p><button id="btnTreeApply">${T("Apply the moves", "Zastosuj ruchy")}</button>` : `<p>${T("No move found that pays off.", "Nie znalazłem ruchu, który się opłaca.")}</p>`;
       if (r.moves.length) $("#btnTreeApply").onclick = ev => applySteps(r.apply_steps, ev.target);
     });
     state.showNode = showNode;
@@ -489,21 +514,21 @@ const views = {
   async checkup(el) {
     const g = goals();
     const r = await api("/api/checkup?" + q(g));
-    el.innerHTML = `<div class="panel"><h2>Co hamuje build</h2><p class="muted small">Problemy znalezione w buildzie, najważniejsze na górze (kolejność zależy od suwaków). „Pewne” = policzone w PoB, „do sprawdzenia” = PoB tego nie zmierzy, oceń sam.</p>${
-      r.findings.map(f => `<div class="finding ${f.severity}"><h4>${esc(f.title)} <span class="pill ${f.certainty}">${{sure: "pewne", likely: "prawdopodobne", check: "do sprawdzenia"}[f.certainty]}</span></h4>
-        <p>${esc(f.why)}</p><p><b>Zysk:</b> ${esc(f.effect)}</p><ul>${f.action.map(a => `<li>${esc(a)}</li>`).join("")}</ul>
-        ${findingDetails(f.data)}</div>`).join("") || `<p>Nic nie znaleziono.</p>`
+    el.innerHTML = `<div class="panel"><h2>${T("What holds the build back", "Co hamuje build")}</h2><p class="muted small">${T("Problems found in the build, most important on top (the order follows the sliders). “Sure” = calculated in PoB, “to check” = PoB cannot measure it, judge it yourself.", "Problemy znalezione w buildzie, najważniejsze na górze (kolejność zależy od suwaków). „Pewne” = policzone w PoB, „do sprawdzenia” = PoB tego nie zmierzy, oceń sam.")}</p>${
+      r.findings.map(f => `<div class="finding ${f.severity}"><h4>${esc(f.title)} <span class="pill ${f.certainty}">${{sure: T("sure", "pewne"), likely: T("likely", "prawdopodobne"), check: T("to check", "do sprawdzenia")}[f.certainty]}</span></h4>
+        <p>${esc(f.why)}</p><p><b>${T("Gain", "Zysk")}:</b> ${esc(f.effect)}</p><ul>${f.action.map(a => `<li>${esc(a)}</li>`).join("")}</ul>
+        ${findingDetails(f.data)}</div>`).join("") || `<p>${T("Nothing found.", "Nic nie znaleziono.")}</p>`
     }<p class="muted small">${esc(r.credit)}</p></div>`;
   },
 
   async overview(el) {
     const o = state.overview || (state.overview = await api("/api/overview"));
     const s = o.summary;
-    const tiles = [["DPS", s.CombinedDPS], ["EHP", s.TotalEHP], ["Życie", s.Life], ["Energy Shield", s.EnergyShield],
+    const tiles = [["DPS", s.CombinedDPS], ["EHP", s.TotalEHP], [T("Life", "Życie"), s.Life], ["Energy Shield", s.EnergyShield],
       ["Mana", s.Mana], ["Spirit", `${fmt(s.SpiritReserved)} / ${fmt(s.Spirit)}`], ["Evasion", s.Evasion], ["Armour", s.Armour],
-      ["Unik", s.EvadeChance != null ? s.EvadeChance + "%" : "–"], ["Deflect", s.DeflectChance != null ? s.DeflectChance + "%" : "–"],
-      ["Ruch", s.MovementSpeedMod ? Math.round(s.MovementSpeedMod * 100) + "%" : "–"], ["Ataki/s", s.Speed]];
-    const res = [["Ogień", s.FireResist, "--fire"], ["Zimno", s.ColdResist, "--cold"], ["Błyskawice", s.LightningResist, "--light"], ["Chaos", s.ChaosResist, "--chaos"]];
+      [T("Evade", "Unik"), s.EvadeChance != null ? s.EvadeChance + "%" : "–"], ["Deflect", s.DeflectChance != null ? s.DeflectChance + "%" : "–"],
+      [T("Movement", "Ruch"), s.MovementSpeedMod ? Math.round(s.MovementSpeedMod * 100) + "%" : "–"], [T("Attacks/s", "Ataki/s"), s.Speed]];
+    const res = [[T("Fire", "Ogień"), s.FireResist, "--fire"], [T("Cold", "Zimno"), s.ColdResist, "--cold"], [T("Lightning", "Błyskawice"), s.LightningResist, "--light"], ["Chaos", s.ChaosResist, "--chaos"]];
     const hits = ["Physical", "Fire", "Cold", "Lightning", "Chaos"].map(t => [t, s[t + "MaximumHitTaken"]]);
     const maxHit = Math.max(...hits.map(h => h[1] || 0), 1);
     const hitCol = {Physical: "--phys", Fire: "--fire", Cold: "--cold", Lightning: "--light", Chaos: "--chaos"};
@@ -511,12 +536,12 @@ const views = {
     el.innerHTML = `<div class="panel"><h2>${esc(s.class)} · ${esc(s.ascendancy)} · lvl ${s.level} · ${esc(s.main_skill)}</h2>
       <div class="tiles">${tiles.map(([k, v]) => `<div class="tile"><div class="k">${k}</div><div class="v">${typeof v === "number" ? fmt(v, v < 10 ? 2 : 0) : v}</div></div>`).join("")}</div></div>
       <div class="grid2">
-        <div class="panel"><h2>Odporności</h2>${res.map(([k, v, c]) => `<div class="gauge"><span>${k}</span><div class="bar"><i style="width:${Math.max(0, Math.min(100, (v + 60) / 1.6))}%;background:var(${c})"></i><span class="cap" style="left:${(75 + 60) / 1.6}%"></span></div><b class="n">${v}%</b></div>`).join("")}
-          <p class="muted small">Kreska = cap 75%. Wróg: ${Object.entries(o.enemy || {}).map(([k, v]) => `${k} ${fmt(v)}`).join(", ")}</p></div>
-        <div class="panel"><h2>Największy hit, który przeżyjesz</h2>${hits.map(([k, v]) => `<div class="gauge"><span>${k}</span><div class="bar"><i style="width:${(v || 0) / maxHit * 100}%;background:var(${hitCol[k]})"></i></div><b class="n">${fmt(v)}</b></div>`).join("")}</div>
-        <div class="panel"><h2>Punkty pasywne</h2><p>Wydane <b>${pts.used}</b> z <b>${pts.available}</b> · zestawy broni ${pts.weapon_set_1}/${pts.weapon_set_2} (max ${pts.weapon_set_max}) · ascendancy ${pts.ascendancy_used}/${pts.ascendancy_max}</p>
-          <p class="muted small">Aktywny zestaw broni: ${pts.active_weapon_set}. ${esc(pts.note || "")}</p></div>
-        <div class="panel"><h2>Config w PoB</h2><div class="chips">${Object.entries(o.config).filter(([, v]) => v != null && v !== false).map(([k, v]) => `<span class="chip">${esc(k)}: ${esc(v)}</span>`).join("")}</div></div>
+        <div class="panel"><h2>${T("Resistances", "Odporności")}</h2>${res.map(([k, v, c]) => `<div class="gauge"><span>${k}</span><div class="bar"><i style="width:${Math.max(0, Math.min(100, (v + 60) / 1.6))}%;background:var(${c})"></i><span class="cap" style="left:${(75 + 60) / 1.6}%"></span></div><b class="n">${v}%</b></div>`).join("")}
+          <p class="muted small">${T("Line = 75% cap. Enemy", "Kreska = cap 75%. Wróg")}: ${Object.entries(o.enemy || {}).map(([k, v]) => `${k} ${fmt(v)}`).join(", ")}</p></div>
+        <div class="panel"><h2>${T("Biggest hit you survive", "Największy hit, który przeżyjesz")}</h2>${hits.map(([k, v]) => `<div class="gauge"><span>${k}</span><div class="bar"><i style="width:${(v || 0) / maxHit * 100}%;background:var(${hitCol[k]})"></i></div><b class="n">${fmt(v)}</b></div>`).join("")}</div>
+        <div class="panel"><h2>${T("Passive points", "Punkty pasywne")}</h2><p>${T("Spent", "Wydane")} <b>${pts.used}</b> ${T("of", "z")} <b>${pts.available}</b> · ${T("weapon sets", "zestawy broni")} ${pts.weapon_set_1}/${pts.weapon_set_2} (max ${pts.weapon_set_max}) · ascendancy ${pts.ascendancy_used}/${pts.ascendancy_max}</p>
+          <p class="muted small">${T("Active weapon set", "Aktywny zestaw broni")}: ${pts.active_weapon_set}. ${esc(pts.note || "")}</p></div>
+        <div class="panel"><h2>${T("PoB config", "Config w PoB")}</h2><div class="chips">${Object.entries(o.config).filter(([, v]) => v != null && v !== false).map(([k, v]) => `<span class="chip">${esc(k)}: ${esc(v)}</span>`).join("")}</div></div>
       </div>`;
   },
 
@@ -528,22 +553,22 @@ const views = {
         <img loading="lazy" alt="" src="/api/icon?${q({name: g.name, kind: g.support ? "item" : "skill"})}" onerror="iconRetry(this)">
         <span><span class="gn">${esc(g.name)}</span>${g.tags ? `<div class="small muted">${esc(g.tags)}</div>` : ""}</span>
         <span class="lv">${g.level ?? ""}${g.quality ? ` / ${g.quality}%` : ""}</span>
-        <div class="gemtext" hidden>${g.why_not ? `<div class="why">Nie działa: ${esc(g.why_not)}</div>` : ""}${g.description ? `<p>${esc(g.description)}</p>` : ""}
+        <div class="gemtext" hidden>${g.why_not ? `<div class="why">${T("Does not apply", "Nie działa")}: ${esc(g.why_not)}</div>` : ""}${g.description ? `<p>${esc(g.description)}</p>` : ""}
           ${g.stats.length ? `<div class="stats">${g.stats.map(esc).join("<br>")}</div>` : ""}
           <div class="small">${Object.entries(g.req).map(([k, v]) => `${k.toUpperCase()} ${v}`).join(" · ")}${g.max_level ? ` · max lvl ${g.max_level}` : ""}
           · <a href="https://poe2db.tw/us/${encodeURIComponent(g.name.replace(/'/g, "").replace(/\s+/g, "_"))}" target="_blank" rel="noopener">poe2db</a></div></div>
       </div>`;
-    el.innerHTML = `<div class="panel"><h2>Skille i supporty</h2>
-      <p class="muted small">Kliknij gem, żeby zobaczyć jego opis z gry. Kolor obwódki = atrybut (siła, zręczność, inteligencja). Przekreślone = nie działa na tym skillu (z powodem).</p>
+    el.innerHTML = `<div class="panel"><h2>${T("Skills and supports", "Skille i supporty")}</h2>
+      <p class="muted small">${T("Click a gem to see its in-game description. Border colour = attribute (strength, dexterity, intelligence). Struck through = does not apply to this skill (with the reason).", "Kliknij gem, żeby zobaczyć jego opis z gry. Kolor obwódki = atrybut (siła, zręczność, inteligencja). Przekreślone = nie działa na tym skillu (z powodem).")}</p>
       <div class="groups">${sg.groups.map((g, gi) => `<div class="group ${g.main ? "main" : ""}">
-        <div class="gh"><b>${esc(g.skills.join(", ") || g.label || "Grupa " + g.index)}</b>${g.main ? '<span class="pill sure">główny</span>' : ""}
+        <div class="gh"><b>${esc(g.skills.join(", ") || g.label || T("Group ", "Grupa ") + g.index)}</b>${g.main ? `<span class="pill sure">${T("main", "główny")}</span>` : ""}
           ${g.dps ? `<span class="small muted">DPS ${fmt(g.dps)}</span>` : ""}<span class="small muted">${esc(g.slot || "")}</span></div>
         ${g.gems.map((x, i) => gemRow(x, gi, i)).join("")}</div>`).join("")}</div></div>
-    <details class="panel"><summary><b>DPS każdego skilla</b></summary><div class="tablewrap" style="margin-top:8px"><table><tr><th>Skill</th><th class="n">Hit DPS</th><th class="n">DoT</th><th class="n">Minion</th><th class="n">Ataki/s</th></tr>${
-      o.skill_dps.map(d => `<tr><td>${esc(d.name)} <span class="muted small">gr. ${d.group}</span></td><td class="n">${fmt(d.TotalDPS)}</td><td class="n">${fmt(d.TotalDotDPS)}</td><td class="n">${fmt(d.MinionDPS)}</td><td class="n">${fmt(d.Speed, 2)}</td></tr>`).join("")
+    <details class="panel"><summary><b>${T("DPS of every skill", "DPS każdego skilla")}</b></summary><div class="tablewrap" style="margin-top:8px"><table><tr><th>Skill</th><th class="n">Hit DPS</th><th class="n">DoT</th><th class="n">Minion</th><th class="n">${T("Attacks/s", "Ataki/s")}</th></tr>${
+      o.skill_dps.map(d => `<tr><td>${esc(d.name)} <span class="muted small">${T("gr.", "gr.")} ${d.group}</span></td><td class="n">${fmt(d.TotalDPS)}</td><td class="n">${fmt(d.TotalDotDPS)}</td><td class="n">${fmt(d.MinionDPS)}</td><td class="n">${fmt(d.Speed, 2)}</td></tr>`).join("")
     }</table></div></details>
-    <div class="panel"><h2>Optymalizator supportów (główny skill)</h2><p class="muted small">Każdy pasujący support w każdym slocie, pełne przeliczenia PoB. Trwa ~25 s.</p>
-      <button id="btnSup">Szukaj najlepszych supportów</button><div id="supOut"></div></div>`;
+    <div class="panel"><h2>${T("Support optimizer (main skill)", "Optymalizator supportów (główny skill)")}</h2><p class="muted small">${T("Every fitting support in every socket, full PoB recalculations. Takes ~25 s.", "Każdy pasujący support w każdym slocie, pełne przeliczenia PoB. Trwa ~25 s.")}</p>
+      <button id="btnSup">${T("Find the best supports", "Szukaj najlepszych supportów")}</button><div id="supOut"></div></div>`;
     el.querySelectorAll(".gem").forEach(row => row.onclick = ev => {
       if (ev.target.closest("a")) return;
       const t = row.querySelector(".gemtext"); t.hidden = !t.hidden;
@@ -552,13 +577,13 @@ const views = {
       const g = goals();
       const r = await api("/api/optimize_supports?" + q({damage: g.damage, survive: g.survive, speed: g.speed, budget: g.budget}));
       const c = r.best_combination;
-      $("#supOut").innerHTML = `<h3>Wartość obecnych supportów (bez niego)</h3><div class="tablewrap"><table><tr><th>Support</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
+      $("#supOut").innerHTML = `<h3>${T("Value of the current supports (without it)", "Wartość obecnych supportów (bez niego)")}</h3><div class="tablewrap"><table><tr><th>Support</th><th class="n">DPS</th><th class="n">EHP</th></tr>${
         Object.entries(r.current_supports).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${pct(v.dps_pct)}</td><td class="n">${pct(v.ehp_pct)}</td></tr>`).join("")}</table></div>
-        ${r.current_supports_that_lower_the_score.length ? `<div class="finding warn"><h4>Te supporty w PoB obniżają wynik</h4><p class="small">${r.current_supports_that_lower_the_score.map(x => esc(x.support)).join(", ")}: bez nich jest lepiej. Pewnie dają coś, czego PoB nie liczy (obrona, użyteczność, więcej celów). Sprawdź, zanim wymienisz.</p></div>` : ""}
-        ${r.skipped_over_budget && r.skipped_over_budget.length ? `<p class="muted small">Pominięte ponad budżet: ${esc(r.skipped_over_budget.join(", "))}</p>` : ""}
-        ${c ? `<h3>Najlepszy zestaw zmian (sprawdzony razem)</h3><p>${c.swaps.map(s => `${esc(s.replace)} → <b>${esc(s.with)}</b>${s.price ? ` <span class="muted small">(${esc(s.price.text)})</span>` : ""}`).join("<br>")}</p><p>DPS ${pct(c.dps_pct)} · EHP ${pct(c.ehp_pct)}</p><button id="btnSupApply">Zastosuj</button>` : "<p>Brak lepszego zestawu.</p>"}
-        <h3>Najlepsze pojedyncze (etap 1)</h3><div class="chips">${r.stage1_top.map(x => `<span class="chip">${esc(x.support)} ${pct(x.dps_pct)}${x.price ? " · " + esc(x.price.text) : ""}</span>`).join("")}</div>
-        <p class="muted small">${esc(r.note)} · ${r.evaluated} przeliczeń w ${r.seconds} s</p>`;
+        ${r.current_supports_that_lower_the_score.length ? `<div class="finding warn"><h4>${T("These supports lower the score in PoB", "Te supporty w PoB obniżają wynik")}</h4><p class="small">${r.current_supports_that_lower_the_score.map(x => esc(x.support)).join(", ")}: ${T("better without them. They probably give something PoB does not count (defence, utility, more targets). Check before swapping.", "bez nich jest lepiej. Pewnie dają coś, czego PoB nie liczy (obrona, użyteczność, więcej celów). Sprawdź, zanim wymienisz.")}</p></div>` : ""}
+        ${r.skipped_over_budget && r.skipped_over_budget.length ? `<p class="muted small">${T("Skipped, over budget", "Pominięte ponad budżet")}: ${esc(r.skipped_over_budget.join(", "))}</p>` : ""}
+        ${c ? `<h3>${T("Best set of changes (checked together)", "Najlepszy zestaw zmian (sprawdzony razem)")}</h3><p>${c.swaps.map(s => `${esc(s.replace)} → <b>${esc(s.with)}</b>${s.price ? ` <span class="muted small">(${esc(s.price.text)})</span>` : ""}`).join("<br>")}</p><p>DPS ${pct(c.dps_pct)} · EHP ${pct(c.ehp_pct)}</p><button id="btnSupApply">${T("Apply", "Zastosuj")}</button>` : `<p>${T("No better set.", "Brak lepszego zestawu.")}</p>`}
+        <h3>${T("Best single swaps (stage 1)", "Najlepsze pojedyncze (etap 1)")}</h3><div class="chips">${r.stage1_top.map(x => `<span class="chip">${esc(x.support)} ${pct(x.dps_pct)}${x.price ? " · " + esc(x.price.text) : ""}</span>`).join("")}</div>
+        <p class="muted small">${esc(r.note)} · ${T(`${r.evaluated} recalculations in ${r.seconds} s`, `${r.evaluated} przeliczeń w ${r.seconds} s`)}</p>`;
       if (c) $("#btnSupApply").onclick = ev => applySteps(c.apply_steps, ev.target);
     });
   },
@@ -569,16 +594,16 @@ const views = {
     const rank = s => { const i = order.indexOf(s); return i < 0 ? 99 : i; };
     const items = eq.items.slice().sort((a, b) => rank(a.slot) - rank(b.slot));
     const card = i => `<div class="eqcard" data-slot="${esc(i.slot)}" tabindex="0" role="button" aria-label="${esc(i.slot)}: ${esc(i.name)}">${itemTip(i, true)}</div>`;
-    el.innerHTML = `<div class="panel"><h2>Co wymienić najpierw</h2>
-      <p class="muted small">Każdy slot porównany z realnym rare na Twój level (lvl ${esc(eq.level)}): najlepsza baza, którą możesz założyć, 3 prefiksy + 3 suffiksy ze środkowych tierów, dobrane pod build. Przy każdym gotowy przepis na craft. ~5 s.</p>
-      <button id="btnAudit">Sprawdź cały gear</button><div id="auditOut"></div></div>
-      <div class="panel"><h2>Ekwipunek</h2>
-      <p class="muted small">Kliknij item: ile daje każdy mod, czy opłaca się exalt / chaos / annul / fracture, przepis na lepszy item, porównanie i trade.</p>
+    el.innerHTML = `<div class="panel"><h2>${T("What to replace first", "Co wymienić najpierw")}</h2>
+      <p class="muted small">${T(`Every slot against a realistic rare for your level (level ${esc(eq.level)}): the best base you can wear, 3 prefixes + 3 suffixes of middle tiers, picked for the build. Each with a ready craft recipe. ~5 s.`, `Każdy slot porównany z realnym rare na Twój level (lvl ${esc(eq.level)}): najlepsza baza, którą możesz założyć, 3 prefiksy + 3 suffiksy ze środkowych tierów, dobrane pod build. Przy każdym gotowy przepis na craft. ~5 s.`)}</p>
+      <button id="btnAudit">${T("Check all gear", "Sprawdź cały gear")}</button><div id="auditOut"></div></div>
+      <div class="panel"><h2>${T("Equipment", "Ekwipunek")}</h2>
+      <p class="muted small">${T("Click an item: what every mod gives, whether exalt / chaos / annul / fracture pays off, a recipe for a better item, comparison and trade.", "Kliknij item: ile daje każdy mod, czy opłaca się exalt / chaos / annul / fracture, przepis na lepszy item, porównanie i trade.")}</p>
       <div class="eqgrid">${items.filter(i => !/^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div>
-      <details style="margin-top:10px"><summary>Flaski i charmy</summary><div class="eqgrid" style="margin-top:8px">${items.filter(i => /^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div></details></div>
+      <details style="margin-top:10px"><summary>${T("Flasks and charms", "Flaski i charmy")}</summary><div class="eqgrid" style="margin-top:8px">${items.filter(i => /^(Flask|Charm)/.test(i.slot)).map(card).join("")}</div></details></div>
       <div id="slotOut"></div>
-      <div class="panel"><h2>Ile wart jest każdy stat</h2><p class="muted small">Jedna linia dodana do biżuterii, policzona w PoB. Szukaj na gearze statów z góry listy.</p><button id="btnSW">Policz wagi statów</button><div id="swOut"></div></div>
-      <div class="panel"><h2>Unikat, który Ci się podoba</h2><div class="row"><input type="text" id="uName" placeholder="np. Headhunter" style="flex:1;min-width:180px"><button id="btnTryU">Sprawdź</button></div><div id="tryUOut"></div></div>`;
+      <div class="panel"><h2>${T("What every stat is worth", "Ile wart jest każdy stat")}</h2><p class="muted small">${T("One line added to jewellery, calculated in PoB. Look for the stats at the top of the list on gear.", "Jedna linia dodana do biżuterii, policzona w PoB. Szukaj na gearze statów z góry listy.")}</p><button id="btnSW">${T("Calculate stat weights", "Policz wagi statów")}</button><div id="swOut"></div></div>
+      <div class="panel"><h2>${T("A unique you like", "Unikat, który Ci się podoba")}</h2><div class="row"><input type="text" id="uName" placeholder="${T("e.g. Headhunter", "np. Headhunter")}" style="flex:1;min-width:180px"><button id="btnTryU">${T("Check", "Sprawdź")}</button></div><div id="tryUOut"></div></div>`;
     el.querySelectorAll(".eqcard").forEach(b => {
       b.onclick = () => {
         el.querySelectorAll(".eqcard").forEach(x => x.classList.toggle("on", x === b));
@@ -594,45 +619,45 @@ const views = {
     $("#btnSW").onclick = e => busy(e.target, async () => {
       const g = goals();
       const r = await api("/api/stat_weights?" + q({damage: g.damage, survive: g.survive, speed: g.speed}));
-      $("#swOut").innerHTML = `<div class="tablewrap"><table><tr><th>Stat</th><th class="n">DPS</th><th class="n">EHP</th><th class="n">Wynik</th></tr>${
+      $("#swOut").innerHTML = `<div class="tablewrap"><table><tr><th>Stat</th><th class="n">DPS</th><th class="n">EHP</th><th class="n">${T("Score", "Wynik")}</th></tr>${
         r.weights.map(w => `<tr><td>${esc(w.stat)}</td><td class="n">${pct(w.dps_pct)}</td><td class="n">${pct(w.ehp_pct)}</td><td class="n">${fmt(w.score, 2)}</td></tr>`).join("")}</table></div><p class="muted small">${esc(r.note)}</p>`;
     });
     $("#btnTryU").onclick = e => busy(e.target, async () => {
       const g = goals();
       const r = await api("/api/try_unique?" + q({name: $("#uName").value, damage: g.damage, survive: g.survive}));
-      $("#tryUOut").innerHTML = `<h3>${esc(r.unique)} (${esc(r.base)}) w ${esc(r.slot)} zamiast ${esc(r.replaces || "pustego slotu")}</h3>
-        <p>DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}${r.penalty ? ` · <span class="neg">kara ${fmt(r.penalty, 1)}</span>` : ""} · cena: <b>${r.price ? esc(r.price.text) : "brak na poe.ninja"}</b></p>${diffTable(r.changes)}${notes(r.notes)}
-        <details><summary>mody unikatu</summary><pre>${esc(r.unique_mods.join("\n"))}</pre></details>`;
+      $("#tryUOut").innerHTML = `<h3>${esc(r.unique)} (${esc(r.base)}) ${T("in", "w")} ${esc(r.slot)} ${T("instead of", "zamiast")} ${esc(r.replaces || T("an empty slot", "pustego slotu"))}</h3>
+        <p>DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}${r.penalty ? ` · <span class="neg">${T("penalty", "kara")} ${fmt(r.penalty, 1)}</span>` : ""} · ${T("price", "cena")}: <b>${r.price ? esc(r.price.text) : T("not on poe.ninja", "brak na poe.ninja")}</b></p>${diffTable(r.changes)}${notes(r.notes)}
+        <details><summary>${T("unique mods", "mody unikatu")}</summary><pre>${esc(r.unique_mods.join("\n"))}</pre></details>`;
     });
   },
 
   async combo(el) {
-    el.innerHTML = `<div class="panel"><h2>Combo i synergie</h2><p class="muted small">Co build tworzy, z czego korzysta, co do tego pasuje. ~10 s.</p><button id="btnCombo">Analizuj</button><div id="comboOut"></div></div>`;
+    el.innerHTML = `<div class="panel"><h2>${T("Combos and synergies", "Combo i synergie")}</h2><p class="muted small">${T("What the build creates, what it feeds on, what fits. ~10 s.", "Co build tworzy, z czego korzysta, co do tego pasuje. ~10 s.")}</p><button id="btnCombo">${T("Analyse", "Analizuj")}</button><div id="comboOut"></div></div>`;
     $("#btnCombo").onclick = e => busy(e.target, async () => {
       const g = goals();
       const r = await api("/api/combos?" + q({damage: g.damage, survive: g.survive}));
       const block = (title, obj) => Object.entries(obj).map(([m, b]) => `<h3>${title}: ${esc(m)}</h3>
-        ${(b.supports || []).length ? `<p class="small"><b>Supporty:</b> ${b.supports.map(x => `${esc(x.support)} ${pct(x.dps_pct)}`).join(", ")}</p>` : ""}
-        ${b.passives.length ? `<p class="small"><b>Pasywki:</b> ${b.passives.map(x => `${esc(x.passive)} (${x.points} pkt) ${pct(x.dps_pct)}`).join(", ")}</p>` : ""}
-        ${b.uniques.length ? `<p class="small"><b>Unikaty do sprawdzenia:</b> ${b.uniques.map(x => esc(x.unique)).join(", ")}</p>` : ""}`).join("");
+        ${(b.supports || []).length ? `<p class="small"><b>${T("Supports", "Supporty")}:</b> ${b.supports.map(x => `${esc(x.support)} ${pct(x.dps_pct)}`).join(", ")}</p>` : ""}
+        ${b.passives.length ? `<p class="small"><b>${T("Passives", "Pasywki")}:</b> ${b.passives.map(x => `${esc(x.passive)} (${x.points} ${T("pts", "pkt")}) ${pct(x.dps_pct)}`).join(", ")}</p>` : ""}
+        ${b.uniques.length ? `<p class="small"><b>${T("Uniques to check", "Unikaty do sprawdzenia")}:</b> ${b.uniques.map(x => esc(x.unique)).join(", ")}</p>` : ""}`).join("");
       $("#comboOut").innerHTML = `
-        ${r.config_check.length ? `<div class="finding warn"><h4>Config zakłada rzeczy, których build nie robi</h4><ul>${r.config_check.map(c => `<li><b>${esc(c.mechanic)}</b> (${esc(c.config)}) – DPS może być zawyżony</li>`).join("")}</ul></div>` : ""}
-        <h3>Tworzy</h3><div class="chips">${Object.entries(r.profile.produces).map(([k, v]) => `<span class="chip" title="${esc(v.join("\n"))}">${esc(k)}</span>`).join("")}</div>
-        <h3>Korzysta z</h3><div class="chips">${Object.entries(r.profile.benefits_from).map(([k, v]) => `<span class="chip ${r.profile.produces[k] ? "" : "warn"}" title="${esc(v.join("\n"))}">${esc(k)}</span>`).join("")}</div>
-        ${block("Wykorzystaj", r.payoffs)}${block("Brakuje źródła", r.enablers)}<p class="muted small">${esc(r.note)}</p>`;
+        ${r.config_check.length ? `<div class="finding warn"><h4>${T("The config assumes things the build does not do", "Config zakłada rzeczy, których build nie robi")}</h4><ul>${r.config_check.map(c => `<li><b>${esc(c.mechanic)}</b> (${esc(c.config)}) – ${T("DPS may be inflated", "DPS może być zawyżony")}</li>`).join("")}</ul></div>` : ""}
+        <h3>${T("Creates", "Tworzy")}</h3><div class="chips">${Object.entries(r.profile.produces).map(([k, v]) => `<span class="chip" title="${esc(v.join("\n"))}">${esc(k)}</span>`).join("")}</div>
+        <h3>${T("Feeds on", "Korzysta z")}</h3><div class="chips">${Object.entries(r.profile.benefits_from).map(([k, v]) => `<span class="chip ${r.profile.produces[k] ? "" : "warn"}" title="${esc(v.join("\n"))}">${esc(k)}</span>`).join("")}</div>
+        ${block(T("Make use of", "Wykorzystaj"), r.payoffs)}${block(T("Missing a source", "Brakuje źródła"), r.enablers)}<p class="muted small">${esc(r.note)}</p>`;
     });
   },
 
   async plan(el) {
-    el.innerHTML = `<div class="panel"><h2>Plan ulepszeń</h2><p class="muted small">Supporty, drzewko, mody na gearze i poziom gemu, posortowane wg zysku, plus wszystko razem. ~1 min.</p><button id="btnPlan">Ułóż plan</button><div id="planOut"></div></div>`;
+    el.innerHTML = `<div class="panel"><h2>${T("Improvement plan", "Plan ulepszeń")}</h2><p class="muted small">${T("Supports, tree, gear mods and gem level, sorted by gain, plus everything together. ~1 min.", "Supporty, drzewko, mody na gearze i poziom gemu, posortowane wg zysku, plus wszystko razem. ~1 min.")}</p><button id="btnPlan">${T("Make the plan", "Ułóż plan")}</button><div id="planOut"></div></div>`;
     $("#btnPlan").onclick = e => busy(e.target, async () => {
       const g = goals();
       const r = await api("/api/plan?" + q({damage: g.damage, survive: g.survive, speed: g.speed, budget: g.budget}));
       const t = r.all_together;
-      $("#planOut").innerHTML = `<div class="tablewrap"><table><tr><th>Zmiana</th><th class="n">DPS</th><th class="n">EHP</th><th>Koszt</th></tr>${
+      $("#planOut").innerHTML = `<div class="tablewrap"><table><tr><th>${T("Change", "Zmiana")}</th><th class="n">DPS</th><th class="n">EHP</th><th>${T("Cost", "Koszt")}</th></tr>${
         r.top_changes.map(x => `<tr><td>${esc(x.what)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td><td class="small muted">${esc(x.cost)}</td></tr>`).join("")}</table></div>
-        ${t ? `<h3>Gemy + drzewko razem (zmierzone)</h3><p>DPS ${pct(t.dps_pct)} · EHP ${pct(t.ehp_pct)}${t.known_cost_divine ? ` · znany koszt: <b>${fmt(t.known_cost_divine, 2)} div</b>` : ""}</p><button id="btnPlanApply">Zastosuj gemy i drzewko</button>` : ""}
-        <h3>Czego szukać na gearze</h3><div class="chips">${r.gear_stat_priorities.map(x => `<span class="chip">${esc(x.stat)}</span>`).join("")}</div>
+        ${t ? `<h3>${T("Gems + tree together (measured)", "Gemy + drzewko razem (zmierzone)")}</h3><p>DPS ${pct(t.dps_pct)} · EHP ${pct(t.ehp_pct)}${t.known_cost_divine ? ` · ${T("known cost", "znany koszt")}: <b>${fmt(t.known_cost_divine, 2)} div</b>` : ""}</p><button id="btnPlanApply">${T("Apply gems and tree", "Zastosuj gemy i drzewko")}</button>` : ""}
+        <h3>${T("What to look for on gear", "Czego szukać na gearze")}</h3><div class="chips">${r.gear_stat_priorities.map(x => `<span class="chip">${esc(x.stat)}</span>`).join("")}</div>
         <p class="muted small">${esc(r.note)} · ${r.seconds} s</p>`;
       if (t) $("#btnPlanApply").onclick = ev => applySteps(t.steps, ev.target);
     });
@@ -641,11 +666,11 @@ const views = {
   async craft(el) {
     const c = state.craft = state.craft || {type: "Ring", base: null, ilvl: 82, wanted: {}, filter: ""};
     const types = (await api("/api/craft/bases?" + q({type: "Ring"}))).types;
-    el.innerHTML = `<div class="panel"><h2>Kuźnia</h2>
-      <p class="muted small">Wybierz bazę i mody, które chcesz mieć (do 3 prefiksów i 3 suffiksów). Porównam drogi craftu: najpewniejszą i najtańszą do skutku, z cenami orbów z poe.ninja.</p>
+    el.innerHTML = `<div class="panel"><h2>${T("Forge", "Kuźnia")}</h2>
+      <p class="muted small">${T("Pick a base and the mods you want (up to 3 prefixes and 3 suffixes). The routes are compared: the surest and the cheapest until done, with orb prices from poe.ninja.", "Wybierz bazę i mody, które chcesz mieć (do 3 prefiksów i 3 suffiksów). Porównam drogi craftu: najpewniejszą i najtańszą do skutku, z cenami orbów z poe.ninja.")}</p>
       <div class="row">
-        <label class="small muted">Typ <select id="cType" style="width:auto">${types.map(t => `<option ${t === c.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
-        <input type="text" id="cFind" placeholder="szukaj bazy" style="flex:1;min-width:140px">
+        <label class="small muted">${T("Type", "Typ")} <select id="cType" style="width:auto">${types.map(t => `<option ${t === c.type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+        <input type="text" id="cFind" placeholder="${T("find a base", "szukaj bazy")}" style="flex:1;min-width:140px">
         <label class="small muted">Item level <input type="number" id="cIlvl" min="1" max="86" value="${c.ilvl}" style="width:5em"></label>
       </div>
       <div id="cMine" class="chips" style="margin-top:8px"></div>
@@ -657,7 +682,7 @@ const views = {
       const list = bases.filter(b => !f || b.name.toLowerCase().includes(f));
       $("#cBases").innerHTML = list.map(b => `<button class="basebtn ${b.name === c.base ? "on" : ""}" data-b="${esc(b.name)}">
         <img loading="lazy" alt="" src="/api/icon?${q({name: b.name})}" onerror="iconRetry(this)">
-        <span>${esc(b.name)}<small>${esc(b.sub_type || b.type)} · wym. lvl ${b.level}</small></span></button>`).join("") || `<p class="muted small">Brak baz.</p>`;
+        <span>${esc(b.name)}<small>${esc(b.sub_type || b.type)} · ${T("req. level", "wym. lvl")} ${b.level}</small></span></button>`).join("") || `<p class="muted small">${T("No bases.", "Brak baz.")}</p>`;
       $("#cBases").querySelectorAll("[data-b]").forEach(btn => btn.onclick = () => { c.base = btn.dataset.b; c.wanted = {}; showBases(); loadPool(); });
     };
     const loadBases = async () => { bases = (await api("/api/craft/bases?" + q({type: c.type}))).bases; showBases(); };
@@ -667,7 +692,7 @@ const views = {
 
     async function loadPool() {
       const body = $("#cBody");
-      body.innerHTML = `<div class="panel"><span class="busy"></span> Wczytuję mody…</div>`;
+      body.innerHTML = `<div class="panel"><span class="busy"></span> ${T("Loading mods…", "Wczytuję mody…")}</div>`;
       const p = await api("/api/craft/pool?" + q({base: c.base, ilvl: c.ilvl}));
       c.pool = p;
       for (const [k, w] of Object.entries(c.wanted)) {
@@ -675,21 +700,21 @@ const views = {
         if (m) { w.family = m.family; if (w.min_level && !m.tiers.some(t => t.level === w.min_level)) w.min_level = (m.tiers.slice().reverse().find(t => t.level >= w.min_level) || m.tiers[0]).level; }
         else delete c.wanted[k];
       }
-      body.innerHTML = `<div class="panel"><h2>Mody na ${esc(p.base)}</h2>
-          <input type="text" id="cModFind" placeholder="filtruj, np. life, resistance, spell" value="${esc(c.filter)}">
-          <div class="modcols" style="margin-top:10px">${["Prefix", "Suffix"].map(t => `<div><h3>${t === "Prefix" ? "Prefiksy" : "Suffiksy"} <span class="small muted" id="cnt${t}"></span></h3>
+      body.innerHTML = `<div class="panel"><h2>${T("Mods on", "Mody na")} ${esc(p.base)}</h2>
+          <input type="text" id="cModFind" placeholder="${T("filter, e.g. life, resistance, spell", "filtruj, np. life, resistance, spell")}" value="${esc(c.filter)}">
+          <div class="modcols" style="margin-top:10px">${["Prefix", "Suffix"].map(t => `<div><h3>${t === "Prefix" ? T("Prefixes", "Prefiksy") : T("Suffixes", "Suffiksy")} <span class="small muted" id="cnt${t}"></span></h3>
             <div class="modlist" id="list${t}"></div></div>`).join("")}</div>
-          <p class="muted small">Tier = minimalny poziom moda, który Ci wystarczy. Ikona esencji: ten mod da się dostać na pewno. „Tylko esencja”: nie wypada losowo. % = szansa, że losowy prefix/suffix wypadnie z tej grupy.
-            ${p.weights === "poe2db" ? `Wagi, rodziny modów, esencje i mody desecrated: <a target="_blank" href="https://poe2db.tw/us/${esc(p.poe2db_page)}#ModifiersCalc">poe2db (${esc(p.poe2db_page)})</a>.` : `<span class="neg">Brak strony poe2db dla tej bazy: równe wagi z danych PoB.</span>`}</p></div>
+          <p class="muted small">${T("Tier = the lowest mod level that is enough for you. Essence icon: this mod can be guaranteed. “Essence only”: it does not roll randomly. % = chance that a random prefix/suffix is from this group.", "Tier = minimalny poziom moda, który Ci wystarczy. Ikona esencji: ten mod da się dostać na pewno. „Tylko esencja”: nie wypada losowo. % = szansa, że losowy prefix/suffix wypadnie z tej grupy.")}
+            ${p.weights === "poe2db" ? `${T("Weights, mod families, essences and desecrated mods", "Wagi, rodziny modów, esencje i mody desecrated")}: <a target="_blank" href="https://poe2db.tw/us/${esc(p.poe2db_page)}#ModifiersCalc">poe2db (${esc(p.poe2db_page)})</a>.` : `<span class="neg">${T("No poe2db page for this base: equal weights from PoB's data.", "Brak strony poe2db dla tej bazy: równe wagi z danych PoB.")}</span>`}</p></div>
         <div class="forgeout">
-          <div class="panel"><h2>Cel</h2><div id="cGoal"></div>
-            <div class="row" style="margin-top:10px;justify-content:center"><button id="btnRoutes">Znajdź drogę craftu</button><button class="ghost" id="btnClear">Wyczyść</button></div></div>
-          <div class="panel" id="cRoutesPanel"><h2>Drogi craftu</h2><div id="cRoutes"><p class="muted">Zaznacz mody i kliknij „Znajdź drogę craftu”.</p></div></div></div>`;
+          <div class="panel"><h2>${T("Goal", "Cel")}</h2><div id="cGoal"></div>
+            <div class="row" style="margin-top:10px;justify-content:center"><button id="btnRoutes">${T("Find a craft route", "Znajdź drogę craftu")}</button><button class="ghost" id="btnClear">${T("Clear", "Wyczyść")}</button></div></div>
+          <div class="panel" id="cRoutesPanel"><h2>${T("Craft routes", "Drogi craftu")}</h2><div id="cRoutes"><p class="muted">${T("Pick mods and click “Find a craft route”.", "Zaznacz mody i kliknij „Znajdź drogę craftu”.")}</p></div></div></div>`;
       $("#cModFind").oninput = e => { c.filter = e.target.value; drawMods(); };
       $("#btnClear").onclick = () => { c.wanted = {}; drawMods(); };
       $("#btnRoutes").onclick = e => busy(e.target, async () => {
-        $("#cRoutes").innerHTML = `<p class="muted"><span class="busy"></span> Symuluję drogi craftu (do ~10 s)…</p>`;
-        try { await findRoutes(); } catch (err) { $("#cRoutes").innerHTML = `<p class="neg">Błąd: ${esc(err.message)}</p>`; throw err; }
+        $("#cRoutes").innerHTML = `<p class="muted"><span class="busy"></span> ${T("Simulating craft routes (up to ~10 s)…", "Symuluję drogi craftu (do ~10 s)…")}</p>`;
+        try { await findRoutes(); } catch (err) { $("#cRoutes").innerHTML = `<p class="neg">${T("Error", "Błąd")}: ${esc(err.message)}</p>`; throw err; }
       });
       drawMods();
     }
@@ -702,19 +727,19 @@ const views = {
       for (const t of ["Prefix", "Suffix"]) {
         const rows = p.families.filter(m => m.type === t && (!f || m.text.toLowerCase().includes(f) || (m.tags || []).join(" ").includes(f) || key(m) in c.wanted))
           .sort((a, b) => (key(b) in c.wanted) - (key(a) in c.wanted));  // picked ones on top
-        $(`#cnt${t}`).textContent = `${taken[t]}/3 wybrane`;
+        $(`#cnt${t}`).textContent = `${taken[t]}/3 ${T("picked", "wybrane")}`;
         $(`#list${t}`).innerHTML = rows.map(m => {
           const k = key(m), on = k in c.wanted, full = !on && (taken[t] >= 3 || fams.has(m.family));
-          const ess = m.essences.length ? `<img class="ic" style="width:20px;height:20px" onerror="this.remove()" alt=""" title="${esc(m.essences.map(e => e.name).join(", "))}" src="/api/icon?${q({name: m.essences[0].name})}">` : "";
+          const ess = m.essences.length ? `<img class="ic" style="width:20px;height:20px" onerror="this.remove()" alt="" title="${esc(m.essences.map(e => e.name).join(", "))}" src="/api/icon?${q({name: m.essences[0].name})}">` : "";
           return `<div class="modrow ${on ? "on" : ""} ${full ? "off" : ""}" data-k="${esc(k)}">
-            <input type="checkbox" ${on ? "checked" : ""} ${full ? "disabled" : ""} aria-label="wybierz">
+            <input type="checkbox" ${on ? "checked" : ""} ${full ? "disabled" : ""} aria-label="${T("pick", "wybierz")}">
             <div class="mt">${esc(m.text)}</div>
-            <div class="mx">${m.essence_only ? '<span class="pill crafted">tylko esencja</span>' : ""}${ess}
-              ${on ? `<select data-tier="${esc(k)}"><option value="0">dowolny tier</option>${m.tiers.map(t => `<option value="${t.level}" ${c.wanted[k].min_level === t.level ? "selected" : ""}>T${t.tier}+ (lvl ${t.level}): ${esc(t.text)}</option>`).join("")}</select>`
-                    : `<span class="muted">${tiers(m.tiers.length)}, najlepszy lvl ${m.tiers[0].level}</span>`}
-              ${m.essence_only ? "" : m.chance_pct < 0.5 ? `<span class="pill" style="color:var(--bad)" title="waga z poe2db">prawie nie wypada</span>`
-                : `<span class="muted" title="szansa, że losowy ${t === "Prefix" ? "prefix" : "suffix"} będzie z tej grupy (wagi z poe2db)">· ${fmt(m.chance_pct, 1)}%</span>`}</div></div>`;
-        }).join("") || `<p class="muted small" style="padding:8px">Nic nie pasuje.</p>`;
+            <div class="mx">${m.essence_only ? `<span class="pill crafted">${T("essence only", "tylko esencja")}</span>` : ""}${ess}
+              ${on ? `<select data-tier="${esc(k)}"><option value="0">${T("any tier", "dowolny tier")}</option>${m.tiers.map(t => `<option value="${t.level}" ${c.wanted[k].min_level === t.level ? "selected" : ""}>T${t.tier}+ (lvl ${t.level}): ${esc(t.text)}</option>`).join("")}</select>`
+                    : `<span class="muted">${tiers(m.tiers.length)}, ${T("best level", "najlepszy lvl")} ${m.tiers[0].level}</span>`}
+              ${m.essence_only ? "" : m.chance_pct < 0.5 ? `<span class="pill" style="color:var(--bad)" title="${T("poe2db weight", "waga z poe2db")}">${T("almost never rolls", "prawie nie wypada")}</span>`
+                : `<span class="muted" title="${T(`chance that a random ${t.toLowerCase()} is from this group (poe2db weights)`, `szansa, że losowy ${t === "Prefix" ? "prefix" : "suffix"} będzie z tej grupy (wagi z poe2db)`)}">· ${fmt(m.chance_pct, 1)}%</span>`}</div></div>`;
+        }).join("") || `<p class="muted small" style="padding:8px">${T("Nothing matches.", "Nic nie pasuje.")}</p>`;
       }
       document.querySelectorAll(".modrow").forEach(r => r.onclick = e => {
         if (e.target.tagName === "SELECT" || e.target.tagName === "OPTION" || r.classList.contains("off")) return;
@@ -733,74 +758,75 @@ const views = {
         return w.min_level ? t.text : m.tiers[m.tiers.length - 1].text + " … " + m.tiers[0].text; };
       const pre = ws.filter(([, w]) => w.type === "Prefix"), suf = ws.filter(([, w]) => w.type === "Suffix");
       $("#cGoal").innerHTML = ws.length ? `<div class="tip RARE" style="max-width:420px;margin:0 auto">
-        <div class="th"><div class="nm">Twój cel</div><div class="bs">${esc(p.base)}</div></div>
+        <div class="th"><div class="nm">${T("Your goal", "Twój cel")}</div><div class="bs">${esc(p.base)}</div></div>
         <img class="ico" alt="" src="/api/icon?${q({name: p.base})}" onerror="this.remove()">
-        <div class="tb"><div class="small" style="color:#7f7f7f">Item Level: ${p.item_level} · wymaga lvl ${p.base_level}</div>
+        <div class="tb"><div class="small" style="color:#7f7f7f">Item Level: ${p.item_level} · ${T("requires level", "wymaga lvl")} ${p.base_level}</div>
           ${pre.map(x => `<div class="ln">${esc(line(x))}</div>`).join("")}${pre.length && suf.length ? '<div class="sep"></div>' : ""}${suf.map(x => `<div class="ln">${esc(line(x))}</div>`).join("")}</div></div>`
-        : `<p class="muted">Zaznacz mody po lewej.</p>`;
+        : `<p class="muted">${T("Pick mods on the left.", "Zaznacz mody po lewej.")}</p>`;
       $("#cGoal").insertAdjacentHTML("beforeend", `<div id="cValue" class="small" style="margin-top:8px;text-align:center"></div>`);
-      $("#cRoutes").innerHTML = `<p class="muted">Zaznacz mody i kliknij „Znajdź drogę craftu”.</p>`;
+      $("#cRoutes").innerHTML = `<p class="muted">${T("Pick mods and click “Find a craft route”.", "Zaznacz mody i kliknij „Znajdź drogę craftu”.")}</p>`;
       clearTimeout(c.valueTimer);
       if (state.loaded && ws.length) c.valueTimer = setTimeout(goalValue, 400);
     }
 
     async function goalValue() {  // what this goal gives the loaded build, in its slot
       const box = $("#cValue"); if (!box) return;
-      box.innerHTML = `<span class="busy"></span> liczę zysk dla Twojej postaci…`;
+      box.innerHTML = `<span class="busy"></span> ${T("calculating the gain for your character…", "liczę zysk dla Twojej postaci…")}`;
       const g = goals();
       try {
         const v = await api("/api/craft/value", {body: {slot: c.slot, base: c.base, ilvl: c.ilvl, damage: g.damage, survive: g.survive,
           wanted: Object.values(c.wanted).map(w => ({group: w.group, type: w.type, min_level: w.min_level}))}});
         if (!$("#cValue")) return;
-        $("#cValue").innerHTML = v.slot ? `Dla Twojej postaci (${esc(v.slot)}, zamiast ${esc((v.current || "pustego slotu").split(",")[0])}): DPS ${pct(v.dps_pct)} · EHP ${pct(v.ehp_pct)}<div class="muted">${esc(v.note)}</div>`
+        $("#cValue").innerHTML = v.slot ? `${T("For your character", "Dla Twojej postaci")} (${esc(v.slot)}, ${T("instead of", "zamiast")} ${esc((v.current || T("an empty slot", "pustego slotu")).split(",")[0])}): DPS ${pct(v.dps_pct)} · EHP ${pct(v.ehp_pct)}<div class="muted">${esc(v.note)}</div>`
           : `<span class="muted">${esc(v.note)}</span>`;
-      } catch (e) { if ($("#cValue")) $("#cValue").innerHTML = `<span class="muted">Zysk: ${esc(e.message)}</span>`; }
+      } catch (e) { if ($("#cValue")) $("#cValue").innerHTML = `<span class="muted">${T("Gain", "Zysk")}: ${esc(e.message)}</span>`; }
     }
 
     async function findRoutes() {
       const wanted = Object.values(c.wanted).map(w => ({group: w.group, type: w.type, min_level: w.min_level}));
-      if (!wanted.length) { toast("Zaznacz najpierw mody."); return; }
+      if (!wanted.length) { toast(T("Pick mods first.", "Zaznacz najpierw mody.")); return; }
       const r = await api("/api/craft/routes", {body: {base: c.base, ilvl: c.ilvl, wanted}});
       const out = $("#cRoutes");
       if (!r.possible) { out.innerHTML = `<div class="finding bad">${r.problems.map(esc).join("<br>")}</div>`; return; }
       const div = v => v == null ? "?" : v < 0.1 && state.exPerDiv ? `${fmt(v * state.exPerDiv, v * state.exPerDiv < 10 ? 1 : 0)} ex` : `${fmt(v, v < 1 ? 2 : v < 100 ? 1 : 0)} div`;
-      const chance = v => !v ? "0%" : v >= 1 ? `${fmt(v, 1)}%` : v >= 0.1 ? `${fmt(v, 2)}%` : `1 na ${fmt(Math.round(100 / v))}`;
+      const chance = v => !v ? "0%" : v >= 1 ? `${fmt(v, 1)}%` : v >= 0.1 ? `${fmt(v, 2)}%` : `${T("1 in", "1 na")} ${fmt(Math.round(100 / v))}`;
       const k = r.wanted.length;
-      const real = (r.realistic || []).map(x => `<tr><td><b>${x.hits} z ${x.of}</b></td><td class="n"><b>${div(x.expected_divine)}</b></td><td class="small muted">${esc(x.route)}</td></tr>`).join("");
-      out.innerHTML = (r.need_item_level > c.ilvl ? `<div class="finding warn">Wybrane tiery wymagają item level ${r.need_item_level}.</div>` : "") +
+      const real = (r.realistic || []).map(x => `<tr><td><b>${x.hits} ${T("of", "z")} ${x.of}</b></td><td class="n"><b>${div(x.expected_divine)}</b></td><td class="small muted">${esc(x.route)}</td></tr>`).join("");
+      out.innerHTML = (r.need_item_level > c.ilvl ? `<div class="finding warn">${T("The picked tiers need item level", "Wybrane tiery wymagają item level")} ${r.need_item_level}.</div>` : "") +
         (r.warnings || []).map(w => `<div class="finding bad">${esc(w)}</div>`).join("") +
-        ((r.rules_changes || []).length ? `<div class="finding warn"><b>Zasady craftingu zmieniły się na poe2db</b> (szczegóły w panelu Dane):<br>${r.rules_changes.map(esc).join("<br>")}</div>` : "") +
-        (real ? `<div class="finding"><h4>Co realnie wyjdzie i za ile</h4><p class="small muted">Najtańsza droga do danej liczby wybranych modów (średnio, do skutku).</p>
-          <div class="tablewrap"><table><tr><th>Mody</th><th class="n">Koszt</th><th>Droga</th></tr>${real}</table></div></div>` : "") +
+        ((r.rules_changes || []).length ? `<div class="finding warn"><b>${T("Crafting rules changed on poe2db", "Zasady craftingu zmieniły się na poe2db")}</b> (${T("details in the Data panel", "szczegóły w panelu Dane")}):<br>${r.rules_changes.map(esc).join("<br>")}</div>` : "") +
+        (real ? `<div class="finding"><h4>${T("What you realistically get and for how much", "Co realnie wyjdzie i za ile")}</h4><p class="small muted">${T("The cheapest route to a given number of the picked mods (on average, until done).", "Najtańsza droga do danej liczby wybranych modów (średnio, do skutku).")}</p>
+          <div class="tablewrap"><table><tr><th>${T("Mods", "Mody")}</th><th class="n">${T("Cost", "Koszt")}</th><th>${T("Route", "Droga")}</th></tr>${real}</table></div></div>` : "") +
         r.routes.map(x => {
           const dead = !x.chance_pct && !Object.values(x.ladder).some(l => l.expected_divine != null);
           const ladder = Object.entries(x.ladder).filter(([j]) => +j >= Math.max(1, k - 2) || x.loop)
             .map(([j, l]) => `<span class="chip">${j}/${k}: <b>${l.expected_divine == null ? "–" : div(l.expected_divine)}</b></span>`).join("");
           return `<div class="route ${x.badges ? "top" : ""} ${dead ? "dead" : ""}">
-            <h4>${esc(x.name)}${(x.badges || []).map(b => `<span class="pill sure">${esc(b)}</span>`).join("")}${dead ? '<span class="pill">ta droga nie da celu</span>' : ""}</h4>
+            <h4>${esc(x.name)}${(x.badges || []).map(b => `<span class="pill sure">${esc(b)}</span>`).join("")}${dead ? `<span class="pill">${T("this route cannot reach the goal", "ta droga nie da celu")}</span>` : ""}</h4>
             <div class="small muted">${esc(x.about)}</div>
             <div class="odds">
-              <div class="o"><b>${chance(x.chance_pct)}</b><span class="small muted">${x.loop ? "że się uda (limit orbów)" : "szansa na próbę"}</span></div>
-              <div class="o"><b>${div(x.cost_try_divine)}</b><span class="small muted">${x.loop ? "średnio wydasz" : "koszt próby"}${x.cost_complete ? "" : " (bez części cen)"}</span></div>
-              <div class="o"><b>${x.expected_divine == null ? "–" : div(x.expected_divine)}</b><span class="small muted">do skutku${x.tries && !x.loop ? ` (~${fmt(x.tries, x.tries < 10 ? 1 : 0)} baz)` : ""}</span></div>
+              <div class="o"><b>${chance(x.chance_pct)}</b><span class="small muted">${x.loop ? T("that it works (orb limit)", "że się uda (limit orbów)") : T("chance per try", "szansa na próbę")}</span></div>
+              <div class="o"><b>${div(x.cost_try_divine)}</b><span class="small muted">${x.loop ? T("you spend on average", "średnio wydasz") : T("cost per try", "koszt próby")}${x.cost_complete ? "" : T(" (some prices missing)", " (bez części cen)")}</span></div>
+              <div class="o"><b>${x.expected_divine == null ? "–" : div(x.expected_divine)}</b><span class="small muted">${T("until done", "do skutku")}${x.tries && !x.loop ? ` (~${fmt(x.tries, x.tries < 10 ? 1 : 0)} ${T("bases", "baz")})` : ""}</span></div>
             </div>
-            <div class="chips" style="margin-top:8px"><span class="small muted">Gdy wystarczy mniej modów:</span>${ladder}</div>
-            <div class="orbs">${x.steps.map((s, j) => `${j ? '<span class="arr">→</span>' : ""}<span class="orb" title="${esc(s.orb)}${s.price_divine != null ? ` · ${s.price_divine} div/szt.` : " · brak ceny"}">
+            <div class="chips" style="margin-top:8px"><span class="small muted">${T("When fewer mods are enough:", "Gdy wystarczy mniej modów:")}</span>${ladder}</div>
+            <div class="orbs">${x.steps.map((s, j) => `${j ? '<span class="arr">→</span>' : ""}<span class="orb" title="${esc(s.orb)}${s.price_divine != null ? ` · ${s.price_divine} ${T("div each", "div/szt.")}` : T(" · no price", " · brak ceny")}">
               <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="iconRetry(this)">${esc(s.orb)} <b>×${fmt(s.avg_count, s.avg_count % 1 ? 2 : 0)}</b></span>`).join("")}</div></div>`;
-        }).join("") + `<p class="muted small">${esc(r.note)} Liczby przy orbach to średnie zużycie na próbę (przy drogach „do skutku”: na cały craft).</p>`;
+        }).join("") + `<p class="muted small">${esc(r.note)} ${T("The numbers next to the orbs are the average use per try (for “until done” routes: for the whole craft).", "Liczby przy orbach to średnie zużycie na próbę (przy drogach „do skutku”: na cały craft).")}</p>`;
     }
 
     // the player's own gear: one click picks that base
     if (state.loaded) api("/api/equipment").then(eq => {
       const mine = (eq.items || []).filter(i => i.base && !/Flask|Charm/.test(i.slot));
-      $("#cMine").innerHTML = mine.length ? `<span class="small muted">Ułóż cel pod mój build:</span>` + mine.map(i => `<button class="ghost small" data-goal="${esc(i.slot)}" title="Najlepsza baza na Twój level i 3+3 mody, które najwięcej dają temu buildowi">${esc(i.slot)}</button>`).join("")
-        + `<span class="small muted" style="margin-left:8px">albo sama baza z gearu:</span>` + mine.map(i => `<button class="ghost small" data-mine="${esc(i.base)}">${esc(i.base)}</button>`).join("") : "";
+      $("#cMine").innerHTML = mine.length ? `<span class="small muted">${T("Goal for my build:", "Ułóż cel pod mój build:")}</span>` + mine.map(i => `<button class="ghost small" data-goal="${esc(i.slot)}" title="${T("The best base for your level and the 3+3 mods that give this build the most", "Najlepsza baza na Twój level i 3+3 mody, które najwięcej dają temu buildowi")}">${esc(i.slot)}</button>`).join("")
+        + `<span class="small muted" style="margin-left:8px">${T("or just a base from your gear:", "albo sama baza z gearu:")}</span>` + mine.map(i => `<button class="ghost small" data-mine="${esc(i.base)}">${esc(i.base)}</button>`).join("") : "";
       $("#cMine").querySelectorAll("[data-mine]").forEach(b => b.onclick = () => openForge(b.dataset.mine));
       $("#cMine").querySelectorAll("[data-goal]").forEach(b => b.onclick = () => busy(b, async () => {
         const g = goals();
         const t = await api("/api/craft/for_slot?" + q({slot: b.dataset.goal, damage: g.damage, survive: g.survive}));
         await openForge(t.base, t);
-        toast(`Cel dla ${t.slot}: ${t.base}, DPS ${t.gain.dps_pct > 0 ? "+" : ""}${fmt(t.gain.dps_pct, 1)}%, EHP ${t.gain.ehp_pct > 0 ? "+" : ""}${fmt(t.gain.ehp_pct, 1)}% względem obecnego itemu.`, 6000);
+        const gain = `DPS ${t.gain.dps_pct > 0 ? "+" : ""}${fmt(t.gain.dps_pct, 1)}%, EHP ${t.gain.ehp_pct > 0 ? "+" : ""}${fmt(t.gain.ehp_pct, 1)}%`;
+        toast(T(`Goal for ${t.slot}: ${t.base}, ${gain} against the current item.`, `Cel dla ${t.slot}: ${t.base}, ${gain} względem obecnego itemu.`), 6000);
       }));
     }).catch(() => {});
     await loadBases();
@@ -808,11 +834,11 @@ const views = {
   },
 
   async search(el) {
-    el.innerHTML = `<div class="panel"><h2>Baza wiedzy</h2><div class="row"><input type="text" id="sq" placeholder="np. life leech, twister, headhunter" style="flex:1;min-width:180px">
-      <select id="sk" style="width:auto"><option value="">wszystko</option><option>gem</option><option>unique</option><option>node</option><option>mod</option><option>base</option><option>skill</option></select><button id="btnS">Szukaj</button></div><div id="sOut"></div></div>`;
+    el.innerHTML = `<div class="panel"><h2>${T("Knowledge base", "Baza wiedzy")}</h2><div class="row"><input type="text" id="sq" placeholder="${T("e.g. life leech, twister, headhunter", "np. life leech, twister, headhunter")}" style="flex:1;min-width:180px">
+      <select id="sk" style="width:auto"><option value="">${T("everything", "wszystko")}</option><option>gem</option><option>unique</option><option>node</option><option>mod</option><option>base</option><option>skill</option></select><button id="btnS">${T("Search", "Szukaj")}</button></div><div id="sOut"></div></div>`;
     const go = e => busy($("#btnS"), async () => {
       const r = await api("/api/kb/search?" + q({q: $("#sq").value, kind: $("#sk").value}));
-      $("#sOut").innerHTML = `<div class="tablewrap"><table>${r.map(x => `<tr><td><span class="pill">${esc(x.kind)}</span></td><td><b>${esc(x.name)}</b><div class="small muted">${esc(x.snippet).replace(/\[/g, "<b>").replace(/\]/g, "</b>")}</div></td></tr>`).join("") || "<tr><td>Nic.</td></tr>"}</table></div>`;
+      $("#sOut").innerHTML = `<div class="tablewrap"><table>${r.map(x => `<tr><td><span class="pill">${esc(x.kind)}</span></td><td><b>${esc(x.name)}</b><div class="small muted">${esc(x.snippet).replace(/\[/g, "<b>").replace(/\]/g, "</b>")}</div></td></tr>`).join("") || `<tr><td>${T("Nothing.", "Nic.")}</td></tr>`}</table></div>`;
     });
     $("#btnS").onclick = go;
     $("#sq").onkeydown = e => { if (e.key === "Enter") go(); };
@@ -827,21 +853,21 @@ function findingDetails(d) {
   if (Array.isArray(d.nodes)) body = `<div class="chips">${d.nodes.map(n => `<a class="chip" target="_blank" href="${wiki(n)}">${esc(n)}</a>`).join("")}</div>`;
   else if (d.nodes) body = Object.entries(d.nodes).map(([n, st]) => `<p class="small"><a target="_blank" href="${wiki(n)}"><b>${esc(n)}</b></a>: ${esc([].concat(st).join("; "))}</p>`).join("");
   else if (d.mods) body = `<ul class="small">${d.mods.map(m => `<li><b>${esc(m.slot)}</b> (${esc(m.item.split(",")[0])}): ${esc(m.mod)}</li>`).join("")}</ul>`;
-  else if (d.gems) body = `<ul class="small">${d.gems.map(g => `<li>${esc(g.gem)}: poziom ${g.level}</li>`).join("")}</ul>`;
+  else if (d.gems) body = `<ul class="small">${d.gems.map(g => `<li>${esc(g.gem)}: ${T("level", "poziom")} ${g.level}</li>`).join("")}</ul>`;
   else body = `<p class="small">${Object.entries(d).map(([k, v]) => `${esc(k)}: ${esc(typeof v === "object" ? JSON.stringify(v) : v)}`).join(" · ")}</p>`;
-  return `<details><summary>szczegóły</summary>${body}<p class="muted small">Klik w nazwę otwiera opis na poe2wiki.</p></details>`;
+  return `<details><summary>${T("details", "szczegóły")}</summary>${body}<p class="muted small">${T("Clicking a name opens it on poe2wiki.", "Klik w nazwę otwiera opis na poe2wiki.")}</p></details>`;
 }
 
 function marketCard(m) {
   if (!m) return "";
-  if (m.error) return `<div class="small muted">Rynek: ${esc(m.error)}</div>`;
+  if (m.error) return `<div class="small muted">${T("Market", "Rynek")}: ${esc(m.error)}</div>`;
   const b = m.best;
-  const link = m.link ? ` <a target="_blank" href="${m.link}">otwórz wyszukiwanie na trade</a>` : "";
-  return `<div class="market"><b>Na rynku:</b> ${esc(m.verdict)}${link}
+  const link = m.link ? ` <a target="_blank" href="${m.link}">${T("open the search on trade", "otwórz wyszukiwanie na trade")}</a>` : "";
+  return `<div class="market"><b>${T("On the market", "Na rynku")}:</b> ${esc(m.verdict)}${link}
     ${b ? `<div class="small"><b>${esc(b.name)}</b> · ${esc(b.price)}${b.price_divine != null ? ` (≈${fmt(b.price_divine, 2)} div)` : ""} · ${pct(b.dps_pct)} DPS · ${pct(b.ehp_pct)} EHP
       <pre>${esc([...(b.implicits || []), ...(b.grants_skill || []).map(x => "Grants Skill: " + x), "--", ...(b.mods || [])].join("\n"))}</pre></div>` : ""}
     ${m.warning ? `<div class="small muted">${esc(m.warning)}</div>` : ""}
-    <div class="small muted">Szukane: ${esc((m.searched || []).join(" + "))} · znalezionych ofert: ${m.found}</div></div>`;
+    <div class="small muted">${T("Searched", "Szukane")}: ${esc((m.searched || []).join(" + "))} · ${T("listings found", "znalezionych ofert")}: ${m.found}</div></div>`;
 }
 
 // ---------------------------------------------------------------- AI (Claude)
@@ -866,24 +892,24 @@ function md(text) {  // small markdown: headings, bold, code, lists, tables, par
   return out.join("");
 }
 async function askAi(question, resume) {
-  if (!question.trim()) return toast("Napisz pytanie.");
+  if (!question.trim()) return toast(T("Write a question.", "Napisz pytanie."));
   const box = $("#answer");
   const thread = resume ? box : (box.innerHTML = "", box);
   const card = document.createElement("div");
   card.className = "panel";
-  card.innerHTML = `<div class="muted small">Ty: ${esc(question)}</div><div class="aiBody"><span class="busy"></span> Claude myśli…</div>`;
+  card.innerHTML = `<div class="muted small">${T("You", "Ty")}: ${esc(question)}</div><div class="aiBody"><span class="busy"></span> ${T("Claude is thinking…", "Claude myśli…")}</div>`;
   thread.appendChild(card);
   let j = await api("/api/ai", {body: {question, resume}});
   while (j.status === "running") {
     await new Promise(r => setTimeout(r, 1500));
     j = await api("/api/ai/" + j.id);
     const last = j.steps.slice(-4).join(" → ");
-    card.querySelector(".aiBody").innerHTML = `<span class="busy"></span> Claude pracuje (${j.seconds} s)${last ? ": " + esc(last) : "…"}`;
+    card.querySelector(".aiBody").innerHTML = `<span class="busy"></span> ${T("Claude is working", "Claude pracuje")} (${j.seconds} s)${last ? ": " + esc(last) : "…"}`;
   }
   if (j.status === "error") { card.querySelector(".aiBody").innerHTML = `<b class="neg">AI:</b> <pre class="small" style="white-space:pre-wrap">${esc(j.error)}</pre>`; return; }
   card.querySelector(".aiBody").innerHTML = `<div class="aiAnswer">${md(j.answer)}</div>
-    <p class="muted small">Claude · ${j.seconds} s · ${j.steps.length} wywołań narzędzi. Liczby z PoB pod obecny config.</p>
-    <div class="row"><input class="aiFollow" placeholder="Dopytaj… (np. a co jeśli mam tylko 3 div?)"><button class="aiFollowBtn">Dopytaj</button></div>`;
+    <p class="muted small">Claude · ${j.seconds} s · ${T(`${j.steps.length} tool calls. PoB numbers under the current config.`, `${j.steps.length} wywołań narzędzi. Liczby z PoB pod obecny config.`)}</p>
+    <div class="row"><input class="aiFollow" placeholder="${T("Ask more… (e.g. what if I only have 3 div?)", "Dopytaj… (np. a co jeśli mam tylko 3 div?)")}"><button class="aiFollowBtn">${T("Ask more", "Dopytaj")}</button></div>`;
   const inp = card.querySelector(".aiFollow"), btn = card.querySelector(".aiFollowBtn");
   btn.onclick = () => busy(btn, () => askAi(inp.value, j.session));
   inp.onkeydown = e => { if (e.key === "Enter") btn.click(); };
@@ -891,24 +917,24 @@ async function askAi(question, resume) {
 
 function renderAnswer(r) {
   const out = $("#answer");
-  const kindPl = {gem: "gem", dead_support: "support nie działa", support: "support", tree: "drzewko", gear: "gear", unique: "unikat"};
+  const kindPl = {gem: "gem", dead_support: T("support does not apply", "support nie działa"), support: "support", tree: T("tree", "drzewko"), gear: "gear", unique: T("unique", "unikat")};
   out.innerHTML = `<div class="panel"><h2>${esc(r.skill)}: ${esc(r.goal_label)}</h2>
     <div class="chips">${r.understood.map(u => `<span class="chip">${esc(u)}</span>`).join("")}</div>
-    <p class="small">Teraz: DPS <b>${fmt(r.now.dps)}</b> · średni hit <b>${fmt(r.now.average_hit)}</b> · crit <b>${fmt(r.now.crit_chance, 1)}%</b> · EHP <b>${fmt(r.now.ehp)}</b></p>
+    <p class="small">${T("Now", "Teraz")}: DPS <b>${fmt(r.now.dps)}</b> · ${T("average hit", "średni hit")} <b>${fmt(r.now.average_hit)}</b> · crit <b>${fmt(r.now.crit_chance, 1)}%</b> · EHP <b>${fmt(r.now.ehp)}</b></p>
     ${r.explain ? `<p class="small">${esc(r.explain)}</p>` : ""}
     ${r.warnings.map(w => `<div class="finding warn"><p>${esc(w)}</p></div>`).join("")}
-    ${r.steps.length ? `<h3>Zrób to, od największego zysku</h3>` : `<p>Nie znalazłem zmiany, która się opłaca.</p>`}
+    ${r.steps.length ? `<h3>${T("Do this, biggest gain first", "Zrób to, od największego zysku")}</h3>` : `<p>${T("No change found that pays off.", "Nie znalazłem zmiany, która się opłaca.")}</p>`}
     ${r.steps.map((s, i) => `<div class="step"><div class="stepn">${i + 1}</div><div style="flex:1">
       <div><b>${esc(s.title)}</b> <span class="pill">${kindPl[s.kind] || s.kind}</span></div>
       <div class="small muted">${esc(s.how || "")}</div>
-      <div class="small">Zysk: <b class="pos">${esc(s.gain)}</b> · Koszt: ${esc(s.cost || "-")}</div>
+      <div class="small">${T("Gain", "Zysk")}: <b class="pos">${esc(s.gain)}</b> · ${T("Cost", "Koszt")}: ${esc(s.cost || "-")}</div>
       ${marketCard(s.market)}
-      <div class="row" style="margin-top:4px">${s.apply ? `<button class="ghost small" data-apply="${i}">Zastosuj w buildzie</button>` : ""}${s.node ? `<button class="ghost small" data-tree="${esc(s.node)}">Pokaż na drzewku</button>` : ""}</div>
+      <div class="row" style="margin-top:4px">${s.apply ? `<button class="ghost small" data-apply="${i}">${T("Apply to the build", "Zastosuj w buildzie")}</button>` : ""}${s.node ? `<button class="ghost small" data-tree="${esc(s.node)}">${T("Show on the tree", "Pokaż na drzewku")}</button>` : ""}</div>
     </div></div>`).join("")}
-    ${(r.beyond_budget || []).length ? `<details class="finding"><summary><b>Poza budżetem ${fmt(r.budget_divine, 1)} div (${r.beyond_budget.length})</b>: realne zyski, ale drożej albo loteria</summary>${r.beyond_budget.map(s => `<div class="step"><div style="flex:1"><b>${esc(s.title)}</b><div class="small muted">${esc(s.how || "")}</div><div class="small">Zysk: ${esc(s.gain)} · Koszt: ${esc(s.cost)}</div>${marketCard(s.market)}</div></div>`).join("")}</details>` : ""}
-    ${r.all_together ? `<div class="finding"><h4>Wszystko, co da się zastosować, naraz (zmierzone razem)</h4><p>${esc(r.all_together.gain)}</p><button id="btnAll">Zastosuj wszystko</button></div>` : ""}
-    ${r.look_for_on_gear.length ? `<h3>Na nowym gearze szukaj</h3><ul class="small">${r.look_for_on_gear.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    <p class="muted small">Policzone w ${r.seconds} s. „Zastosuj” zmienia build w appce. „Kod PoB” na górze daje kod do wklejenia w Path of Building.</p></div>`;
+    ${(r.beyond_budget || []).length ? `<details class="finding"><summary><b>${T("Over the budget of", "Poza budżetem")} ${fmt(r.budget_divine, 1)} div (${r.beyond_budget.length})</b>: ${T("real gains, but pricier or a lottery", "realne zyski, ale drożej albo loteria")}</summary>${r.beyond_budget.map(s => `<div class="step"><div style="flex:1"><b>${esc(s.title)}</b><div class="small muted">${esc(s.how || "")}</div><div class="small">${T("Gain", "Zysk")}: ${esc(s.gain)} · ${T("Cost", "Koszt")}: ${esc(s.cost)}</div>${marketCard(s.market)}</div></div>`).join("")}</details>` : ""}
+    ${r.all_together ? `<div class="finding"><h4>${T("Everything that can be applied, at once (measured together)", "Wszystko, co da się zastosować, naraz (zmierzone razem)")}</h4><p>${esc(r.all_together.gain)}</p><button id="btnAll">${T("Apply everything", "Zastosuj wszystko")}</button></div>` : ""}
+    ${r.look_for_on_gear.length ? `<h3>${T("Look for this on new gear", "Na nowym gearze szukaj")}</h3><ul class="small">${r.look_for_on_gear.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    <p class="muted small">${T(`Calculated in ${r.seconds} s. “Apply” changes the build in the app. “PoB code” at the top gives a code to paste into Path of Building.`, `Policzone w ${r.seconds} s. „Zastosuj” zmienia build w appce. „Kod PoB” na górze daje kod do wklejenia w Path of Building.`)}</p></div>`;
   out.querySelectorAll("[data-apply]").forEach(b => b.onclick = ev => applySteps(r.steps[+b.dataset.apply].apply, ev.target));
   out.querySelectorAll("[data-tree]").forEach(b => b.onclick = async () => {
     state.tab = "tree"; await render();
@@ -995,7 +1021,7 @@ function treeView(box, data) {
     if (drag) { ox = drag.ox + e.clientX - drag.x; oy = drag.oy + e.clientY - drag.y; drag.moved = true; tip.style.display = "none"; draw(); return; }
     const n = nodeAt(px, py);
     if (n && n.type !== "Normal" || n && scale > 0.05) {
-      tip.innerHTML = `<b>${esc(n.name)}</b>${alloc.has(n.id) ? ' <span class="pill sure">wzięta</span>' : ""}<br>${(n.stats || []).map(esc).join("<br>")}`;
+      tip.innerHTML = `<b>${esc(n.name)}</b>${alloc.has(n.id) ? ` <span class="pill sure">${T("taken", "wzięta")}</span>` : ""}<br>${(n.stats || []).map(esc).join("<br>")}`;
       tip.style.display = "block"; tip.style.left = Math.min(px + 14, canvas.clientWidth - 260) + "px"; tip.style.top = (py + 14) + "px";
     } else tip.style.display = "none";
   };
@@ -1032,10 +1058,10 @@ function iconRetry(img) {  // icons come from poe2db one by one: a slow first fe
   if (img.dataset.retry) { img.style.visibility = "hidden"; return; }
   img.dataset.retry = 1; setTimeout(() => { img.src = img.src + "&retry=1"; }, 3000);
 }
-const tiers = n => `${n} ${n === 1 ? "tier" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "tiery" : "tierów"}`;
-async function openForge(base, preset) {  // the Kuźnia tab with this base picked (and a goal from the build)
+const tiers = n => LANG === "pl" ? `${n} ${n === 1 ? "tier" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? "tiery" : "tierów"}` : `${n} tier${n === 1 ? "" : "s"}`;
+async function openForge(base, preset) {  // the Forge tab with this base picked (and a goal from the build)
   const hit = (await api("/api/craft/bases?" + q({q: base}))).bases.find(b => b.name === base);
-  if (!hit) { toast("Tej bazy nie da się craftować w Kuźni."); return; }
+  if (!hit) { toast(T("This base cannot be crafted in the Forge.", "Tej bazy nie da się craftować w Kuźni.")); return; }
   const wanted = {};
   for (const w of (preset && preset.wanted) || []) wanted[`${w.type}|${w.group}`] = {group: w.group, type: w.type, min_level: w.min_level};
   state.craft = {type: hit.type, base: hit.name, ilvl: (preset && preset.item_level) || (state.craft || {}).ilvl || 82,
@@ -1059,21 +1085,21 @@ function itemTip(i, withSlot) {
 }
 function recipeView(r) {
   const t = r.target, o = r.odds;
-  const tipItem = {name: "Twój nowy item", base: t.base, rarity: "RARE", implicits: (t.implicit || []).map(text => ({text, flags: []})),
+  const tipItem = {name: T("Your new item", "Twój nowy item"), base: t.base, rarity: "RARE", implicits: (t.implicit || []).map(text => ({text, flags: []})),
     mods: t.mods.map(m => ({text: m.text, flags: m.text === r.essence_mod ? ["crafted"] : []}))};
   const step = s => `<div class="st ${s.kind === "tip" ? "tip-step" : ""}">
       <img loading="lazy" alt="" src="/api/icon?${q({name: s.orb})}" onerror="iconRetry(this)">
       <div><div class="t">${esc(s.title)}</div><div class="small muted">${esc(s.detail)}</div></div>
-      <div class="price">${s.price ? esc(s.price.text) + (s.count > 1 ? ` × ${s.count}` : "") : s.kind === "base" ? "cena nieznana" : "nie ma na poe.ninja"}</div></div>`;
+      <div class="price">${s.price ? esc(s.price.text) + (s.count > 1 ? ` × ${s.count}` : "") : s.kind === "base" ? T("price unknown", "cena nieznana") : T("not on poe.ninja", "nie ma na poe.ninja")}</div></div>`;
   return `<div class="grid2" style="align-items:start">
-    <div>${itemTip(tipItem)}<p class="small" style="margin-top:8px">Zysk vs obecny: <b class="${t.score > 0.5 ? "pos" : "muted"}">${gainCell(t)}</b>
-      <br><span class="muted">Mod z esencji (pewny) wyróżniony innym kolorem. Wartości to środkowe tiery.</span></p></div>
+    <div>${itemTip(tipItem)}<p class="small" style="margin-top:8px">${T("Gain vs current", "Zysk vs obecny")}: <b class="${t.score > 0.5 ? "pos" : "muted"}">${gainCell(t)}</b>
+      <br><span class="muted">${T("The essence mod (guaranteed) is in another colour. Values are middle tiers.", "Mod z esencji (pewny) wyróżniony innym kolorem. Wartości to środkowe tiery.")}</span></p></div>
     <div><div class="recipe">${r.steps.map(step).join("")}</div>
       <div class="odds">
-        ${Object.entries(o.at_least_pct).map(([k, v]) => `<div class="o"><b>${v}%</b><span class="small muted">≥ ${k} z ${o.wanted_mods} modów celu</span></div>`).join("")}
-        <div class="o"><b>${r.cost_divine ? fmt(r.cost_divine, 2) + " div" : "?"}</b><span class="small muted">koszt próby${r.cost_complete ? "" : " (część cen nieznana)"}</span></div>
+        ${Object.entries(o.at_least_pct).map(([k, v]) => `<div class="o"><b>${v}%</b><span class="small muted">≥ ${k} ${T("of", "z")} ${o.wanted_mods} ${T("goal mods", "modów celu")}</span></div>`).join("")}
+        <div class="o"><b>${r.cost_divine ? fmt(r.cost_divine, 2) + " div" : "?"}</b><span class="small muted">${T("cost per try", "koszt próby")}${r.cost_complete ? "" : T(" (some prices unknown)", " (część cen nieznana)")}</span></div>
       </div>
-      <p class="muted small">Szanse z symulacji na wagach modów z poe2db. Trafienie = dobra rodzina moda, dowolny tier.</p></div></div>`;
+      <p class="muted small">${T("Odds from a simulation on poe2db mod weights. A hit = the right mod family, any tier.", "Szanse z symulacji na wagach modów z poe2db. Trafienie = dobra rodzina moda, dowolny tier.")}</p></div></div>`;
 }
 
 function gainCell(x) {
@@ -1081,20 +1107,20 @@ function gainCell(x) {
   const parts = [];
   if (x.dps_pct) parts.push(`DPS ${pct(x.dps_pct)}`);
   if (x.ehp_pct) parts.push(`EHP ${pct(x.ehp_pct)}`);
-  if (x.move_speed_pct) parts.push(`ruch ${pct(x.move_speed_pct)}`);
-  return parts.join(" · ") || "bez zmian";
+  if (x.move_speed_pct) parts.push(`${T("movement", "ruch")} ${pct(x.move_speed_pct)}`);
+  return parts.join(" · ") || T("no change", "bez zmian");
 }
 function renderAudit(r) {
   const firstIdx = r.slots.findIndex(s => (s.realistic || {}).score > 0.5);
   $("#auditOut").innerHTML = `${firstIdx >= 0
-      ? `<p><b>Wymień najpierw: ${esc(r.slots[firstIdx].slot)}</b> (${esc(r.slots[firstIdx].item.split(",")[0])}). Realny rare na lvl ${r.level} da ${gainCell(r.slots[firstIdx].realistic)}.</p>`
-      : `<p><b>Na tym levelu żaden realny rare nie bije Twojego gearu.</b> Ulepszeń szukaj w modach (kliknij item) albo w droższych itemach z rynku.</p>`}
-    <div class="tablewrap"><table><tr><th>Slot</th><th>Teraz</th><th>Co daje teraz</th><th>Realny rare na lvl ${r.level}</th><th></th></tr>${
+      ? `<p><b>${T("Replace first", "Wymień najpierw")}: ${esc(r.slots[firstIdx].slot)}</b> (${esc(r.slots[firstIdx].item.split(",")[0])}). ${T(`A realistic rare for level ${r.level} gives`, `Realny rare na lvl ${r.level} da`)} ${gainCell(r.slots[firstIdx].realistic)}.</p>`
+      : `<p><b>${T("At this level no realistic rare beats your gear.", "Na tym levelu żaden realny rare nie bije Twojego gearu.")}</b> ${T("Look for upgrades in the mods (click an item) or in pricier market items.", "Ulepszeń szukaj w modach (kliknij item) albo w droższych itemach z rynku.")}</p>`}
+    <div class="tablewrap"><table><tr><th>Slot</th><th>${T("Now", "Teraz")}</th><th>${T("What it gives now", "Co daje teraz")}</th><th>${T(`Realistic rare, level ${r.level}`, `Realny rare na lvl ${r.level}`)}</th><th></th></tr>${
     r.slots.map((s, i) => { const x = s.realistic || {};
       return `<tr class="${i === firstIdx ? "first" : ""}"><td>${esc(s.slot)}</td><td class="small">${esc(s.item.split(",")[0])}</td>
         <td class="small">${gainCell(s.item_value)}</td>
-        <td class="small">${x.error ? `<span class="muted">${esc(x.error)}</span>` : x.score > 0.5 ? `<b class="pos">${gainCell(x)}</b>` : `<span class="muted">nie lepszy (${gainCell(x)})</span>`}</td>
-        <td>${x.mods ? `<button class="ghost small" data-audit="${i}">Przepis</button>` : ""}</td></tr>
+        <td class="small">${x.error ? `<span class="muted">${esc(x.error)}</span>` : x.score > 0.5 ? `<b class="pos">${gainCell(x)}</b>` : `<span class="muted">${T("not better", "nie lepszy")} (${gainCell(x)})</span>`}</td>
+        <td>${x.mods ? `<button class="ghost small" data-audit="${i}">${T("Recipe", "Przepis")}</button>` : ""}</td></tr>
         <tr style="display:none" id="auditRow${i}"><td colspan="5"></td></tr>`; }).join("")}</table></div>
     <p class="muted small">${esc(r.note)}</p>`;
   document.querySelectorAll("[data-audit]").forEach(b => b.onclick = () => {
@@ -1102,13 +1128,13 @@ function renderAudit(r) {
     row.style.display = row.style.display ? "" : "none";
     if (row.dataset.loaded) return;
     row.dataset.loaded = "1";
-    row.firstElementChild.innerHTML = `<div id="auditRecipe${i}"><span class="busy"></span> Układam przepis na craft…</div>
-      <div class="row" style="margin-top:10px"><span class="small">Wolisz kupić? Szukaj na trade itemu z 3 najważniejszymi modami (min. ~80% wartości), każda oferta przeliczona w PoB:</span>
-      <button class="ghost" id="auditTrade${i}">Szukaj na trade</button></div><div id="auditTradeOut${i}"></div>`;
+    row.firstElementChild.innerHTML = `<div id="auditRecipe${i}"><span class="busy"></span> ${T("Putting the craft recipe together…", "Układam przepis na craft…")}</div>
+      <div class="row" style="margin-top:10px"><span class="small">${T("Rather buy? Search trade for an item with the 3 most important mods (at least ~80% of their value), every listing calculated in PoB:", "Wolisz kupić? Szukaj na trade itemu z 3 najważniejszymi modami (min. ~80% wartości), każda oferta przeliczona w PoB:")}</span>
+      <button class="ghost" id="auditTrade${i}">${T("Search trade", "Szukaj na trade")}</button></div><div id="auditTradeOut${i}"></div>`;
     const g0 = goals();
     api("/api/craft_plan?" + q({slot: s.slot, damage: g0.damage, survive: g0.survive}))
       .then(r => { $("#auditRecipe" + i).innerHTML = recipeView(r); })
-      .catch(e => { $("#auditRecipe" + i).innerHTML = `<p class="muted">Przepis: ${esc(e.message)}</p>`; });
+      .catch(e => { $("#auditRecipe" + i).innerHTML = `<p class="muted">${T("Recipe", "Przepis")}: ${esc(e.message)}</p>`; });
     $("#auditTrade" + i).onclick = e => busy(e.target, async () => {
       const g = goals();
       const m = await api("/api/search_items", {body: {slot: s.slot, mods: x.mods.slice(0, 3).flatMap(mm => mm.text.split(" / ")), budget: g.budget, damage: g.damage, survive: g.survive, speed: g.speed}});
@@ -1118,31 +1144,32 @@ function renderAudit(r) {
 }
 function tradeTable(m) {
   const best = (m.items || []).find(x => x.score > 0.5);
-  return marketCard({...m, searched: m.searched_mods, best, verdict: best ? `${best.name} za ${best.price}` : "nic lepszego od obecnego w budżecie"})
-    + ((m.items || []).length ? `<div class="tablewrap"><table><tr><th>Item</th><th class="n">Cena</th><th class="n">DPS</th><th class="n">EHP</th></tr>${m.items.map(x => `<tr><td class="small"><b>${esc(x.name)}</b><div class="muted">${esc((x.mods || []).join("; "))}</div></td><td class="n">${esc(x.price)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td></tr>`).join("")}</table></div>` : "");
+  return marketCard({...m, searched: m.searched_mods, best, verdict: best ? `${best.name} ${T("for", "za")} ${best.price}` : T("nothing better than the current item within budget", "nic lepszego od obecnego w budżecie")})
+    + ((m.items || []).length ? `<div class="tablewrap"><table><tr><th>Item</th><th class="n">${T("Price", "Cena")}</th><th class="n">DPS</th><th class="n">EHP</th></tr>${m.items.map(x => `<tr><td class="small"><b>${esc(x.name)}</b><div class="muted">${esc((x.mods || []).join("; "))}</div></td><td class="n">${esc(x.price)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td></tr>`).join("")}</table></div>` : "");
 }
 function renderAnalysis(a) {
   const c = a.crafting || {};
-  const vclass = v => esc(String(v || "").split(" ")[0]);
-  const best = list => (list || []).length ? `<ul class="small">${list.slice(0, 4).map(o => `<li>${o.removes ? `<span class="muted">zamiast ${esc(o.removes)}:</span> ` : ""}<b>${esc(o.text)}</b> ${gainCell(o)}</li>`).join("")}</ul>` : "";
-  const price = p => p ? esc(p.text) : "cena nieznana";
+  const vclass = v => esc(String(v || ""));
+  const verdict = x => `<span class="verdict ${vclass(x.verdict)}">${esc(x.verdict_text || x.verdict)}</span>`;
+  const best = list => (list || []).length ? `<ul class="small">${list.slice(0, 4).map(o => `<li>${o.removes ? `<span class="muted">${T("instead of", "zamiast")} ${esc(o.removes)}:</span> ` : ""}<b>${esc(o.text)}</b> ${gainCell(o)}</li>`).join("")}</ul>` : "";
+  const price = p => p ? esc(p.text) : T("price unknown", "cena nieznana");
   const cards = [];
-  if (c.exalt) cards.push(`<div><b>Exalted Orb</b> (${price(c.exalt.price)}): <span class="verdict ${vclass(c.exalt.verdict)}">${esc(c.exalt.verdict)}</span>
-    <div class="small">Dodaje losowy mod w wolne miejsce. Szansa na odczuwalny zysk: <b>${c.exalt.chance_pct}%</b>, wtedy średnio +${fmt(c.exalt.gain_if_good, 1)} pkt.</div>${best(c.exalt.best)}</div>`);
-  if (c.chaos) cards.push(`<div><b>Chaos Orb</b> (${price(c.chaos.price)}): <span class="verdict ${vclass(c.chaos.verdict)}">${esc(c.chaos.verdict)}</span>
-    <div class="small">Usuwa losowy mod i dodaje losowy. Szansa, że wyjdzie lepiej: <b>${c.chaos.chance_pct}%</b>${c.chaos.expected_score < 0 ? ", średnio tracisz (może zabrać mocny mod)" : ""}.</div>${best(c.chaos.best)}</div>`);
-  if (c.annul) cards.push(`<div><b>Orb of Annulment</b> (${price(c.annul.price)}): <span class="verdict ${vclass(c.annul.verdict)}">${esc(c.annul.verdict)}</span>
-    <div class="small">Usuwa losowy mod. Szansa, że trafi bezużyteczny: <b>${c.annul.chance_pct}%</b>${c.annul.junk_mods.length ? ` (${esc(c.annul.junk_mods.join("; "))})` : ""}. Potem wolne miejsce na exalta.</div></div>`);
-  if (c.fracture) cards.push(`<div><b>Fracturing Orb</b> (${price(c.fracture.price)}): <span class="verdict ${vclass(c.fracture.verdict)}">${esc(c.fracture.verdict)}</span>
-    <div class="small">Zamraża losowy mod na stałe. Szansa na najcenniejszy (<b>${esc(c.fracture.best_mod)}</b>, ${gainCell(c.fracture.best_value)}): <b>${c.fracture.chance_best_pct}%</b>, na bezużyteczny: ${c.fracture.chance_junk_pct}%. Opłaca się przed dalszym craftem chaosami/annulami.</div></div>`);
+  if (c.exalt) cards.push(`<div><b>Exalted Orb</b> (${price(c.exalt.price)}): ${verdict(c.exalt)}
+    <div class="small">${T(`Adds a random mod in a free slot. Chance of a noticeable gain: <b>${c.exalt.chance_pct}%</b>, then +${fmt(c.exalt.gain_if_good, 1)} points on average.`, `Dodaje losowy mod w wolne miejsce. Szansa na odczuwalny zysk: <b>${c.exalt.chance_pct}%</b>, wtedy średnio +${fmt(c.exalt.gain_if_good, 1)} pkt.`)}</div>${best(c.exalt.best)}</div>`);
+  if (c.chaos) cards.push(`<div><b>Chaos Orb</b> (${price(c.chaos.price)}): ${verdict(c.chaos)}
+    <div class="small">${T(`Removes a random mod and adds a random one. Chance it ends up better: <b>${c.chaos.chance_pct}%</b>`, `Usuwa losowy mod i dodaje losowy. Szansa, że wyjdzie lepiej: <b>${c.chaos.chance_pct}%</b>`)}${c.chaos.expected_score < 0 ? T(", on average you lose (it can take a strong mod)", ", średnio tracisz (może zabrać mocny mod)") : ""}.</div>${best(c.chaos.best)}</div>`);
+  if (c.annul) cards.push(`<div><b>Orb of Annulment</b> (${price(c.annul.price)}): ${verdict(c.annul)}
+    <div class="small">${T(`Removes a random mod. Chance it hits a useless one: <b>${c.annul.chance_pct}%</b>`, `Usuwa losowy mod. Szansa, że trafi bezużyteczny: <b>${c.annul.chance_pct}%</b>`)}${c.annul.junk_mods.length ? ` (${esc(c.annul.junk_mods.join("; "))})` : ""}. ${T("Then a free slot for an exalt.", "Potem wolne miejsce na exalta.")}</div></div>`);
+  if (c.fracture) cards.push(`<div><b>Fracturing Orb</b> (${price(c.fracture.price)}): ${verdict(c.fracture)}
+    <div class="small">${T(`Locks a random mod for good. Chance of the most valuable one (<b>${esc(c.fracture.best_mod)}</b>, ${gainCell(c.fracture.best_value)}): <b>${c.fracture.chance_best_pct}%</b>, of a useless one: ${c.fracture.chance_junk_pct}%. Worth it before more chaos/annul crafting.`, `Zamraża losowy mod na stałe. Szansa na najcenniejszy (<b>${esc(c.fracture.best_mod)}</b>, ${gainCell(c.fracture.best_value)}): <b>${c.fracture.chance_best_pct}%</b>, na bezużyteczny: ${c.fracture.chance_junk_pct}%. Opłaca się przed dalszym craftem chaosami/annulami.`)}</div></div>`);
   const af = a.affixes || {};
   return `<div class="panel"><h2>${esc(a.slot)}: ${esc(a.item)}</h2>
-    <p>Ten item daje Ci: <b>${gainCell(a.item_value)}</b> <span class="muted small">(w porównaniu z pustym slotem)</span></p>
-    <div class="tablewrap"><table><tr><th>Mod</th><th>Typ</th><th class="n">DPS</th><th class="n">EHP</th><th class="n">Wartość</th></tr>${
+    <p>${T("This item gives you", "Ten item daje Ci")}: <b>${gainCell(a.item_value)}</b> <span class="muted small">${T("(compared with an empty slot)", "(w porównaniu z pustym slotem)")}</span></p>
+    <div class="tablewrap"><table><tr><th>Mod</th><th>${T("Type", "Typ")}</th><th class="n">DPS</th><th class="n">EHP</th><th class="n">${T("Value", "Wartość")}</th></tr>${
       a.mods.map(m => `<tr><td>${esc(m.text)}${m.flags.length ? ` <span class="pill check">${esc(m.flags.join(", "))}</span>` : ""}</td><td class="small muted">${esc(m.type || "?")}${m.tier ? " " + esc(m.tier) : ""}</td>
-        <td class="n">${pct(m.value.dps_pct)}</td><td class="n">${pct(m.value.ehp_pct)}</td><td class="n">${m.value.score < 0.5 ? '<span class="neg">śmieć</span>' : fmt(m.value.score, 1)}</td></tr>`).join("")}</table></div>
-    <p class="muted small">Wartość = ile tracisz bez tego moda (DPS/EHP w %, wynik wg Twoich celów). Wolne miejsca: ${af.open_prefix ?? 0} prefix, ${af.open_suffix ?? 0} suffix.</p>
-    <h3>Crafting na tym itemie</h3>${c.possible === false ? `<p class="muted">${esc(c.why)}</p>` : `<div class="craftgrid">${cards.join("")}</div><p class="muted small">Szanse na wagach modów z poe2db. Wynik liczony dla środkowego tieru.</p>`}</div>`;
+        <td class="n">${pct(m.value.dps_pct)}</td><td class="n">${pct(m.value.ehp_pct)}</td><td class="n">${m.value.score < 0.5 ? `<span class="neg">${T("junk", "śmieć")}</span>` : fmt(m.value.score, 1)}</td></tr>`).join("")}</table></div>
+    <p class="muted small">${T(`Value = what you lose without the mod (DPS/EHP in %, score by your goals). Open slots: ${af.open_prefix ?? 0} prefix, ${af.open_suffix ?? 0} suffix.`, `Wartość = ile tracisz bez tego moda (DPS/EHP w %, wynik wg Twoich celów). Wolne miejsca: ${af.open_prefix ?? 0} prefix, ${af.open_suffix ?? 0} suffix.`)}</p>
+    <h3>${T("Crafting on this item", "Crafting na tym itemie")}</h3>${c.possible === false ? `<p class="muted">${esc(c.why)}</p>` : `<div class="craftgrid">${cards.join("")}</div><p class="muted small">${T("Odds on poe2db mod weights. The result uses a middle tier.", "Szanse na wagach modów z poe2db. Wynik liczony dla środkowego tieru.")}</p>`}</div>`;
 }
 
 async function slotView(slot) {
@@ -1153,19 +1180,19 @@ async function slotView(slot) {
   try {
     const [item, up, uq, an] = await Promise.all([api("/api/item?" + q({slot})), api("/api/mod_upgrades?" + gq), api("/api/uniques?" + gq).catch(() => null),
       api("/api/item_analysis?" + gq).catch(e => ({error: e.message}))]);
-    out.innerHTML = (an.error ? `<div class="panel muted">Analiza itemu: ${esc(an.error)}</div>` : renderAnalysis(an))
-      + `<div class="panel"><h2>Wycraftuj lepszy item</h2><p class="muted small">Realny rare na Twój level pod ten build i przepis krok po kroku: baza, esencja z pewnym modem, exalty, szanse i koszt jednej próby.</p>
-         <div class="row"><button id="btnRecipe">Pokaż przepis</button>${item && item.base ? `<button class="ghost" id="btnForge">Kuźnia: wybierz mody sam</button>` : ""}</div><div id="recipeOut" style="margin-top:10px"></div></div>`
-      + `<div class="panel"><h2>Ulepszenia i porównanie</h2><div class="grid2">
+    out.innerHTML = (an.error ? `<div class="panel muted">${T("Item analysis", "Analiza itemu")}: ${esc(an.error)}</div>` : renderAnalysis(an))
+      + `<div class="panel"><h2>${T("Craft a better item", "Wycraftuj lepszy item")}</h2><p class="muted small">${T("A realistic rare for your level and this build, with a step-by-step recipe: base, an essence with a guaranteed mod, exalts, odds and the cost of one try.", "Realny rare na Twój level pod ten build i przepis krok po kroku: baza, esencja z pewnym modem, exalty, szanse i koszt jednej próby.")}</p>
+         <div class="row"><button id="btnRecipe">${T("Show the recipe", "Pokaż przepis")}</button>${item && item.base ? `<button class="ghost" id="btnForge">${T("Forge: pick the mods yourself", "Kuźnia: wybierz mody sam")}</button>` : ""}</div><div id="recipeOut" style="margin-top:10px"></div></div>`
+      + `<div class="panel"><h2>${T("Upgrades and comparison", "Ulepszenia i porównanie")}</h2><div class="grid2">
       <div><pre>${esc(item.raw.replace(/\{[^}]*\}/g, ""))}</pre>
-        <h3>Sprawdź inny item (wklej z gry lub trade)</h3><textarea id="wiText" placeholder="Ctrl+C na itemie w grze i wklej tutaj"></textarea><button id="btnWI" style="margin-top:6px">Porównaj</button><div id="wiOut"></div></div>
-      <div><h3>Lepsze mody na tym itemie</h3>${up.corrupted ? "<p>Item jest skorumpowany, nie da się go zmienić.</p>" :
-        up.upgrades.length ? `<div class="tablewrap"><table><tr><th>Zamień</th><th>Na</th><th class="n">DPS</th><th class="n">EHP</th></tr>${up.upgrades.map(u => `<tr><td class="small">${esc(u.replace)}<div class="muted">${esc(u.replace_as)}</div></td><td class="small"><b>${esc(u.with)}</b>${u.essence.length ? `<div class="muted">esencja: ${esc(u.essence.join(", "))}</div>` : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td></tr>`).join("")}</table></div>` : "<p class='muted'>Nic lepszego w puli modów.</p>"}
-        ${up.not_changeable_or_unknown.length ? `<p class="muted small">Spoza zwykłej puli: ${esc(up.not_changeable_or_unknown.join("; "))}</p>` : ""}
-        <button class="ghost" id="btnIdeal">Pokaż idealny item na ten slot</button><div id="idealOut"></div>
-        <h3>Ulepszenie z rynku</h3><p class="muted small">Szuka na trade itemu, który zachowa najmocniejsze mody Twojego i doda wybrany mod. Każda oferta przeliczona w PoB. Budżet z pola nad zakładkami.</p>
-        <div class="row"><select id="mktWanted" style="flex:1"><option value="">(tylko zachowaj obecne mody)</option>${up.upgrades.map(u => `<option>${esc(u.with)}</option>`).join("")}</select><button class="ghost" id="btnMarket">Szukaj na rynku</button></div><div id="marketOut"></div>
-        ${uq ? `<h3>Unikaty na ten slot</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ' <span class="pill check">częściowo</span>' : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td><td class="n small">${u.price ? esc(u.price.text) : "–"}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
+        <h3>${T("Check another item (paste from the game or trade)", "Sprawdź inny item (wklej z gry lub trade)")}</h3><textarea id="wiText" placeholder="${T("Ctrl+C on an item in game and paste here", "Ctrl+C na itemie w grze i wklej tutaj")}"></textarea><button id="btnWI" style="margin-top:6px">${T("Compare", "Porównaj")}</button><div id="wiOut"></div></div>
+      <div><h3>${T("Better mods on this item", "Lepsze mody na tym itemie")}</h3>${up.corrupted ? `<p>${T("The item is corrupted, it cannot be changed.", "Item jest skorumpowany, nie da się go zmienić.")}</p>` :
+        up.upgrades.length ? `<div class="tablewrap"><table><tr><th>${T("Replace", "Zamień")}</th><th>${T("With", "Na")}</th><th class="n">DPS</th><th class="n">EHP</th></tr>${up.upgrades.map(u => `<tr><td class="small">${esc(u.replace)}<div class="muted">${esc(u.replace_as)}</div></td><td class="small"><b>${esc(u.with)}</b>${u.essence.length ? `<div class="muted">${T("essence", "esencja")}: ${esc(u.essence.join(", "))}</div>` : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td></tr>`).join("")}</table></div>` : `<p class="muted">${T("Nothing better in the mod pool.", "Nic lepszego w puli modów.")}</p>`}
+        ${up.not_changeable_or_unknown.length ? `<p class="muted small">${T("Outside the normal pool", "Spoza zwykłej puli")}: ${esc(up.not_changeable_or_unknown.join("; "))}</p>` : ""}
+        <button class="ghost" id="btnIdeal">${T("Show the ideal item for this slot", "Pokaż idealny item na ten slot")}</button><div id="idealOut"></div>
+        <h3>${T("Upgrade from the market", "Ulepszenie z rynku")}</h3><p class="muted small">${T("Searches trade for an item that keeps your strongest mods and adds the chosen one. Every listing calculated in PoB. Budget from the field above the tabs.", "Szuka na trade itemu, który zachowa najmocniejsze mody Twojego i doda wybrany mod. Każda oferta przeliczona w PoB. Budżet z pola nad zakładkami.")}</p>
+        <div class="row"><select id="mktWanted" style="flex:1"><option value="">${T("(only keep the current mods)", "(tylko zachowaj obecne mody)")}</option>${up.upgrades.map(u => `<option>${esc(u.with)}</option>`).join("")}</select><button class="ghost" id="btnMarket">${T("Search the market", "Szukaj na rynku")}</button></div><div id="marketOut"></div>
+        ${uq ? `<h3>${T("Uniques for this slot", "Unikaty na ten slot")}</h3><div class="tablewrap"><table>${uq.ranking.slice(0, 8).map(u => `<tr><td>${esc(u.unique)}${u.not_calculated ? ` <span class="pill check">${T("partly", "częściowo")}</span>` : ""}</td><td class="n">${pct(u.dps_pct)}</td><td class="n">${pct(u.ehp_pct)}</td><td class="n small">${u.price ? esc(u.price.text) : "–"}</td></tr>`).join("")}</table></div><p class="muted small">${esc(uq.note)}</p>` : ""}
       </div></div></div>`;
     if ($("#btnForge")) $("#btnForge").onclick = () => openForge(item.base);
     $("#btnRecipe").onclick = e => busy(e.target, async () => {
@@ -1180,12 +1207,12 @@ async function slotView(slot) {
       const g = goals();
       const m = await api("/api/find_upgrade", {body: {slot, wanted: $("#mktWanted").value, budget: g.budget, damage: g.damage, survive: g.survive, speed: g.speed}});
       const best = m.items.find(x => x.score > 0.5);
-      $("#marketOut").innerHTML = marketCard({...m, searched: m.searched_mods, best, verdict: best ? `${best.name} za ${best.price}` : "nic lepszego od obecnego w budżecie"})
-        + (m.items.length ? `<div class="tablewrap"><table><tr><th>Item</th><th class="n">Cena</th><th class="n">DPS</th><th class="n">EHP</th></tr>${m.items.map(x => `<tr><td class="small"><b>${esc(x.name)}</b><div class="muted">${esc((x.mods || []).join("; "))}</div></td><td class="n">${esc(x.price)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td></tr>`).join("")}</table></div>` : "");
+      $("#marketOut").innerHTML = marketCard({...m, searched: m.searched_mods, best, verdict: best ? `${best.name} ${T("for", "za")} ${best.price}` : T("nothing better than the current item within budget", "nic lepszego od obecnego w budżecie")})
+        + (m.items.length ? `<div class="tablewrap"><table><tr><th>Item</th><th class="n">${T("Price", "Cena")}</th><th class="n">DPS</th><th class="n">EHP</th></tr>${m.items.map(x => `<tr><td class="small"><b>${esc(x.name)}</b><div class="muted">${esc((x.mods || []).join("; "))}</div></td><td class="n">${esc(x.price)}</td><td class="n">${pct(x.dps_pct)}</td><td class="n">${pct(x.ehp_pct)}</td></tr>`).join("")}</table></div>` : "");
     });
     $("#btnIdeal").onclick = e => busy(e.target, async () => {
       const r = await api("/api/ideal_item?" + gq);
-      $("#idealOut").innerHTML = `<p>Sufit vs obecny: DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}</p><ul class="small">${r.mods.map(m => `<li>${esc(m.type)}: <b>${esc(m.text)}</b> <span class="muted">(lvl ${m.level})</span></li>`).join("")}</ul>`;
+      $("#idealOut").innerHTML = `<p>${T("Ceiling vs current", "Sufit vs obecny")}: DPS ${pct(r.dps_pct)} · EHP ${pct(r.ehp_pct)}</p><ul class="small">${r.mods.map(m => `<li>${esc(m.type)}: <b>${esc(m.text)}</b> <span class="muted">(lvl ${m.level})</span></li>`).join("")}</ul>`;
     });
   } catch (e) { out.innerHTML = `<div class="panel neg">${esc(e.message)}</div>`; }
 }
@@ -1194,17 +1221,17 @@ async function slotView(slot) {
 async function render() {
   const el = $("#view");
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
-  if (!state.loaded && !["search", "craft"].includes(state.tab)) { el.innerHTML = `<div class="panel empty"><b>Witaj, wygnańcze</b>Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.</div>`; return; }
-  el.innerHTML = `<div class="panel"><span class="busy"></span> Liczę w Path of Building…</div>`;
-  try { await views[state.tab](el); } catch (e) { el.innerHTML = `<div class="panel"><b class="neg">Błąd:</b> ${esc(e.message)}</div>`; }
+  if (!state.loaded && !["search", "craft"].includes(state.tab)) { el.innerHTML = `<div class="panel empty"><b>${T("Welcome, exile", "Witaj, wygnańcze")}</b>${T("Paste a Path of Building code or import a character from poe.ninja.", "Wklej kod buildu z Path of Building albo zaimportuj postać z poe.ninja.")}</div>`; return; }
+  el.innerHTML = `<div class="panel"><span class="busy"></span> ${T("Calculating in Path of Building…", "Liczę w Path of Building…")}</div>`;
+  try { await views[state.tab](el); } catch (e) { el.innerHTML = `<div class="panel"><b class="neg">${T("Error", "Błąd")}:</b> ${esc(e.message)}</div>`; }
 }
 async function refreshBadge() {
   const s = await api("/api/status");
   state.loaded = s.loaded;
   state.buildId = s.build_id;
   state.overview = null;
-  $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· dane gry: PoB ${s.kb.pob_version}, drzewko ${s.kb.tree_version}${s.poe2db && s.poe2db.pages ? `, mody: poe2db (${s.poe2db.fetched})` : ""}` : "· brak bazy wiedzy: uruchom soe kb build";
-  api("/api/prices").then(p => { state.exPerDiv = p.status.divine_in_exalted; $("#kbInfo").textContent += ` · ceny: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
+  $("#kbInfo").textContent = s.kb && s.kb.pob_version ? `· ${T("game data", "dane gry")}: PoB ${s.kb.pob_version}, ${T("tree", "drzewko")} ${s.kb.tree_version}${s.poe2db && s.poe2db.pages ? `, ${T("mods", "mody")}: poe2db (${s.poe2db.fetched})` : ""}` : T("· no knowledge base: run soe kb build", "· brak bazy wiedzy: uruchom soe kb build");
+  api("/api/prices").then(p => { state.exPerDiv = p.status.divine_in_exalted; $("#kbInfo").textContent += ` · ${T("prices", "ceny")}: ${p.status.league}, 1 div = ${fmt(p.status.divine_in_exalted)} ex`; }).catch(() => {});
   $("#loadPanel").open = !s.loaded;
   if (s.loaded) {
     const sk = await api("/api/skills");
@@ -1213,23 +1240,24 @@ async function refreshBadge() {
   }
   $("#btnSync").style.display = s.source ? "" : "none";
   if (s.source) $("#btnSync").title = `${s.source.account} / ${s.source.name} (${s.source.league}), poe.ninja: ${s.source.updated || "?"}`;
+  if (!s.loaded) $("#buildBadge").textContent = T("no build", "brak buildu");
   if (s.loaded) {
     const m = s.summary;
     $("#buildBadge").innerHTML = `<span class="asc">${esc(m.ascendancy || m.class)}</span><span>lvl <b>${m.level}</b></span>
       <span class="stat">${esc(m.main_skill)}</span><span class="stat">DPS <b>${fmt(m.MainDPS || m.CombinedDPS)}</b></span><span class="stat">EHP <b>${fmt(m.TotalEHP)}</b></span>
-      <span class="stat">Życie <b>${fmt(m.Life)}</b> · ES <b>${fmt(m.EnergyShield)}</b></span>`;
+      <span class="stat">${T("Life", "Życie")} <b>${fmt(m.Life)}</b> · ES <b>${fmt(m.EnergyShield)}</b></span>`;
   }
 }
 
 $("#mainSkill").onchange = e => busy(null, async () => {
   const [group, skill] = e.target.value.split(":").map(Number);
   await api("/api/main_skill", {body: {group, skill}});
-  state.cache = {}; await refreshBadge(); render(); toast("Główny skill zmieniony.");
+  state.cache = {}; await refreshBadge(); render(); toast(T("Main skill changed.", "Główny skill zmieniony."));
 });
 $("#tabs").onclick = e => { const t = e.target.closest("button"); if (t) { state.tab = t.dataset.tab; render(); } };
 $("#btnLoad").onclick = e => busy(e.target, async () => {
   const code = $("#code").value.trim();
-  if (!code) return toast("Wklej kod buildu.");
+  if (!code) return toast(T("Paste a build code.", "Wklej kod buildu."));
   await api("/api/load", {body: {code}});
   await refreshBadge();
   $("#code").value = "";
@@ -1238,23 +1266,23 @@ $("#btnLoad").onclick = e => busy(e.target, async () => {
 });
 $("#btnImport").onclick = e => busy(e.target, async () => {
   const ref = $("#impAcc").value.trim(), name = $("#impName").value.trim();
-  if (!ref) return toast("Podaj konto (Nazwa#1234) i postać albo wklej link z poe.ninja.");
+  if (!ref) return toast(T("Enter an account (Name#1234) and a character, or paste a poe.ninja link.", "Podaj konto (Nazwa#1234) i postać albo wklej link z poe.ninja."));
   const r = await api("/api/import", {body: {ref, name}});
   try { localStorage.setItem("soe-account", ref.includes("poe.ninja") ? "" : ref); } catch {}
-  toast(`Wczytano ${r.character.name} (${r.character.class}, lvl ${r.character.level}, ${r.character.league})`);
+  toast(`${T("Loaded", "Wczytano")} ${r.character.name} (${r.character.class}, lvl ${r.character.level}, ${r.character.league})`);
   await refreshBadge(); state.tab = "checkup"; render();
 });
 $("#btnSync").onclick = e => busy(e.target, async () => {
   const r = await api("/api/resync", {body: {}});
-  toast(`Zsynchronizowano ${r.character.name} (poe.ninja: ${r.character.updated || "?"})`);
+  toast(`${T("Synced", "Zsynchronizowano")} ${r.character.name} (poe.ninja: ${r.character.updated || "?"})`);
   state.cache = {}; await refreshBadge(); render();
 });
 try { const a = localStorage.getItem("soe-account"); if (a) $("#impAcc").value = a; } catch {}
 $("#btnExport").onclick = e => busy(e.target, async () => {
   const r = await api("/api/export");
-  try { await navigator.clipboard.writeText(r.code); toast("Kod buildu skopiowany."); } catch { prompt("Kod buildu:", r.code); }
+  try { await navigator.clipboard.writeText(r.code); toast(T("Build code copied.", "Kod buildu skopiowany.")); } catch { prompt(T("Build code:", "Kod buildu:"), r.code); }
 });
-$("#btnReset").onclick = e => busy(e.target, async () => { await api("/api/reset", {body: {}}); await refreshBadge(); render(); toast("Build jak po wczytaniu."); });
+$("#btnReset").onclick = e => busy(e.target, async () => { await api("/api/reset", {body: {}}); await refreshBadge(); render(); toast(T("Build back as loaded.", "Build jak po wczytaniu.")); });
 $("#btnTheme").onclick = () => {
   const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";  // dark is the default look
   document.documentElement.dataset.theme = next;
@@ -1265,6 +1293,15 @@ for (const id of ["gDamage", "gSurvive", "gSpeed", "gMana"]) {
   $("#" + id).onchange = () => { if (state.tab === "checkup") render(); };
 }
 try { const t = localStorage.getItem("soe-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+$("#btnLang").onclick = async () => {  // English <-> Polish: static texts, every view and the server's texts
+  LANG = LANG === "pl" ? "en" : "pl";
+  try { localStorage.setItem("soe-lang", LANG); } catch {}
+  api("/api/settings", {body: {lang: LANG}}).catch(() => {});  // background updates log in this language
+  applyStaticLang(); state.cache = {}; state.overview = null;
+  await refreshBadge().catch(() => {}); render(); dataStatus();
+};
+applyStaticLang();
+api("/api/settings", {body: {lang: LANG}}).catch(() => {});
 refreshBadge().then(render).catch(() => render());
 dataStatus();
 
@@ -1273,60 +1310,60 @@ let dataTimer = null;
 async function dataStatus() {
   let s;
   try { s = await api("/api/data_status"); } catch (e) {
-    $("#dataBadge").textContent = state.fullUpdate ? "· appka uruchamia się ponownie…" : "· status niedostępny";
+    $("#dataBadge").textContent = state.fullUpdate ? T("· the app is restarting…", "· appka uruchamia się ponownie…") : T("· status unavailable", "· status niedostępny");
     if (state.fullUpdate) setTimeout(() => location.reload(), 5000);
     return;
   }
   const ok = (good, text) => `<span class="${good ? "pos" : "neg"}">${good ? "✓" : "!"}</span> ${text}`;
   const u = s.updater;
-  $("#dataBadge").innerHTML = u.running ? `<span class="busy"></span> ${esc(u.step || "aktualizuję")}…`
-    : s.ok ? `<span class="pos">· wszystko aktualne</span>` : `<span class="neg">· ${esc(s.todo.join(", "))}</span>`;
+  $("#dataBadge").innerHTML = u.running ? `<span class="busy"></span> ${esc(u.step || T("updating", "aktualizuję"))}…`
+    : s.ok ? `<span class="pos">${T("· all up to date", "· wszystko aktualne")}</span>` : `<span class="neg">· ${esc(s.todo.join(", "))}</span>`;
   const rows = [
-    ["Path of Building", ok(s.pob.installed && !s.pob.update, `${esc(s.pob.pinned || "?")}${s.pob.latest ? ` (najnowsze na GitHubie: ${esc(s.pob.latest)})` : ""}`)],
-    ["Baza wiedzy", ok(s.kb.matches, s.kb.pob_version ? `z PoB ${esc(s.kb.pob_version)}, drzewko ${esc(s.kb.tree)}, zbudowana ${esc(s.kb.built_at)}` : "brak")],
-    ["Mody, wagi, esencje (poe2db)", ok(s.poe2db.pages && !s.poe2db.stale, s.poe2db.pages ? `${s.poe2db.pages} stron, pobrane ${esc(s.poe2db.oldest)}${s.poe2db.stale ? `, ${s.poe2db.stale} starych` : ""}` : "brak")],
-    ["Ceny (poe.ninja)", ok(!s.prices.old, s.prices.updated ? `pobrane ${esc(s.prices.updated)}` : "jeszcze nie pobrane")],
-    ["Zasady craftingu (poe2db)", s.rules.checked_items ? ok(!s.rules.changes.length, s.rules.changes.length
-        ? `${s.rules.changes.length} zmian od ostatniego sprawdzenia: drogi w Kuźni mogą być nieaktualne`
-        : `${s.rules.checked_items} orbów, omenów i kości działa tak, jak zakłada Kuźnia${s.rules.checked ? ` (sprawdzone ${esc(s.rules.checked)})` : ""}`)
-      : ok(false, "jeszcze nie sprawdzone")],
-    ["Appka", s.app.git ? ok(!s.app.behind, `wersja ${esc(s.app.commit)}${s.app.behind ? `, na GitHubie ${s.app.behind} nowych zmian` : s.app.behind === 0 ? ", aktualna" : ""}`) : "<span class=\"muted\">paczka bez gita: nowe wersje pobierasz ręcznie</span>"],
+    ["Path of Building", ok(s.pob.installed && !s.pob.update, `${esc(s.pob.pinned || "?")}${s.pob.latest ? ` (${T("latest on GitHub", "najnowsze na GitHubie")}: ${esc(s.pob.latest)})` : ""}`)],
+    [T("Knowledge base", "Baza wiedzy"), ok(s.kb.matches, s.kb.pob_version ? T(`from PoB ${esc(s.kb.pob_version)}, tree ${esc(s.kb.tree)}, built ${esc(s.kb.built_at)}`, `z PoB ${esc(s.kb.pob_version)}, drzewko ${esc(s.kb.tree)}, zbudowana ${esc(s.kb.built_at)}`) : T("missing", "brak"))],
+    [T("Mods, weights, essences (poe2db)", "Mody, wagi, esencje (poe2db)"), ok(s.poe2db.pages && !s.poe2db.stale, s.poe2db.pages ? T(`${s.poe2db.pages} pages, fetched ${esc(s.poe2db.oldest)}${s.poe2db.stale ? `, ${s.poe2db.stale} old` : ""}`, `${s.poe2db.pages} stron, pobrane ${esc(s.poe2db.oldest)}${s.poe2db.stale ? `, ${s.poe2db.stale} starych` : ""}`) : T("missing", "brak"))],
+    [T("Prices (poe.ninja)", "Ceny (poe.ninja)"), ok(!s.prices.old, s.prices.updated ? `${T("fetched", "pobrane")} ${esc(s.prices.updated)}` : T("not fetched yet", "jeszcze nie pobrane"))],
+    [T("Crafting rules (poe2db)", "Zasady craftingu (poe2db)"), s.rules.checked_items ? ok(!s.rules.changes.length, s.rules.changes.length
+        ? T(`${s.rules.changes.length} changes since the last check: Forge routes may be outdated`, `${s.rules.changes.length} zmian od ostatniego sprawdzenia: drogi w Kuźni mogą być nieaktualne`)
+        : T(`${s.rules.checked_items} orbs, omens and bones work as the Forge assumes`, `${s.rules.checked_items} orbów, omenów i kości działa tak, jak zakłada Kuźnia`) + (s.rules.checked ? ` (${T("checked", "sprawdzone")} ${esc(s.rules.checked)})` : ""))
+      : ok(false, T("not checked yet", "jeszcze nie sprawdzone"))],
+    [T("App", "Appka"), s.app.git ? ok(!s.app.behind, `${T("version", "wersja")} ${esc(s.app.commit)}${s.app.behind ? T(`, ${s.app.behind} new changes on GitHub`, `, na GitHubie ${s.app.behind} nowych zmian`) : s.app.behind === 0 ? T(", up to date", ", aktualna") : ""}`) : `<span class="muted">${T("package without git: new versions are downloaded by hand", "paczka bez gita: nowe wersje pobierasz ręcznie")}</span>`],
   ];
-  const last = u.last ? `Ostatnia aktualizacja ${esc(u.last.when)}: ${esc((u.last.done || []).join(", ") || "wszystko było aktualne")}${(u.last.errors || []).length ? ` · <span class="neg">${esc(u.last.errors.join("; "))}</span>` : ""}` : "";
+  const last = u.last ? `${T("Last update", "Ostatnia aktualizacja")} ${esc(u.last.when)}: ${esc((u.last.done || []).join(", ") || T("everything was current", "wszystko było aktualne"))}${(u.last.errors || []).length ? ` · <span class="neg">${esc(u.last.errors.join("; "))}</span>` : ""}` : "";
   $("#dataBody").innerHTML = `<div class="tablewrap"><table>${rows.map(([k, v]) => `<tr><td class="small muted">${k}</td><td>${v}</td></tr>`).join("")}</table></div>
-    <p class="small muted">Appka sama sprawdza to przy starcie i przy wejściu na stronę (najczęściej co 6 h${s.checked ? `, ostatnio ${esc(s.checked)}` : ""}). Nowe PoB instaluje dopiero, gdy przejdzie test na buildach wzorcowych; inaczej zostaje stara wersja.${u.git ? "" : " Brak gita: PoB nie da się zaktualizować automatycznie."}</p>
-    ${s.rules.changes.length ? `<div class="finding bad"><h4>Zmiany zasad craftingu na poe2db</h4><ul>${s.rules.changes.map(c => `<li><b>${esc(c.item)}</b>: ${c.kind === "missing" ? "nie ma już opisu na poe2db" : `<span class="muted">było:</span> ${esc(c.old)}<br><span class="muted">jest:</span> ${esc(c.new)}`}${c.assumes ? `<br><span class="muted">Kuźnia zakłada: ${esc(c.assumes)}</span>` : ""}</li>`).join("")}</ul>
-      <p class="small">Drogi craftu z tymi przedmiotami liczą się po staremu, dopóki kod appki tego nie uwzględni (poprawka przyjdzie z aktualizacją appki).</p>
-      <button class="ghost small" id="btnRulesOk">Przyjmuję do wiadomości</button></div>` : ""}
-    ${s.rules.applied.length ? `<p class="small">Uwzględnione automatycznie: ${s.rules.applied.map(esc).join("; ")}</p>` : ""}
-    ${s.rules.new_omens.length ? `<p class="small">Nowe omeny w grze (Kuźnia ich jeszcze nie używa): ${s.rules.new_omens.map(esc).join(", ")}</p>` : ""}
+    <p class="small muted">${T("The app checks this on start and when you open the page (at most every 6 h", "Appka sama sprawdza to przy starcie i przy wejściu na stronę (najczęściej co 6 h")}${s.checked ? `, ${T("last", "ostatnio")} ${esc(s.checked)}` : ""}). ${T("A new PoB is installed only after it passes the check on the reference builds; otherwise the old version stays.", "Nowe PoB instaluje dopiero, gdy przejdzie test na buildach wzorcowych; inaczej zostaje stara wersja.")}${u.git ? "" : T(" No git: PoB cannot be updated automatically.", " Brak gita: PoB nie da się zaktualizować automatycznie.")}</p>
+    ${s.rules.changes.length ? `<div class="finding bad"><h4>${T("Crafting rule changes on poe2db", "Zmiany zasad craftingu na poe2db")}</h4><ul>${s.rules.changes.map(c => `<li><b>${esc(c.item)}</b>: ${c.kind === "missing" ? T("no description on poe2db any more", "nie ma już opisu na poe2db") : `<span class="muted">${T("was", "było")}:</span> ${esc(c.old)}<br><span class="muted">${T("is", "jest")}:</span> ${esc(c.new)}`}${c.assumes ? `<br><span class="muted">${T("The Forge assumes", "Kuźnia zakłada")}: ${esc(c.assumes)}</span>` : ""}</li>`).join("")}</ul>
+      <p class="small">${T("Craft routes with these items are calculated the old way until the app's code follows (the fix comes with an app update).", "Drogi craftu z tymi przedmiotami liczą się po staremu, dopóki kod appki tego nie uwzględni (poprawka przyjdzie z aktualizacją appki).")}</p>
+      <button class="ghost small" id="btnRulesOk">${T("Acknowledge", "Przyjmuję do wiadomości")}</button></div>` : ""}
+    ${s.rules.applied.length ? `<p class="small">${T("Applied automatically", "Uwzględnione automatycznie")}: ${s.rules.applied.map(esc).join("; ")}</p>` : ""}
+    ${s.rules.new_omens.length ? `<p class="small">${T("New omens in the game (the Forge does not use them yet)", "Nowe omeny w grze (Kuźnia ich jeszcze nie używa)")}: ${s.rules.new_omens.map(esc).join(", ")}</p>` : ""}
     ${last ? `<p class="small">${last}</p>` : ""}
     ${u.running && u.log.length ? `<pre>${esc(u.log.join(String.fromCharCode(10)))}</pre>` : ""}
     ${s.app.git && s.app.source ? `<label class="small" style="display:block;margin:6px 0"><input type="checkbox" id="chkAutoApp" ${s.app.auto ? "checked" : ""} style="width:auto;vertical-align:middle">
-      Aktualizuj appkę automatycznie z GitHuba przy każdym uruchomieniu <span class="muted">(${esc(s.app.source.replace("https://github.com/", "").replace(".git", ""))}; nigdy nie nadpisuje Twoich zmian w plikach)</span></label>` : ""}
-    ${u.restart_needed ? `<div class="finding warn">Appka pobrała nową wersję kodu: zamknij okno appki i uruchom ją ponownie (skrótem uruchamia się sama).</div>` : ""}
-    <div class="row"><button class="ghost" id="btnDataNow" ${u.running ? "disabled" : ""}>Sprawdź i zaktualizuj teraz</button>
-      <button class="ghost" id="btnDataFull" ${u.running ? "disabled" : ""} title="Pobiera wszystko od nowa, niezależnie od ostatniego sprawdzenia">Wymuś pełną aktualizację</button>
-      ${s.app.behind ? `<button id="btnAppUpdate">Aktualizuj appkę</button>` : ""}</div>`;
+      ${T("Update the app from GitHub automatically on every start", "Aktualizuj appkę automatycznie z GitHuba przy każdym uruchomieniu")} <span class="muted">(${esc(s.app.source.replace("https://github.com/", "").replace(".git", ""))}; ${T("never overwrites your own changes to the files", "nigdy nie nadpisuje Twoich zmian w plikach")})</span></label>` : ""}
+    ${u.restart_needed ? `<div class="finding warn">${T("The app downloaded a new version of its code: close the app window and start it again (the shortcut restarts it by itself).", "Appka pobrała nową wersję kodu: zamknij okno appki i uruchom ją ponownie (skrótem uruchamia się sama).")}</div>` : ""}
+    <div class="row"><button class="ghost" id="btnDataNow" ${u.running ? "disabled" : ""}>${T("Check and update now", "Sprawdź i zaktualizuj teraz")}</button>
+      <button class="ghost" id="btnDataFull" ${u.running ? "disabled" : ""} title="${T("Downloads everything again, whatever the last check said", "Pobiera wszystko od nowa, niezależnie od ostatniego sprawdzenia")}">${T("Force a full update", "Wymuś pełną aktualizację")}</button>
+      ${s.app.behind ? `<button id="btnAppUpdate">${T("Update the app", "Aktualizuj appkę")}</button>` : ""}</div>`;
   if (!s.ok && !u.running) $("#dataPanel").open = true;
   if ($("#btnRulesOk")) $("#btnRulesOk").onclick = e => busy(e.target, async () => { await api("/api/rules/accept", {body: {}}); dataStatus(); });
   if ($("#chkAutoApp")) $("#chkAutoApp").onchange = async e => {
     await api("/api/settings", {body: {auto_update_app: e.target.checked}});
-    toast(e.target.checked ? "Appka będzie się aktualizować sama przy starcie." : "Automatyczna aktualizacja appki wyłączona.");
+    toast(e.target.checked ? T("The app will update itself on start.", "Appka będzie się aktualizować sama przy starcie.") : T("Automatic app updates are off.", "Automatyczna aktualizacja appki wyłączona."));
   };
   $("#btnDataFull").onclick = e => {
-    if (!confirm("Pełna aktualizacja pobierze wszystko od nowa: bazę wiedzy, wszystkie strony poe2db, zasady craftingu i ceny. Naprawi też uszkodzone Path of Building i pobierze nową wersję appki z GitHuba (wtedy appka uruchomi się ponownie). Trwa kilka minut, w tym czasie appka działa. Kontynuować?")) return;
+    if (!confirm(T("A full update downloads everything again: the knowledge base, every poe2db page, the crafting rules and prices. It also repairs a damaged Path of Building and pulls a new app version from GitHub (the app then restarts). It takes a few minutes; the app keeps working. Continue?", "Pełna aktualizacja pobierze wszystko od nowa: bazę wiedzy, wszystkie strony poe2db, zasady craftingu i ceny. Naprawi też uszkodzone Path of Building i pobierze nową wersję appki z GitHuba (wtedy appka uruchomi się ponownie). Trwa kilka minut, w tym czasie appka działa. Kontynuować?"))) return;
     busy(e.target, async () => {
       await api("/api/data_update", {body: {what: "full"}});
-      toast("Pełna aktualizacja ruszyła w tle. Postęp widać w tym panelu.", 6000);
+      toast(T("The full update started in the background. Progress shows in this panel.", "Pełna aktualizacja ruszyła w tle. Postęp widać w tym panelu."), 6000);
       state.fullUpdate = true; dataStatus();
     });
   };
-  $("#btnDataNow").onclick = e => busy(e.target, async () => { await api("/api/data_update", {body: {what: "data"}}); toast("Sprawdzam i aktualizuję w tle."); dataStatus(); });
+  $("#btnDataNow").onclick = e => busy(e.target, async () => { await api("/api/data_update", {body: {what: "data"}}); toast(T("Checking and updating in the background.", "Sprawdzam i aktualizuję w tle.")); dataStatus(); });
   if ($("#btnAppUpdate")) $("#btnAppUpdate").onclick = e => busy(e.target, async () => {
     const r = await api("/api/data_update", {body: {what: "app"}});
-    if (!r.ok) { toast("Błąd: " + r.error); return; }
-    toast(r.restarting ? "Zaktualizowane, appka uruchamia się ponownie…" : "Zaktualizowane. Zamknij okno appki i uruchom ją jeszcze raz.", 9000);
+    if (!r.ok) { toast(T("Error: ", "Błąd: ") + r.error); return; }
+    toast(r.restarting ? T("Updated, the app is restarting…", "Zaktualizowane, appka uruchamia się ponownie…") : T("Updated. Close the app window and start it again.", "Zaktualizowane. Zamknij okno appki i uruchom ją jeszcze raz."), 9000);
     if (r.restarting) setTimeout(() => location.reload(), 8000);
   });
   clearTimeout(dataTimer);

@@ -11,6 +11,7 @@ import random
 
 from soe.items.craft import added_tags, can_roll, family, pool_by_group, resolve_ranges
 from soe.items.gear import realistic_item
+from soe.i18n import t
 from soe.optimize.objective import Objective
 
 SIMS = 4000
@@ -97,28 +98,37 @@ def craft_plan(session, slot: str, objective: Objective | None = None, level: in
     p = {n: _price(n) for n in ("Orb of Transmutation", "Exalted Orb", "Orb of Annulment")}
     ess_price = _price(ess["name"]) if ess else None
     steps = [{"orb": target["base"], "kind": "base",
-              "title": f"Baza: {target['base']}, item level co najmniej {need_ilvl}",
-              "detail": (f"Normalny (biały) item. Wymaga {target.get('base_level') or 1} lvl postaci. Drop albo trade; "
-                         "ceny baz nie ma na poe.ninja, zwykle są tanie."), "price": None},
+              "title": t(f"Base: {target['base']}, item level {need_ilvl} or higher",
+                         f"Baza: {target['base']}, item level co najmniej {need_ilvl}"),
+              "detail": t(f"A normal (white) item. Needs character level {target.get('base_level') or 1}. Drop or trade; "
+                          "poe.ninja has no base prices, they are usually cheap.",
+                          f"Normalny (biały) item. Wymaga {target.get('base_level') or 1} lvl postaci. Drop albo trade; "
+                          "ceny baz nie ma na poe.ninja, zwykle są tanie."), "price": None},
              {"orb": "Orb of Transmutation", "kind": "currency", "title": "Orb of Transmutation",
-              "detail": "Robi z bazy magic item z jednym losowym modem.", "price": p["Orb of Transmutation"]}]
+              "detail": t("Makes the base a magic item with one random mod.", "Robi z bazy magic item z jednym losowym modem."),
+              "price": p["Orb of Transmutation"]}]
     if ess:
         steps.append({"orb": ess["name"], "kind": "currency", "title": ess["name"],
-                      "detail": f"Zmienia magic item w rare i daje na pewno: {ess['mod_text']} ({ess['affix']}).",
+                      "detail": t(f"Makes the magic item rare and guarantees: {ess['mod_text']} ({ess['affix']}).",
+                                  f"Zmienia magic item w rare i daje na pewno: {ess['mod_text']} ({ess['affix']})."),
                       "price": ess_price})
     else:
         steps.append({"orb": "Regal Orb", "kind": "currency", "title": "Regal Orb",
-                      "detail": "Żadna esencja nie daje modów z celu na tej bazie: Regal zmienia magic w rare z losowym modem.",
+                      "detail": t("No essence gives a goal mod on this base: a Regal makes the magic item rare with a random mod.",
+                                  "Żadna esencja nie daje modów z celu na tej bazie: Regal zmienia magic w rare z losowym modem."),
                       "price": _price("Regal Orb")})
+    goal = ", ".join(m["text"] for m in target["mods"] if m is not ess_mod)
     steps.append({"orb": "Exalted Orb", "kind": "currency", "title": f"Exalted Orb × {exalts}",
-                  "detail": (f"Każdy dodaje losowy mod, aż item ma 6. Cel: {', '.join(m['text'] for m in target['mods'] if m is not ess_mod)}. "
-                             "Gdy wypadnie śmieć, Orb of Annulment usuwa losowy mod (też dobry, więc ryzyko)."),
+                  "detail": t(f"Each adds a random mod until the item has 6. Goal: {goal}. "
+                              "When junk lands, Orb of Annulment removes a random mod (a good one too, so it is a risk).",
+                              f"Każdy dodaje losowy mod, aż item ma 6. Cel: {goal}. "
+                              "Gdy wypadnie śmieć, Orb of Annulment usuwa losowy mod (też dobry, więc ryzyko)."),
                   "price": p["Exalted Orb"], "count": exalts})
-    for name, why in (("Omen of Sinistral Exaltation", "następny Exalt doda tylko prefix"),
-                      ("Omen of Dextral Exaltation", "następny Exalt doda tylko suffix")):
+    for name, why in (("Omen of Sinistral Exaltation", t("the next Exalt adds only a prefix", "następny Exalt doda tylko prefix")),
+                      ("Omen of Dextral Exaltation", t("the next Exalt adds only a suffix", "następny Exalt doda tylko suffix"))):
         pr = _price(name)
         if pr:
-            steps.append({"orb": name, "kind": "tip", "title": name, "detail": f"Opcjonalnie: {why}, kiedy brakuje modów jednego typu.",
+            steps.append({"orb": name, "kind": "tip", "title": name, "detail": t(f"Optional: {why}, when mods of one kind are missing.", f"Opcjonalnie: {why}, kiedy brakuje modów jednego typu."),
                           "price": pr})
     known = [(s.get("price"), s.get("count", 1)) for s in steps if s["kind"] == "currency"]
     cost = sum(pr["divine"] * n for pr, n in known if pr and pr.get("divine") is not None)

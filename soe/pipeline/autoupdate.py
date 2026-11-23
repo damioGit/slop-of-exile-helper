@@ -23,6 +23,8 @@ import time
 import traceback
 from pathlib import Path
 
+from soe.i18n import t
+
 ROOT = Path(__file__).resolve().parents[2]
 STATE = ROOT / "data" / "update_state.json"
 LOCK = ROOT / "data" / "update.lock"
@@ -68,7 +70,11 @@ def _age(ts: float | None) -> str | None:
     if not ts:
         return None
     s = time.time() - ts
-    return f"{int(s // 60)} min temu" if s < 3600 else f"{s / 3600:.0f} h temu" if s < 2 * 86400 else f"{s / 86400:.0f} dni temu"
+    if s < 3600:
+        return t(f"{int(s // 60)} min ago", f"{int(s // 60)} min temu")
+    if s < 2 * 86400:
+        return t(f"{s / 3600:.0f} h ago", f"{s / 3600:.0f} h temu")
+    return t(f"{s / 86400:.0f} days ago", f"{s / 86400:.0f} dni temu")
 
 
 class Updater:
@@ -115,7 +121,7 @@ class Updater:
                 kb_meta = KB(current_db_path()).meta()
         except Exception:
             kb_meta = {}
-        files = sorted(poe2db.DIR.glob("*.json")) if poe2db.DIR.exists() else []
+        files = sorted(f for f in poe2db.DIR.glob("*.json") if not f.name.startswith("_")) if poe2db.DIR.exists() else []
         fetched = []
         for f in files:
             try:
@@ -178,21 +184,21 @@ class Updater:
         loc["rules"] = rules
         todo = []
         if not loc["pob"]["installed"]:
-            todo.append("brak Path of Building")
+            todo.append(t("Path of Building missing", "brak Path of Building"))
         if loc["pob"]["update"]:
-            todo.append(f"nowe PoB {latest}")
+            todo.append(t(f"new PoB {latest}", f"nowe PoB {latest}"))
         if not loc["kb"]["matches"]:
-            todo.append("baza wiedzy do przebudowania")
+            todo.append(t("knowledge base to rebuild", "baza wiedzy do przebudowania"))
         if loc["poe2db"]["pages"] == 0 or loc["poe2db"]["stale"]:
-            todo.append("dane poe2db do odświeżenia")
+            todo.append(t("poe2db data to refresh", "dane poe2db do odświeżenia"))
         if rules["changes"]:
             todo.append(f"zmiany zasad craftingu ({len(rules['changes'])})")
         if not rules["checked_items"]:
-            todo.append("zasady craftingu niesprawdzone")
+            todo.append(t("crafting rules not checked", "zasady craftingu niesprawdzone"))
         if loc["prices"]["old"]:
-            todo.append("ceny do odświeżenia")
+            todo.append(t("prices to refresh", "ceny do odświeżenia"))
         if loc["app"].get("behind"):
-            todo.append(f"nowa wersja appki ({loc['app']['behind']} zmian)")
+            todo.append(t(f"new app version ({loc['app']['behind']} changes)", f"nowa wersja appki ({loc['app']['behind']} zmian)"))
         loc["todo"] = todo
         loc["ok"] = not todo
         return loc
@@ -224,13 +230,16 @@ class Updater:
             except OSError:
                 return
             self.running = True
+        from soe.i18n import reset_lang, set_lang
+
+        lang_token = set_lang(settings().get("lang"))  # the language the player picked in the app (restored at the end)
         changed_engine = False
         self.restart_needed = False
         result = {"at": time.time(), "done": [], "errors": [], "full": full}
         if full:
-            self._log("pełna aktualizacja: wszystko od nowa")
+            self._log(t("full update: everything again", "pełna aktualizacja: wszystko od nowa"))
         try:
-            self.step = "sprawdzam wersje"
+            self.step = t("checking versions", "sprawdzam wersje")
             rem = self.remote(force=True)
             loc = self.local()
             pinned = loc["pob"]["pinned"]
@@ -238,9 +247,9 @@ class Updater:
             git_ok = shutil.which("git") is not None
             if latest and pinned and latest != pinned:
                 if not git_ok:
-                    result["errors"].append("nowe PoB jest, ale brak gita do pobrania")
+                    result["errors"].append(t("a new PoB is out, but git is missing to download it", "nowe PoB jest, ale brak gita do pobrania"))
                 else:
-                    self.step = f"aktualizuję Path of Building {pinned} -> {latest}"
+                    self.step = t(f"updating Path of Building {pinned} -> {latest}", f"aktualizuję Path of Building {pinned} -> {latest}")
                     self._log(self.step)
                     from soe.pipeline import update as up
 
@@ -249,9 +258,9 @@ class Updater:
                         result["done"].append(f"PoB {pinned} -> {latest}")
                         changed_engine = True
                     else:
-                        result["errors"].append(f"PoB {latest}: test silnika nie przeszedł, zostaje {pinned}")
+                        result["errors"].append(t(f"PoB {latest}: engine check failed, keeping {pinned}", f"PoB {latest}: test silnika nie przeszedł, zostaje {pinned}"))
             elif git_ok and pinned and (not loc["pob"]["installed"] or (full and self._pob_damaged())):
-                self.step = f"pobieram Path of Building {pinned}"
+                self.step = t(f"downloading Path of Building {pinned}", f"pobieram Path of Building {pinned}")
                 self._log(self.step)
                 sys.path.insert(0, str(ROOT / "scripts"))
                 from fetch_pob import fetch
@@ -264,14 +273,14 @@ class Updater:
                 result["done"].append(f"PoB {pinned} pobrane")
                 changed_engine = True
             if not changed_engine and (full or not self.local()["kb"]["matches"]):
-                self.step = "buduję bazę wiedzy"
+                self.step = t("building the knowledge base", "buduję bazę wiedzy")
                 self._log(self.step)
                 from soe.kb.build import build
 
                 build()
-                result["done"].append("baza wiedzy przebudowana")
+                result["done"].append(t("knowledge base rebuilt", "baza wiedzy przebudowana"))
                 changed_engine = True
-            self.step = "odświeżam dane poe2db"
+            self.step = t("refreshing poe2db data", "odświeżam dane poe2db")
             from soe.kb import poe2db
             from soe.kb.query import KB
 
@@ -280,18 +289,18 @@ class Updater:
             if info["failed"]:
                 result["errors"].append(f"poe2db: {len(info['failed'])} stron bez danych")
             if poe2db.status() != before:
-                result["done"].append("poe2db odświeżone")
-            self.step = "sprawdzam zasady craftingu (poe2db)"
+                result["done"].append(t("poe2db refreshed", "poe2db odświeżone"))
+            self.step = t("checking crafting rules (poe2db)", "sprawdzam zasady craftingu (poe2db)")
             try:
                 from soe.kb import craft_rules
 
                 craft_rules.check(force=full)
                 rep = craft_rules.report()
                 if rep["changes"]:
-                    result["errors"].append(f"zasady craftingu: {len(rep['changes'])} zmian na poe2db")
+                    result["errors"].append(t(f"crafting rules: {len(rep['changes'])} changes on poe2db", f"zasady craftingu: {len(rep['changes'])} zmian na poe2db"))
             except Exception as e:
-                result["errors"].append(f"zasady craftingu: {e}")
-            self.step = "odświeżam ceny"
+                result["errors"].append(t(f"crafting rules: {e}", f"zasady craftingu: {e}"))
+            self.step = t("refreshing prices", "odświeżam ceny")
             try:
                 from soe.prices import ninja
 
@@ -302,35 +311,36 @@ class Updater:
                         pr.status()
                     finally:
                         pr.ttl = ttl
-                    result["done"].append("ceny pobrane od nowa")
+                    result["done"].append(t("prices fetched again", "ceny pobrane od nowa"))
                 else:
                     pr.status()
             except Exception as e:
-                result["errors"].append(f"ceny: {e}")
+                result["errors"].append(t(f"prices: {e}", f"ceny: {e}"))
             if full:
-                self.step = "sprawdzam nową wersję appki"
+                self.step = t("checking for a new app version", "sprawdzam nową wersję appki")
                 behind = (self.state.get("remote") or {}).get("app_behind")
                 if behind:
                     r = self.update_app()
                     if r.get("ok"):
-                        result["done"].append(f"appka zaktualizowana ({behind} zmian)")
+                        result["done"].append(t(f"app updated ({behind} changes)", f"appka zaktualizowana ({behind} zmian)"))
                         self.restart_needed = True
                     else:
-                        result["errors"].append(f"appka: {r.get('error')}")
+                        result["errors"].append(t(f"app: {r.get('error')}", f"appka: {r.get('error')}"))
             if changed_engine and self.on_new_engine:
-                self.step = "przełączam appkę na nowe dane"
+                self.step = t("switching the app to the new data", "przełączam appkę na nowe dane")
                 self.on_new_engine()
         except Exception as e:
             traceback.print_exc()
             result["errors"].append(f"{type(e).__name__}: {e}")
         finally:
-            self._log("gotowe: " + (", ".join(result["done"]) or "wszystko było aktualne")
-                      + (f"; problemy: {', '.join(result['errors'])}" if result["errors"] else ""))
+            self._log(t("done: ", "gotowe: ") + (", ".join(result["done"]) or t("everything was current", "wszystko było aktualne"))
+                      + (t("; problems: ", "; problemy: ") + ", ".join(result["errors"]) if result["errors"] else ""))
             self.state["last_result"] = {**result, "when": time.strftime("%Y-%m-%d %H:%M")}
             self._save()
             self.step = None
             self.running = False
             LOCK.unlink(missing_ok=True)
+            reset_lang(lang_token)
 
     def _pob_damaged(self) -> bool:
         """Files of the vendored Path of Building changed or missing (git status in vendor/)."""
@@ -343,12 +353,12 @@ class Updater:
     def update_app(self) -> dict:
         """git pull + reinstall; the app has to start again afterwards."""
         if _git("rev-parse", "--is-inside-work-tree") != "true":
-            return {"ok": False, "error": "To nie jest kopia z gita: pobierz nową paczkę ręcznie."}
+            return {"ok": False, "error": t("This is not a git copy: download the new package by hand.", "To nie jest kopia z gita: pobierz nową paczkę ręcznie.")}
         if _git("status", "--porcelain"):
-            return {"ok": False, "error": "Masz lokalne zmiany w plikach appki: najpierw je zatwierdź albo cofnij."}
+            return {"ok": False, "error": t("You have local changes in the app's files: commit or undo them first.", "Masz lokalne zmiany w plikach appki: najpierw je zatwierdź albo cofnij.")}
         out = _git("pull", "--ff-only", timeout=180)
         if out is None:
-            return {"ok": False, "error": "git pull się nie udał (brak sieci albo rozjechane gałęzie)."}
+            return {"ok": False, "error": t("git pull failed (no network or diverged branches).", "git pull się nie udał (brak sieci albo rozjechane gałęzie).")}
         pip = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", str(ROOT)], capture_output=True, text=True)
         self.state.setdefault("remote", {})["app_behind"] = 0
         self._save()

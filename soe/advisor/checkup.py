@@ -10,9 +10,18 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, field
 
+from soe.i18n import t
+
 RES_CAP = 75
-RES_PL = {"Fire": "ogień", "Cold": "zimno", "Lightning": "błyskawice", "Chaos": "chaos"}
-HIT_PL = {"Physical": "fizyczne", "Fire": "ogień", "Cold": "zimno", "Lightning": "błyskawice", "Chaos": "chaos"}
+_NAMES = {"Physical": ("physical", "fizyczne"), "Fire": ("fire", "ogień"), "Cold": ("cold", "zimno"),
+          "Lightning": ("lightning", "błyskawice"), "Chaos": ("chaos", "chaos")}
+
+
+def res_name(k: str) -> str:
+    return t(*_NAMES[k])
+
+
+hit_name = res_name
 ELEMENTS = ("Fire", "Cold", "Lightning")
 GOALS = ("damage", "survive", "mana", "ease", "speed")
 DEFAULT_GOALS = {"damage": 2, "survive": 2, "mana": 1, "ease": 1, "speed": 1}
@@ -48,7 +57,8 @@ def _why_not_applied(gem: dict) -> str:
     from soe.advisor.assistant import explain_not_applied
 
     na = gem.get("not_applied")
-    return explain_not_applied(na) if na else "Path of Building nie stosuje tego supportu do tego skilla, więc daje 0."
+    return explain_not_applied(na) if na else t("Path of Building does not apply this support to this skill, so it gives 0.",
+                                                 "Path of Building nie stosuje tego supportu do tego skilla, więc daje 0.")
 
 
 def score(f: Finding, goals: dict) -> float:
@@ -118,43 +128,58 @@ def run_checkup(session, goals: dict | None = None, deep: bool = True) -> dict:
             continue
         gap = RES_CAP - v
         less = 100 - 100 * (100 - RES_CAP) / (100 - v)
+        overs = ", ".join(res_name(x) for x in over)
         F.append(Finding(
             id=f"res-{e.lower()}", area="Resistances",
             severity="bad" if gap >= 30 else "warn" if gap >= 10 else "info",
-            title=f"Odporność: {RES_PL[e]} {v}% ({gap} poniżej capu)",
-            why=f"Poniżej {RES_CAP}% dostajesz więcej obrażeń ({RES_PL[e]}) niż trzeba.",
-            effect=f"Cap = ok. {less:.0f}% mniej obrażeń tego typu.",
-            action=[f"Znajdź +{gap}% {e} Resistance na gearze (pierścienie, amulet, pas, buty, rękawice, hełm)."]
-                   + ([f"Masz nadmiar ponad cap na: {', '.join(RES_PL[x] for x in over)}. Zamień część tego na {RES_PL[e]}."]
-                      if over else []),
+            title=t(f"{e} resistance {v}% ({gap} below cap)", f"Odporność: {res_name(e)} {v}% ({gap} poniżej capu)"),
+            why=t(f"Below {RES_CAP}% you take more {e.lower()} damage than you need to.",
+                  f"Poniżej {RES_CAP}% dostajesz więcej obrażeń ({res_name(e)}) niż trzeba."),
+            effect=t(f"Capped = about {less:.0f}% less damage of this type.", f"Cap = ok. {less:.0f}% mniej obrażeń tego typu."),
+            action=[t(f"Find +{gap}% {e} Resistance on gear (rings, amulet, belt, boots, gloves, helmet).",
+                      f"Znajdź +{gap}% {e} Resistance na gearze (pierścienie, amulet, pas, buty, rękawice, hełm).")]
+                   + ([t(f"You are over the cap on: {overs}. Swap some of it for {e.lower()}.",
+                         f"Masz nadmiar ponad cap na: {overs}. Zamień część tego na {res_name(e)}.")] if over else []),
             goals={"survive": min(1.0, gap / 50)}, data={"stat": f"{e}Resist", "gap": gap}))
     chaos = s.get("ChaosResist", 0)
     if chaos < 0:
+        less = 100 - 100 * 100 / (100 - chaos)
         F.append(Finding(
             id="res-chaos", area="Resistances", severity="warn" if chaos <= -30 else "info",
-            title=f"Ujemna odporność na chaos ({chaos}%)",
-            why="Ujemna odporność sprawia, że chaos bije mocniej, niż pokazuje.",
-            effect=f"Podniesienie do 0% to ok. {100 - 100 * 100 / (100 - chaos):.0f}% mniej obrażeń od chaosu.",
-            action=["Dobieraj Chaos Resistance na gearze, gdy żywioły są już na capie."],
+            title=t(f"Negative chaos resistance ({chaos}%)", f"Ujemna odporność na chaos ({chaos}%)"),
+            why=t("Negative resistance makes chaos hit harder than it shows.",
+                  "Ujemna odporność sprawia, że chaos bije mocniej, niż pokazuje."),
+            effect=t(f"Raising it to 0% is about {less:.0f}% less chaos damage.",
+                     f"Podniesienie do 0% to ok. {less:.0f}% mniej obrażeń od chaosu."),
+            action=[t("Pick up Chaos Resistance on gear once the elements are capped.",
+                      "Dobieraj Chaos Resistance na gearze, gdy żywioły są już na capie.")],
             goals={"survive": 0.3}))
 
     # ---- weakest hit
-    hits = {t: s.get(f"{t}MaximumHitTaken", 0) for t in ("Physical", "Fire", "Cold", "Lightning", "Chaos")}
+    hits = {k: s.get(f"{k}MaximumHitTaken", 0) for k in ("Physical", "Fire", "Cold", "Lightning", "Chaos")}
     hits = {k: v for k, v in hits.items() if v > 0}
     if len(hits) >= 3:
         low = min(hits, key=hits.get)
         med = sorted(hits.values())[len(hits) // 2]
         if hits[low] < 0.6 * med:
+            name = hit_name(low)
             F.append(Finding(
                 id=f"hit-{low.lower()}", area="Defence", severity="warn" if hits[low] < 0.4 * med else "info",
                 certainty="likely",
-                title=f"Słabo znosisz duże trafienia: {HIT_PL[low]} (max {_n(hits[low])}, przy innych ok. {_n(med)})",
-                why=f"Największy hit typu {HIT_PL[low]}, który przeżyjesz, jest dużo niższy niż przy innych typach. "
-                    "To od takich bossów najłatwiej dostać oneshota.",
-                effect="Podniesienie go zamyka lukę, przez którą giniesz najszybciej.",
-                action=[{"Physical": "Więcej armoura, życia/ES albo część fizycznych obrażeń przyjmowana jako żywioł.",
-                         "Chaos": "Odporność na chaos, więcej życia albo ES, którego chaos nie omija."}
-                        .get(low, f"Maksymalna odporność ({HIT_PL[low]}) powyżej 75% albo więcej życia/ES.")],
+                title=t(f"You take big hits badly: {name} (max {_n(hits[low])}, others about {_n(med)})",
+                        f"Słabo znosisz duże trafienia: {name} (max {_n(hits[low])}, przy innych ok. {_n(med)})"),
+                why=t(f"The biggest {name} hit you survive is far lower than for other types. "
+                      "Bosses that deal it are the easiest way to get one-shot.",
+                      f"Największy hit typu {name}, który przeżyjesz, jest dużo niższy niż przy innych typach. "
+                      "To od takich bossów najłatwiej dostać oneshota."),
+                effect=t("Raising it closes the gap that kills you fastest.",
+                         "Podniesienie go zamyka lukę, przez którą giniesz najszybciej."),
+                action=[{"Physical": t("More armour, life/ES, or part of physical damage taken as elemental.",
+                                       "Więcej armoura, życia/ES albo część fizycznych obrażeń przyjmowana jako żywioł."),
+                         "Chaos": t("Chaos resistance, more life, or ES that chaos does not bypass.",
+                                    "Odporność na chaos, więcej życia albo ES, którego chaos nie omija.")}
+                        .get(low, t(f"Maximum {name} resistance above 75% or more life/ES.",
+                                    f"Maksymalna odporność ({name}) powyżej 75% albo więcej życia/ES."))],
                 goals={"survive": 0.6}, data=hits))
 
     # ---- attributes
@@ -163,27 +188,34 @@ def run_checkup(session, goals: dict | None = None, deep: bool = True) -> dict:
         if need > have:
             F.append(Finding(
                 id=f"attr-{k.lower()}", area="Attributes", severity="bad",
-                title=f"Za mało atrybutu {name}: masz {have}, potrzeba {need}",
-                why="Itemy lub gemy z niespełnionymi wymaganiami nie działają.",
-                effect="Spełnienie wymagań włączy je z powrotem.",
-                action=[f"Znajdź +{need - have} {name} (gear, pasywki albo inna baza itemu)."],
+                title=t(f"Not enough {name}: you have {have}, you need {need}",
+                        f"Za mało atrybutu {name}: masz {have}, potrzeba {need}"),
+                why=t("Items or gems with unmet requirements do not work.",
+                      "Itemy lub gemy z niespełnionymi wymaganiami nie działają."),
+                effect=t("Meeting the requirements turns them back on.", "Spełnienie wymagań włączy je z powrotem."),
+                action=[t(f"Find +{need - have} {name} (gear, passives or another item base).",
+                          f"Znajdź +{need - have} {name} (gear, pasywki albo inna baza itemu).")],
                 goals={"damage": 0.5, "survive": 0.5}))
 
     # ---- spirit
     free = s.get("SpiritUnreserved", 0)
     if free < 0:
         F.append(Finding(id="spirit-over", area="Spirit", severity="bad",
-                         title=f"Brakuje {-free} Spirit na wszystkie aury/buffy",
-                         why="Część trwałych skilli nie może działać naraz.",
-                         effect="Po naprawie wszystkie buffy, na które liczysz, naprawdę działają.",
-                         action=["Usuń lub zmniejsz którąś rezerwację albo zdobądź więcej Spirit (zbroja, berło, amulet)."],
+                         title=t(f"{-free} Spirit short for all auras/buffs", f"Brakuje {-free} Spirit na wszystkie aury/buffy"),
+                         why=t("Some persistent skills cannot run at the same time.",
+                               "Część trwałych skilli nie może działać naraz."),
+                         effect=t("Once fixed, every buff you count on really runs.",
+                                  "Po naprawie wszystkie buffy, na które liczysz, naprawdę działają."),
+                         action=[t("Remove or shrink a reservation, or get more Spirit (body armour, sceptre, amulet).",
+                                   "Usuń lub zmniejsz którąś rezerwację albo zdobądź więcej Spirit (zbroja, berło, amulet).")],
                          goals={"damage": 0.5, "survive": 0.5}))
     elif free >= 30:
         F.append(Finding(id="spirit-free", area="Spirit", severity="info",
-                         title=f"{free} Spirit leży niewykorzystane",
-                         why="Wolny Spirit to zmarnowana moc.",
-                         effect="Zmieści się kolejny buff, herald albo minion.",
-                         action=["Dodaj trwały skill, który zmieści się w wolnym Spirit."],
+                         title=t(f"{free} Spirit unused", f"{free} Spirit leży niewykorzystane"),
+                         why=t("Free Spirit is wasted power.", "Wolny Spirit to zmarnowana moc."),
+                         effect=t("Another buff, herald or minion fits.", "Zmieści się kolejny buff, herald albo minion."),
+                         action=[t("Add a persistent skill that fits in the free Spirit.",
+                                   "Dodaj trwały skill, który zmieści się w wolnym Spirit.")],
                          goals={"damage": 0.4, "survive": 0.4}))
 
     # ---- mana
@@ -192,10 +224,13 @@ def run_checkup(session, goals: dict | None = None, deep: bool = True) -> dict:
         secs = pool / (cost - regen) if cost > regen else 0
         F.append(Finding(
             id="mana-main", area="Mana", severity="warn" if secs < 10 else "info", certainty="likely",
-            title=f"Główny skill zużywa {cost:.0f} many/s, a regenerujesz {regen:.0f}/s",
-            why=f"Ciągłe używanie skilla opróżnia {_n(pool)} many w ok. {secs:.0f} s (bez leecha i flasek).",
-            effect="Bez braków many nie ma przerw w zadawaniu obrażeń.",
-            action=["Więcej regeneracji many lub leecha, flaska many albo tańszy zestaw supportów."],
+            title=t(f"The main skill uses {cost:.0f} mana/s, you regenerate {regen:.0f}/s",
+                    f"Główny skill zużywa {cost:.0f} many/s, a regenerujesz {regen:.0f}/s"),
+            why=t(f"Using the skill non-stop drains {_n(pool)} mana in about {secs:.0f} s (without leech or flasks).",
+                  f"Ciągłe używanie skilla opróżnia {_n(pool)} many w ok. {secs:.0f} s (bez leecha i flasek)."),
+            effect=t("No mana gaps means no breaks in your damage.", "Bez braków many nie ma przerw w zadawaniu obrażeń."),
+            action=[t("More mana regeneration or leech, a mana flask, or a cheaper set of supports.",
+                      "Więcej regeneracji many lub leecha, flaska many albo tańszy zestaw supportów.")],
             goals={"mana": 1.0, "ease": 0.5}, data={"seconds": round(secs, 1)}))
 
     # ---- skill groups
@@ -206,42 +241,52 @@ def run_checkup(session, goals: dict | None = None, deep: bool = True) -> dict:
         own_gem = not g.get("slot") and not g.get("source")  # not granted by an item, the tree or ascendancy
         for gem in g["gems"]:
             if gem["support"] and gem["enabled"] and not gem.get("applies", True):
+                target = ", ".join(g["skills"]) or t("this group", "tę grupę")
                 F.append(Finding(
                     id=f"support-dead-{g['index']}-{gem['name']}", area="Skills", severity="warn",
-                    title=f"{gem['name']} nie działa na {', '.join(g['skills']) or 'tę grupę'}",
+                    title=t(f"{gem['name']} does not apply to {target}", f"{gem['name']} nie działa na {target}"),
                     why=_why_not_applied(gem),
-                    effect="Ten slot daje teraz 0. Działający support w jego miejscu to darmowy zysk.",
-                    action=["Wymień go na support pasujący do tego skilla (zakładka Skille → optymalizator supportów)."],
+                    effect=t("This socket gives 0 now. A working support in its place is a free gain.",
+                             "Ten slot daje teraz 0. Działający support w jego miejscu to darmowy zysk."),
+                    action=[t("Swap it for a support that fits this skill (Skills tab -> support optimizer).",
+                              "Wymień go na support pasujący do tego skilla (zakładka Skille → optymalizator supportów).")],
                     goals={"damage": 0.7}))
             if own_gem and not gem["support"] and gem["valid"] and gem["enabled"] and gem["level"] < 20:
                 low_gems.append({"group": g["index"], "gem": gem["name"], "level": gem["level"]})
     if low_gems:
         F.append(Finding(
             id="gem-levels", area="Skills", severity="info", certainty="likely",
-            title=f"{len(low_gems)} gemów skilli poniżej poziomu 20",
-            why="Wyższy poziom gema to więcej obrażeń i mocniejsze buffy. Część niskich poziomów bywa celowa "
-                "(tańsza rezerwacja, skille pomocnicze).",
-            effect="Asystent policzy, ile da podniesienie konkretnego skilla.",
-            action=["Podnieś poziom gemów, które się liczą (główny skill, aury, miniony)."],
+            title=t(f"{len(low_gems)} skill gems below level 20", f"{len(low_gems)} gemów skilli poniżej poziomu 20"),
+            why=t("A higher gem level means more damage and stronger buffs. Some low levels are on purpose "
+                  "(cheaper reservation, helper skills).",
+                  "Wyższy poziom gema to więcej obrażeń i mocniejsze buffy. Część niskich poziomów bywa celowa "
+                  "(tańsza rezerwacja, skille pomocnicze)."),
+            effect=t("The assistant calculates what raising a given skill gains.",
+                     "Asystent policzy, ile da podniesienie konkretnego skilla."),
+            action=[t("Level up the gems that matter (main skill, auras, minions).",
+                      "Podnieś poziom gemów, które się liczą (główny skill, aury, miniony).")],
             goals={"damage": 0.4}, data={"gems": low_gems}))
 
     # ---- passive points
     pts = pob.points()
     if pts["unspent"] > 0:
         F.append(Finding(id="tree-unspent", area="Passives", severity="warn",
-                         title=f"{pts['unspent']} niewydanych punktów pasywnych",
-                         why="Wolne punkty to darmowa moc.", effect="Wydaj je: zakładka Drzewko → Co warto wziąć.",
-                         action=["Ranking pokazuje najlepszy zysk na punkt."],
+                         title=t(f"{pts['unspent']} unspent passive points", f"{pts['unspent']} niewydanych punktów pasywnych"),
+                         why=t("Free points are free power.", "Wolne punkty to darmowa moc."),
+                         effect=t("Spend them: Tree tab -> Worth taking.", "Wydaj je: zakładka Drzewko → Co warto wziąć."),
+                         action=[t("The ranking shows the best gain per point.", "Ranking pokazuje najlepszy zysk na punkt.")],
                          goals={"damage": 0.5, "survive": 0.5}))
     inactive = [n for n in pob.allocated_nodes() if not n["active"]]
     if inactive:
         F.append(Finding(
             id="tree-inactive-set", area="Passives", severity="info", certainty="check",
-            title=f"{len(inactive)} pasywek jest na drugim zestawie broni",
-            why=f"Działają tylko przy zestawie broni {inactive[0]['weapon_set']}, a liczymy "
-                f"zestaw {pts['active_weapon_set']}.",
-            effect="Jeśli nigdy nie przełączasz broni, te punkty można przenieść.",
-            action=["Sprawdź, czy naprawdę używasz drugiego zestawu, zanim je przeniesiesz."],
+            title=t(f"{len(inactive)} passives are on the other weapon set", f"{len(inactive)} pasywek jest na drugim zestawie broni"),
+            why=t(f"They work only with weapon set {inactive[0]['weapon_set']}, and we calculate set {pts['active_weapon_set']}.",
+                  f"Działają tylko przy zestawie broni {inactive[0]['weapon_set']}, a liczymy zestaw {pts['active_weapon_set']}."),
+            effect=t("If you never swap weapons, these points can be moved.",
+                     "Jeśli nigdy nie przełączasz broni, te punkty można przenieść."),
+            action=[t("Check that you really use the other set before moving them.",
+                      "Sprawdź, czy naprawdę używasz drugiego zestawu, zanim je przeniesiesz.")],
             goals={"damage": 0.2}, data={"nodes": [n["name"] for n in inactive]}))
 
     if deep:
@@ -266,29 +311,42 @@ def run_checkup(session, goals: dict | None = None, deep: bool = True) -> dict:
         if conditional:
             F.append(Finding(
                 id="tree-conditional", area="Passives", severity="info", certainty="check",
-                title=f"{len(conditional)} pasywek działa tylko pod warunkiem wyłączonym w configu PoB",
-                why="Ich bonus wymaga np. zamrożonego/porażonego wroga, buffa albo charge'a. "
-                    "W configu PoB ten warunek jest wyłączony, więc liczy je jako 0.",
-                effect="Jeśli w grze build naprawdę spełnia ten warunek, są warte pełną wartość.",
-                action=["Włącz ten warunek w configu PoB, żeby zobaczyć ich wartość.",
-                        "Jeśli build nigdy go nie spełnia, punkty można przenieść."],
+                title=t(f"{len(conditional)} passives work only under a condition switched off in PoB's config",
+                        f"{len(conditional)} pasywek działa tylko pod warunkiem wyłączonym w configu PoB"),
+                why=t("Their bonus needs e.g. a frozen/shocked enemy, a buff or a charge. That condition is off in "
+                      "PoB's config, so it counts them as 0.",
+                      "Ich bonus wymaga np. zamrożonego/porażonego wroga, buffa albo charge'a. "
+                      "W configu PoB ten warunek jest wyłączony, więc liczy je jako 0."),
+                effect=t("If the build really meets the condition in game, they are worth their full value.",
+                         "Jeśli w grze build naprawdę spełnia ten warunek, są warte pełną wartość."),
+                action=[t("Turn the condition on in PoB's config to see their value.",
+                          "Włącz ten warunek w configu PoB, żeby zobaczyć ich wartość."),
+                        t("If the build never meets it, the points can be moved.",
+                          "Jeśli build nigdy go nie spełnia, punkty można przenieść.")],
                 goals={"damage": 0.4}, data={"nodes": {n["name"]: n["stats"] for n in conditional}}))
         if dead:
             F.append(Finding(
                 id="tree-dead", area="Passives", severity="warn", certainty="likely",
-                title=f"{len(dead)} pasywek nie zmienia żadnej liczby w PoB",
-                why="Zdjęcie każdej z nich nie zmienia ani jednej liczby, którą liczy PoB (obrażenia, obrona, ailmenty, "
-                    "zasoby, atrybuty), a nie mają żadnego warunku.",
-                effect=f"Do {len(dead)} punktów do przeniesienia na coś, co działa.",
-                action=["Zwolnij je i wydaj punkty według zakładki Drzewko → Co warto wziąć."],
+                title=t(f"{len(dead)} passives change no number in PoB", f"{len(dead)} pasywek nie zmienia żadnej liczby w PoB"),
+                why=t("Removing any of them changes no number PoB calculates (damage, defence, ailments, resources, "
+                      "attributes), and they have no condition.",
+                      "Zdjęcie każdej z nich nie zmienia ani jednej liczby, którą liczy PoB (obrażenia, obrona, ailmenty, "
+                      "zasoby, atrybuty), a nie mają żadnego warunku."),
+                effect=t(f"Up to {len(dead)} points to move to something that works.",
+                         f"Do {len(dead)} punktów do przeniesienia na coś, co działa."),
+                action=[t("Refund them and spend the points as the Tree tab -> Worth taking suggests.",
+                          "Zwolnij je i wydaj punkty według zakładki Drzewko → Co warto wziąć.")],
                 goals={"damage": 0.6, "survive": 0.6}, data={"nodes": [n["name"] for n in dead]}))
         if unmodelled:
             F.append(Finding(
                 id="tree-unmodelled", area="Passives", severity="info", certainty="check",
-                title=f"{len(unmodelled)} pasywek ma efekty, których kalkulator nie liczy",
-                why="Ich wartości nie da się tu zmierzyć (spowolnienia, maim, triggery, efekty ruchu...).",
-                effect="Oceń je po tym, jak grasz. Opis efektu jest w szczegółach, więcej na poe2wiki.net.",
-                action=["Zostaw je, jeśli czujesz ten efekt w grze."],
+                title=t(f"{len(unmodelled)} passives have effects the calculator does not count",
+                        f"{len(unmodelled)} pasywek ma efekty, których kalkulator nie liczy"),
+                why=t("Their value cannot be measured here (slows, maim, triggers, movement effects...).",
+                      "Ich wartości nie da się tu zmierzyć (spowolnienia, maim, triggery, efekty ruchu...)."),
+                effect=t("Judge them by how you play. The effect is in the details, more on poe2wiki.net.",
+                         "Oceń je po tym, jak grasz. Opis efektu jest w szczegółach, więcej na poe2wiki.net."),
+                action=[t("Keep them if you feel the effect in game.", "Zostaw je, jeśli czujesz ten efekt w grze.")],
                 data={"nodes": {n["name"]: n["unsupported"] for n in unmodelled}}))
 
         # gear mods that change nothing
@@ -308,11 +366,16 @@ def run_checkup(session, goals: dict | None = None, deep: bool = True) -> dict:
         if dead_mods:
             F.append(Finding(
                 id="gear-dead", area="Gear", severity="info", certainty="likely",
-                title=f"{len(dead_mods)} modów na gearze nie zmienia żadnej liczby w PoB",
-                why="Zdjęcie każdego z nich nie zmienia żadnej liczby, którą liczy PoB. Lądują tu też rarity, "
-                    "mody użytkowe i odporności ponad cap.",
-                effect="Te sloty najlepiej przecraftować albo wymienić jako pierwsze.",
-                action=["Zacznij od itemu z największą liczbą takich modów (zakładka Gear pokaże lepsze mody)."],
+                title=t(f"{len(dead_mods)} gear mods change no number in PoB",
+                        f"{len(dead_mods)} modów na gearze nie zmienia żadnej liczby w PoB"),
+                why=t("Removing any of them changes no number PoB calculates. Rarity, utility mods and resistances "
+                      "over the cap land here too.",
+                      "Zdjęcie każdego z nich nie zmienia żadnej liczby, którą liczy PoB. Lądują tu też rarity, "
+                      "mody użytkowe i odporności ponad cap."),
+                effect=t("These slots are the first to recraft or replace.",
+                         "Te sloty najlepiej przecraftować albo wymienić jako pierwsze."),
+                action=[t("Start with the item that has the most of them (the Gear tab shows better mods).",
+                          "Zacznij od itemu z największą liczbą takich modów (zakładka Gear pokaże lepsze mody).")],
                 goals={"damage": 0.5, "survive": 0.5}, data={"mods": dead_mods}))
 
     for f in F:

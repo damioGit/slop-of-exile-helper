@@ -1,4 +1,4 @@
-"""Crafting rules sensor: what the orbs, omens and bones the Kuźnia simulates actually do, read from poe2db.
+"""Crafting rules sensor: what the orbs, omens and bones the Forge (Kuźnia) simulates actually do, read from poe2db.
 
 The routes in soe.items.crafter are written for today's rules (an Exalted Orb adds one mod, Greater Exalted only
 mods of level 35+, ...). This module fetches each tracked item's page, keeps its effect text and "Minimum Modifier
@@ -6,7 +6,7 @@ Level", and compares them with the copy the player last accepted:
 
 - a changed minimum level is applied automatically (min_levels() feeds the simulation);
 - a changed effect text is reported until the player accepts it: the routes may be outdated until the code follows;
-- omens that appear on poe.ninja but did not exist at the first check are listed as new (the Kuźnia does not use them).
+- omens that appear on poe.ninja but did not exist at the first check are listed as new (the Forge does not use them).
 
 Saved in data/poe2db/_rules.json. SOE_POE2DB=offline never fetches (tests).
 """
@@ -18,44 +18,50 @@ import re
 import time
 import urllib.error
 
+from soe.i18n import t
 from soe.kb import poe2db
 
 FILE = poe2db.DIR / "_rules.json"
 TTL = 7 * 24 * 3600
 
-# item -> what the simulation assumes (Polish, shown next to a change)
+# item -> what the simulation assumes (English, Polish), shown next to a change
 TRACKED = {
-    "Orb of Transmutation": "zwykły -> magic z 1 modem",
-    "Orb of Augmentation": "dodaje mod do magic (max 2)",
-    "Regal Orb": "magic -> rare, +1 mod",
-    "Orb of Alchemy": "zwykły -> rare z 4 modami",
-    "Exalted Orb": "dodaje 1 losowy mod do rare",
-    "Greater Exalted Orb": "jak Exalted, mody od min. poziomu",
-    "Perfect Exalted Orb": "jak Exalted, mody od min. poziomu",
-    "Chaos Orb": "usuwa losowy mod i dodaje losowy",
-    "Orb of Annulment": "usuwa losowy mod",
-    "Omen of Sinistral Exaltation": "Exalt dodaje tylko prefix",
-    "Omen of Dextral Exaltation": "Exalt dodaje tylko suffix",
-    "Omen of Sinistral Annulment": "Annul usuwa tylko prefix",
-    "Omen of Dextral Annulment": "Annul usuwa tylko suffix",
-    "Omen of Sinistral Crystallisation": "Perfect Essence usuwa tylko prefix",
-    "Omen of Dextral Crystallisation": "Perfect Essence usuwa tylko suffix",
-    "Omen of Sinistral Necromancy": "desecration dodaje tylko prefix",
-    "Omen of Dextral Necromancy": "desecration dodaje tylko suffix",
-    "Omen of Abyssal Echoes": "jedno przelosowanie opcji przy odsłanianiu",
-    "Omen of Light": "Annul usuwa tylko mod desecrated",
-    "Essence of the Body": "magic -> rare z pewnym modem",
-    "Perfect Essence of the Body": "na rare: usuwa losowy mod, dodaje pewny",
-    "Preserved Rib": "desecration zbroi",
-    "Ancient Rib": "desecration zbroi, mody od min. poziomu",
-    "Preserved Collarbone": "desecration biżuterii",
-    "Ancient Collarbone": "desecration biżuterii, mody od min. poziomu",
-    "Preserved Jawbone": "desecration broni",
-    "Ancient Jawbone": "desecration broni, mody od min. poziomu",
+    "Orb of Transmutation": ("normal -> magic with 1 mod", "zwykły -> magic z 1 modem"),
+    "Orb of Augmentation": ("adds a mod to a magic item (max 2)", "dodaje mod do magic (max 2)"),
+    "Regal Orb": ("magic -> rare, +1 mod", "magic -> rare, +1 mod"),
+    "Orb of Alchemy": ("normal -> rare with 4 mods", "zwykły -> rare z 4 modami"),
+    "Exalted Orb": ("adds 1 random mod to a rare", "dodaje 1 losowy mod do rare"),
+    "Greater Exalted Orb": ("like Exalted, mods from a minimum level", "jak Exalted, mody od min. poziomu"),
+    "Perfect Exalted Orb": ("like Exalted, mods from a minimum level", "jak Exalted, mody od min. poziomu"),
+    "Chaos Orb": ("removes a random mod and adds a random one", "usuwa losowy mod i dodaje losowy"),
+    "Orb of Annulment": ("removes a random mod", "usuwa losowy mod"),
+    "Omen of Sinistral Exaltation": ("the Exalt adds only a prefix", "Exalt dodaje tylko prefix"),
+    "Omen of Dextral Exaltation": ("the Exalt adds only a suffix", "Exalt dodaje tylko suffix"),
+    "Omen of Sinistral Annulment": ("the Annul removes only a prefix", "Annul usuwa tylko prefix"),
+    "Omen of Dextral Annulment": ("the Annul removes only a suffix", "Annul usuwa tylko suffix"),
+    "Omen of Sinistral Crystallisation": ("the Perfect Essence removes only a prefix", "Perfect Essence usuwa tylko prefix"),
+    "Omen of Dextral Crystallisation": ("the Perfect Essence removes only a suffix", "Perfect Essence usuwa tylko suffix"),
+    "Omen of Sinistral Necromancy": ("desecration adds only a prefix", "desecration dodaje tylko prefix"),
+    "Omen of Dextral Necromancy": ("desecration adds only a suffix", "desecration dodaje tylko suffix"),
+    "Omen of Abyssal Echoes": ("one reroll of the options when revealing", "jedno przelosowanie opcji przy odsłanianiu"),
+    "Omen of Light": ("the Annul removes only the desecrated mod", "Annul usuwa tylko mod desecrated"),
+    "Essence of the Body": ("magic -> rare with a guaranteed mod", "magic -> rare z pewnym modem"),
+    "Perfect Essence of the Body": ("on a rare: removes a random mod, adds a guaranteed one", "na rare: usuwa losowy mod, dodaje pewny"),
+    "Preserved Rib": ("armour desecration", "desecration zbroi"),
+    "Ancient Rib": ("armour desecration, mods from a minimum level", "desecration zbroi, mody od min. poziomu"),
+    "Preserved Collarbone": ("jewellery desecration", "desecration biżuterii"),
+    "Ancient Collarbone": ("jewellery desecration, mods from a minimum level", "desecration biżuterii, mody od min. poziomu"),
+    "Preserved Jawbone": ("weapon desecration", "desecration broni"),
+    "Ancient Jawbone": ("weapon desecration, mods from a minimum level", "desecration broni, mody od min. poziomu"),
 }
 # the minimum modifier levels the code was written with (used when poe2db has nothing)
 DEFAULT_MIN = {"Greater Exalted Orb": 35, "Perfect Exalted Orb": 50,
                "Ancient Rib": 40, "Ancient Collarbone": 40, "Ancient Jawbone": 40}
+
+
+def assumes(name: str) -> str | None:
+    pair = TRACKED.get(name)
+    return t(*pair) if pair else None
 
 
 def page_name(name: str) -> str:
@@ -160,14 +166,15 @@ def report() -> dict:
     for name, rec in d.get("items", {}).items():
         cur, acc = rec.get("current") or {}, rec.get("accepted") or {}
         if rec.get("missing"):
-            changes.append({"item": name, "kind": "missing", "assumes": TRACKED.get(name),
-                            "text": f"{name}: nie ma już opisu na poe2db (usunięte albo przemianowane?)"})
+            changes.append({"item": name, "kind": "missing", "assumes": assumes(name),
+                            "text": t(f"{name}: no description on poe2db any more (removed or renamed?)", f"{name}: nie ma już opisu na poe2db (usunięte albo przemianowane?)")})
             continue
         if cur.get("effect") and acc.get("effect") and cur["effect"] != acc["effect"]:
-            changes.append({"item": name, "kind": "effect", "assumes": TRACKED.get(name), "old": acc["effect"],
-                            "new": cur["effect"], "text": f"{name}: zmienił się opis działania"})
+            changes.append({"item": name, "kind": "effect", "assumes": assumes(name), "old": acc["effect"],
+                            "new": cur["effect"], "text": t(f"{name}: its effect text changed", f"{name}: zmienił się opis działania")})
         if cur.get("min_level") is not None and name in DEFAULT_MIN and cur["min_level"] != DEFAULT_MIN[name]:
-            applied.append(f"{name}: minimalny poziom moda {DEFAULT_MIN[name]} -> {cur['min_level']} (Kuźnia już liczy z nowym)")
+            applied.append(t(f"{name}: minimum modifier level {DEFAULT_MIN[name]} -> {cur['min_level']} (the Forge already uses the new one)",
+                             f"{name}: minimalny poziom moda {DEFAULT_MIN[name]} -> {cur['min_level']} (Kuźnia już liczy z nowym)"))
     known = set(d.get("known_omens") or [])
     new_omens = [o for o in d.get("omens_now") or [] if known and o not in known]
     return {"tracked": len(TRACKED), "checked_items": len(d.get("items", {})), "changes": changes,

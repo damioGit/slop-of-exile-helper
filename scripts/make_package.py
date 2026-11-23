@@ -1,7 +1,7 @@
 """Zip of the app to give to another player: dist/slop-of-exile-helper-<date>-<commit>.zip
 
 Only files tracked by git at HEAD (no data/, vendor/, .venv/, nobody's build or login), without the
-author's own desktop shortcut. The receiver unzips it and runs instaluj.bat.
+author's own desktop shortcut. The receiver unzips it and runs install.bat.
 Usage: python scripts/make_package.py   (commit first: uncommitted changes are not in the zip)
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ def main() -> Path:
     dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
                            capture_output=True, text=True).stdout.strip()
     if dirty:
-        print("Uwaga: masz niezatwierdzone zmiany; paczka ma stan z ostatniego commita.", file=sys.stderr)
+        print("Note: you have uncommitted changes; the package has the state of the last commit.", file=sys.stderr)
     commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True,
                             check=True).stdout.strip()
     tar = subprocess.run(["git", "archive", "--format=zip", "HEAD"], cwd=ROOT, capture_output=True, check=True).stdout
@@ -36,7 +36,7 @@ def main() -> Path:
             dst.writestr(f"{TOP}/{info.filename}", src.read(info))
             n += 1
         dst.writestr(f"{TOP}/VERSION.txt", f"{commit} {time.strftime('%Y-%m-%d')}\n")
-    print(f"{out}  ({n} plików, {out.stat().st_size // 1024} KB)")
+    print(f"{out}  ({n} files, {out.stat().st_size // 1024} KB)")
     return out
 
 

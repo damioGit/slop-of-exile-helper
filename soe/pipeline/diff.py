@@ -97,13 +97,13 @@ def diff_kb(old: Path, new: Path) -> dict:
 def _md_changes(title: str, block: dict, limit: int = 60) -> list[str]:
     out = [f"## {title}", ""]
     if block.get("added"):
-        out.append(f"**Nowe ({len(block['added'])}):** " + ", ".join(block["added"][:limit])
+        out.append(f"**Added ({len(block['added'])}):** " + ", ".join(block["added"][:limit])
                    + (" …" if len(block["added"]) > limit else ""))
     if block.get("removed"):
-        out.append(f"\n**Usunięte ({len(block['removed'])}):** " + ", ".join(block["removed"][:limit]))
+        out.append(f"\n**Removed ({len(block['removed'])}):** " + ", ".join(block["removed"][:limit]))
     ch = block.get("changed") or {}
     if ch:
-        out.append(f"\n**Zmienione ({len(ch)}):**\n")
+        out.append(f"\n**Changed ({len(ch)}):**\n")
         for name, d in list(ch.items())[:limit]:
             out.append(f"- **{name}**")
             for ln in d["removed"]:
@@ -111,24 +111,24 @@ def _md_changes(title: str, block: dict, limit: int = 60) -> list[str]:
             for ln in d["added"]:
                 out.append(f"  - {ln}")
         if len(ch) > limit:
-            out.append(f"- … i {len(ch) - limit} więcej (pełna lista w JSON)")
+            out.append(f"- … and {len(ch) - limit} more (full list in the JSON)")
     if not (block.get("added") or block.get("removed") or ch or block.get("tiers_changed")):
-        out.append("Bez zmian.")
+        out.append("No changes.")
     if block.get("tiers_changed"):
-        out.append(f"\n**Zmiana liczby tierów ({len(block['tiers_changed'])}):** " + "; ".join(block["tiers_changed"][:limit]))
+        out.append(f"\n**Tier count changed ({len(block['tiers_changed'])}):** " + "; ".join(block["tiers_changed"][:limit]))
     out.append("")
     return out
 
 
 def report_md(d: dict) -> str:
-    lines = [f"# Zmiany w danych: PoB {d['old'].get('pob_version')} → {d['new'].get('pob_version')}", "",
-             f"Drzewko {d['old'].get('tree_version')} → {d['new'].get('tree_version')}. "
-             f"Bazy wiedzy z {d['old'].get('built_at')} i {d['new'].get('built_at')}.", "",
-             "| Co | Nowe | Usunięte | Zmienione |", "|---|---|---|---|"]
+    lines = [f"# Data changes: PoB {d['old'].get('pob_version')} → {d['new'].get('pob_version')}", "",
+             f"Tree {d['old'].get('tree_version')} → {d['new'].get('tree_version')}. "
+             f"Knowledge bases built {d['old'].get('built_at')} and {d['new'].get('built_at')}.", "",
+             "| What | Added | Removed | Changed |", "|---|---|---|---|"]
     for k, c in d["counts"].items():
         lines.append(f"| {k} | {c['added']} | {c['removed']} | {c['changed']} |")
     lines.append("")
-    for key, title in (("gems", "Gemy"), ("uniques", "Unikaty"), ("passives", "Notable i keystone"),
-                       ("ascendancies", "Ascendancy"), ("mod_families", "Mody na itemach"), ("bases", "Bazy itemów")):
+    for key, title in (("gems", "Gems"), ("uniques", "Uniques"), ("passives", "Notables and keystones"),
+                       ("ascendancies", "Ascendancies"), ("mod_families", "Item mods"), ("bases", "Item bases")):
         lines += _md_changes(title, d[key])
     return "\n".join(lines)
